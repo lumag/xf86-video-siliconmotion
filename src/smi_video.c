@@ -41,7 +41,7 @@ Author of changes: Corvin Zahn <zahn@zac.de>
 Date:   2.11.2001
 */
 
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_video.c,v 1.13 2003/11/10 18:22:26 tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_video.c,v 1.14 2003/12/08 16:03:58 alanh Exp $ */
 
 #include "smi.h"
 #include "smi_video.h"
@@ -133,11 +133,6 @@ static void SMI_WaitForSync(ScrnInfoPtr pScrn);
 static void SMI_InitOffscreenImages(ScreenPtr pScreen);
 static FBAreaPtr SMI_AllocateMemory(ScrnInfoPtr pScrn, FBAreaPtr area,
 		int numLines);
-static void SMI_CopyData(unsigned char *src, unsigned char *dst, int srcPitch,
-		int dstPitch, int height, int width);
-static void SMI_CopyYV12Data(unsigned char *src1, unsigned char *src2,
-		unsigned char *src3, unsigned char *dst, int srcPitch1, int srcPitch2,
-		int dstPitch, int height, int width);
 
 static int SMI_AllocSurface(ScrnInfoPtr pScrn,
 		int id, unsigned short width, unsigned short height,
@@ -1690,27 +1685,31 @@ SMI_PutImage(
     offset = (pPort->area->box.y1 * fbPitch) + (top * dstPitch);
 	dstStart = pSmi->FBBase + offset + left;
 
-	switch (id)
-	{
-		case FOURCC_YV12:
-		case FOURCC_I420:
-			top &= ~1;
-			tmp = ((top >> 1) * srcPitch2) + (left >> 2);
-			offset2 += tmp;
-			offset3 += tmp;
-			nLines = ((((y2 + 0xFFFF) >> 16) + 1) & ~1) - top;
-			SMI_CopyYV12Data(buf + (top * srcPitch) + (left >> 1),
-					buf + offset2, buf + offset3, dstStart, srcPitch, srcPitch2,
-					dstPitch, nLines, nPixels);
-			break;
-
-		default:
-			buf += (top * srcPitch) + left;
-			nLines = ((y2 + 0xFFFF) >> 16) - top;
-			SMI_CopyData(buf, dstStart, srcPitch, dstPitch, nLines,
-					nPixels * bpp);
-			break;
+   switch(id) {
+    case FOURCC_YV12:
+    case FOURCC_I420:
+	top &= ~1;
+	tmp = ((top >> 1) * srcPitch2) + (left >> 2);
+	offset2 += tmp;
+	offset3 += tmp;
+	if(id == FOURCC_I420) {
+	   tmp = offset2;
+	   offset2 = offset3;
+	   offset3 = tmp;
 	}
+	nLines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
+	xf86XVCopyYUV12ToPacked(buf + (top * srcPitch) + (left >> 1), 
+				buf + offset2, buf + offset3, dstStart,
+				srcPitch, srcPitch2, dstPitch, nLines, nPixels);
+	break;
+    case FOURCC_UYVY:
+    case FOURCC_YUY2:
+    default:
+	buf += (top * srcPitch) + left;
+	nLines = ((y2 + 0xffff) >> 16) - top;
+	xf86XVCopyPacked(buf, dstStart, srcPitch, dstPitch, nLines, nPixels);
+        break;
+    }
 
 #if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
     if (!RegionsEqual(&pPort->clip, clipBoxes))
@@ -2347,65 +2346,6 @@ SMI_AllocateMemory(
     DEBUG((VERBLEV, "area = %p\n", area));
 	LEAVE_PROC("SMI_AllocateMemory");
 	return(area);
-}
-
-static void
-SMI_CopyData(
-	unsigned char	*src,
-	unsigned char	*dst,
-	int				srcPitch,
-	int				dstPitch,
-	int				height,
-	int				width
-)
-{
-	ENTER_PROC("SMI_CopyData");
-
-	while (height-- > 0)
-	{
-		memcpy(dst, src, width);
-		src += srcPitch;
-		dst += dstPitch;
-	}
-
-	LEAVE_PROC("SMI_CopyData");
-}
-
-static void
-SMI_CopyYV12Data(
-	unsigned char	*src1,
-	unsigned char	*src2,
-	unsigned char	*src3,
-	unsigned char	*dst,
-	int				srcPitch1,
-	int				srcPitch2,
-	int				dstPitch,
-	int				height,
-	int				width
-)
-{
-	CARD32 *pDst = (CARD32 *) dst;
-	int i, j;
-
-	ENTER_PROC("SMI_CopyYV12Data");
-
-	for (j = 0; j < height; j++)
-	{
-		for (i =0; i < width; i++)
-		{
-			pDst[i] = src1[i << 1] | (src1[(i << 1) + 1] << 16) |
-					(src3[i] << 8) | (src2[i] << 24);
-		}
-		pDst += dstPitch >> 2;
-		src1 += srcPitch1;
-		if (j & 1)
-		{
-			src2 += srcPitch2;
-			src3 += srcPitch2;
-		}
-	}
-
-	LEAVE_PROC("SMI_CopyYV12Data");
 }
 
 static int
