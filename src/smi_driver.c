@@ -3441,7 +3441,7 @@ SMI_ddc1(int scrnIndex)
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x72, tmp | 0x20);
 
 	pMon = xf86PrintEDID(xf86DoEDID_DDC1(scrnIndex,
-					     LoaderSymbol("vgaHWddc1SetSpeed"),
+					     vgaHWddc1SetSpeedWeak(),
 					     SMI_ddc1Read));
 	if (pMon != NULL)
 	{
