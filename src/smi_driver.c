@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from The XFree86 Project or Silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_driver.c,v 1.37 2003/11/06 18:38:08 tsi Exp $ */
+/* $XFree86$ */
 
 #include "xf86Resources.h"
 #include "xf86RAC.h"
