@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and Silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_i2c.c,v 1.2 2001/12/20 21:35:39 eich Exp $ */
+/* $XFree86$ */
 
 #include "xf86.h"
 #include "xf86_OSproc.h"
