@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_accel.c,v 1.7tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_accel.c,v 1.8 2003/04/23 21:51:44 tsi Exp $ */
 
 #include "smi.h"
 
@@ -1096,14 +1096,7 @@ SMI_Polylines(DrawablePtr pDraw, GCPtr pGC, int mode, int npt,
 		if (box)
 		{
 			/* Refresh all polyline segments now. */
-			if (pSmi->Chipset == SMI_COUGAR3DR)
-			{
-				SMI_RefreshArea730(pScrn, box, pBox);
-			}
-			else
-			{
-				SMI_RefreshArea(pScrn, box, pBox);
-			}
+			SMI_RefreshArea(pScrn, box, pBox);
 		}
 
 		/* Free the temporary buffer. */

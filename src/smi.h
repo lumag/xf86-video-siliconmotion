@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and Silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi.h,v 1.12tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi.h,v 1.13 2003/04/23 21:51:44 tsi Exp $ */
 
 #ifndef _SMI_H
 #define _SMI_H
@@ -102,7 +102,6 @@ typedef struct
 			DPR44;
 	CARD32	VPR00, VPR0C, VPR10;
 	CARD32	CPR00;
-	CARD32	FPR00_, FPR0C_, FPR10_;
 
 } SMIRegRec, *SMIRegPtr;
 
@@ -146,7 +145,6 @@ typedef struct
 	CARD8 *			DPRBase;	/* Base of DPR registers */
 	CARD8 *			VPRBase;	/* Base of VPR registers */
 	CARD8 *			CPRBase;	/* Base of CPR registers */
-    CARD8 *			FPRBase;    /* Base of FPR registers - for 0730 chipset */
 	CARD8 *			DataPortBase;	/* Base of data port */
 	int			DataPortSize;	/* Size of data port */
 	CARD8 *			IOBase;		/* Base of MMIO VGA ports */
@@ -227,8 +225,7 @@ typedef struct
 						   pixels */
 	CARD32			saveBufferSize;	/* #670 - FB save buffer size */
 	void *			pSaveBuffer;	/* #670 - FB save buffer */
-    CARD32			fbMapOffset;    /* offset for fb mapping */
-        CARD32			savedFBOffset;	/* #670 - Saved FBOffset value */
+	CARD32			savedFBOffset;	/* #670 - Saved FBOffset value */
 	CARD32			savedFBReserved;	/* #670 - Saved
 							   FBReserved value */
 	CARD8 *			paletteBuffer;	/* #920 - Palette save buffer */
@@ -354,7 +351,6 @@ Bool SMI_DGAInit(ScreenPtr pScrn);
 /* smi_shadow.c */
 void SMI_PointerMoved(int index, int x, int y);
 void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
-void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox);
 
 /* smi_video.c */
 void SMI_InitVideo(ScreenPtr pScreen);

@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and Silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_hwcurs.c,v 1.1 2000/11/28 20:59:20 dawes Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_hwcurs.c,v 1.2 2001/03/03 22:26:13 tsi Exp $ */
 
 #include "cursorstr.h"
 #include "smi.h"
@@ -211,17 +211,6 @@ SMI_LoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81,
 			tmp | ((pSmi->FBCursorOffset / 2048) >> 8));
 
-    /* Program FPR copy when on the 730 */
-    if (pSmi->Chipset == SMI_COUGAR3DR)
-    {
-        CARD32 fpr15c;
-
-        /* put address in upper word, and disable the cursor */
-        fpr15c  = READ_FPR(pSmi, FPR15C) & FPR15C_MASK_HWCCOLORS;
-        fpr15c |= (pSmi->FBCursorOffset / 2048) << 16;
-        WRITE_FPR(pSmi, FPR15C, fpr15c);
-    }
-
 	/* Copy cursor image to framebuffer storage */
 	memcpy(pSmi->FBBase + pSmi->FBCursorOffset, src, 1024);
 
@@ -240,17 +229,6 @@ SMI_ShowCursor(ScrnInfoPtr pScrn)
 	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, tmp | 0x80);
 
-    /* Program FPR copy when on the 730 */
-    if (pSmi->Chipset == SMI_COUGAR3DR)
-    {
-        CARD32 fpr15c;
-
-        /* turn on the top bit */
-        fpr15c  = READ_FPR(pSmi, FPR15C);
-        fpr15c |= FPR15C_MASK_HWCENABLE;
-        WRITE_FPR(pSmi, FPR15C, fpr15c);
-    }
-
 	LEAVE_PROC("SMI_ShowCursor");
 }
 
@@ -265,17 +243,6 @@ SMI_HideCursor(ScrnInfoPtr pScrn)
 	/* Hide cursor */
 	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, tmp & ~0x80);
-
-    /* Program FPR copy when on the 730 */
-    if (pSmi->Chipset == SMI_COUGAR3DR)
-    {
-        CARD32 fpr15c;
-
-        /* turn off the top bit */
-        fpr15c  = READ_FPR(pSmi, FPR15C);
-        fpr15c &= ~FPR15C_MASK_HWCENABLE;
-        WRITE_FPR(pSmi, FPR15C, fpr15c);
-    }
 
 	LEAVE_PROC("SMI_HideCursor");
 }
@@ -334,34 +301,6 @@ SMI_SetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 		VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8B, 0x08);
 	}
 
-    /* Program FPR copy when on the 730 */
-    if (pSmi->Chipset == SMI_COUGAR3DR)
-    {
-        CARD32 fpr158;
-
-        if (xoff >= 0)
-        {
-            fpr158 = (xoff & FPR158_MASK_MAXBITS)<<16;
-        }
-        else
-        {
-            fpr158 = (((-xoff) & FPR158_MASK_MAXBITS) | FPR158_MASK_BOUNDARY)<<16;
-        }
-
-        if (yoff >= 0)
-        {
-            fpr158 |= (yoff & FPR158_MASK_MAXBITS);
-        }
-        else
-        {
-            fpr158 |= (((-yoff) & FPR158_MASK_MAXBITS) | FPR158_MASK_BOUNDARY);
-        }
-
-        /* Program combined coordinates */
-        WRITE_FPR(pSmi, FPR158, fpr158);
-
-    }
-
 	LEAVE_PROC("SMI_SetCursorPosition");
 }
 
@@ -386,17 +325,6 @@ SMI_SetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
 	/* Program the colors */
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8C, packedFG);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8D, packedBG);
-
-    /* Program FPR copy when on the 730 */
-    if (pSmi->Chipset == SMI_COUGAR3DR)
-    {
-        CARD32 fpr15c;
-
-        fpr15c  = READ_FPR(pSmi, FPR15C) & FPR15C_MASK_HWCADDREN;
-        fpr15c |= packedFG;
-        fpr15c |= packedBG<<8;
-        WRITE_FPR(pSmi, FPR15C, fpr15c);
-    }
 
 	LEAVE_PROC("SMI_SetCursorColors");
 }
