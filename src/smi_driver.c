@@ -211,7 +211,7 @@ static const char *vgahwSymbols[] =
 	"vgaHWSetMmioFuncs",
 	"vgaHWSetStdFuncs",
 	"vgaHWUnmapMem",
-	"vgaHWddc1SetSpeed",
+	"vgaHWddc1SetSpeedWeak",
 	NULL
 };
 
