@@ -26,7 +26,7 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_accel.c,v 1.8 2003/04/23 21:51:44 tsi Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_accel.c,v 1.7tsi Exp $ */
 
 #include "smi.h"
 
@@ -361,9 +361,9 @@ SMI_SetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int ydir, int rop,
 	DEBUG((VERBLEV, "xdir=%d ydir=%d rop=%02X trans=%08X\n", xdir, ydir,
 			rop, trans));
 
-	pSmi->AccelCmd = XAACopyROP[rop]
-				   | SMI_BITBLT
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetCopyROP(rop)
+				      | SMI_BITBLT
+				      | SMI_START_ENGINE;
 
 	if ((xdir == -1) || (ydir == -1))
 	{
@@ -446,9 +446,9 @@ SMI_SetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop,
 	ENTER_PROC("SMI_SetupForSolidFill");
 	DEBUG((VERBLEV, "color=%08X rop=%02X\n", color, rop));
 
-	pSmi->AccelCmd = XAAPatternROP[rop]
-				   | SMI_BITBLT
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetPatternROP(rop)
+				      | SMI_BITBLT
+				      | SMI_START_ENGINE;
 
 	if (pSmi->ClipTurnedOn)
 	{
@@ -551,10 +551,10 @@ SMI_SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg,
 	ENTER_PROC("SMI_SetupForCPUToScreenColorExpandFill");
 	DEBUG((VERBLEV, "fg=%08X bg=%08X rop=%02X\n", fg, bg, rop));
 
-	pSmi->AccelCmd = XAACopyROP[rop]
-				   | SMI_HOSTBLT_WRITE
-				   | SMI_SRC_MONOCHROME
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetCopyROP(rop)
+				      | SMI_HOSTBLT_WRITE
+				      | SMI_SRC_MONOCHROME
+				      | SMI_START_ENGINE;
 
 	if (bg == -1)
 	{
@@ -638,9 +638,9 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 	DEBUG((VERBLEV, "patx=%08X paty=%08X fg=%08X bg=%08X rop=%02X\n", patx,
 			paty, fg, bg, rop));
 
-	pSmi->AccelCmd = XAAPatternROP[rop]
-				   | SMI_BITBLT
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetPatternROP(rop)
+				      | SMI_BITBLT
+				      | SMI_START_ENGINE;
 
 	if (pSmi->ClipTurnedOn)
 	{
@@ -711,10 +711,10 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 	DEBUG((VERBLEV, "patx=%d paty=%d rop=%02X trans_color=%08X\n", patx, paty,
 			rop, trans_color));
 
-	pSmi->AccelCmd = XAAPatternROP[rop]
-				   | SMI_BITBLT
-				   | SMI_COLOR_PATTERN
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetPatternROP(rop)
+				      | SMI_BITBLT
+				      | SMI_COLOR_PATTERN
+				      | SMI_START_ENGINE;
 
 	if (pScrn->bitsPerPixel <= 16)
 	{
@@ -803,9 +803,9 @@ SMI_SetupForImageWrite(ScrnInfoPtr pScrn, int rop, unsigned int planemask,
 	DEBUG((VERBLEV, "rop=%02X trans_color=%08X bpp=%d depth=%d\n", rop,
 			trans_color, bpp, depth));
 
-	pSmi->AccelCmd = XAACopyROP[rop]
-				   | SMI_HOSTBLT_WRITE
-				   | SMI_START_ENGINE;
+	pSmi->AccelCmd = XAAGetCopyROP(rop)
+				      | SMI_HOSTBLT_WRITE
+				      | SMI_START_ENGINE;
 
 	if (trans_color != -1)
 	{
@@ -1007,7 +1007,7 @@ SMI_ValidatePolylines(GCPtr pGC, unsigned long changes, DrawablePtr pDraw)
 	ENTER_PROC("SMI_ValidatePolylines");
 
 	pSmi->ValidatePolylines(pGC, changes, pDraw);
-	if (pGC->ops->Polylines == XAAFallbackOps.Polylines)
+	if (pGC->ops->Polylines == XAAGetFallbackOps()->Polylines)
 	{
 		/* Override the Polylines function with our own Polylines function. */
 		pGC->ops->Polylines = SMI_Polylines;
@@ -1027,7 +1027,7 @@ SMI_Polylines(DrawablePtr pDraw, GCPtr pGC, int mode, int npt,
 	ENTER_PROC("SMI_Polylines");
 
 	/* Call the original Polylines function. */
-	pGC->ops->Polylines = XAAFallbackOps.Polylines;
+	pGC->ops->Polylines = XAAGetFallbackOps()->Polylines;
 	(*pGC->ops->Polylines)(pDraw, pGC, mode, npt, pptInit);
 	pGC->ops->Polylines = SMI_Polylines;
 
@@ -1096,7 +1096,14 @@ SMI_Polylines(DrawablePtr pDraw, GCPtr pGC, int mode, int npt,
 		if (box)
 		{
 			/* Refresh all polyline segments now. */
-			SMI_RefreshArea(pScrn, box, pBox);
+			if (pSmi->Chipset == SMI_COUGAR3DR)
+			{
+				SMI_RefreshArea730(pScrn, box, pBox);
+			}
+			else
+			{
+				SMI_RefreshArea(pScrn, box, pBox);
+			}
 		}
 
 		/* Free the temporary buffer. */
