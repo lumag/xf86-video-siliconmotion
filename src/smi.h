@@ -227,7 +227,8 @@ typedef struct
 						   pixels */
 	CARD32			saveBufferSize;	/* #670 - FB save buffer size */
 	void *			pSaveBuffer;	/* #670 - FB save buffer */
-	CARD32			savedFBOffset;	/* #670 - Saved FBOffset value */
+    CARD32			fbMapOffset;    /* offset for fb mapping */
+        CARD32			savedFBOffset;	/* #670 - Saved FBOffset value */
 	CARD32			savedFBReserved;	/* #670 - Saved
 							   FBReserved value */
 	CARD8 *			paletteBuffer;	/* #920 - Palette save buffer */
