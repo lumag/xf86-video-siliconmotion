@@ -280,17 +280,8 @@ static const char *vbeSymbols[] =
 
 static const char *fbSymbols[] =
 {
-#ifdef USE_FB
 	"fbPictureInit",
 	"fbScreenInit",
-#else
-	"cfbScreenInit",
-	"cfb16ScreenInit",
-	"cfb24ScreenInit",
-	"cfb32ScreenInit",
-	"cfb16BresS",
-	"cfb24BresS",
-#endif
 	NULL
 };
 
@@ -504,10 +495,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	int i;
 	double real;
 	ClockRangePtr clockRanges;
-#ifndef USE_FB
-	char *mod = NULL;
-	const char *reqSym = NULL;
-#endif
 	char *s;
 	unsigned char config, m, n, shift;
 	int mclk;
@@ -1194,7 +1181,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	/* Set display resolution */
 	xf86SetDpi(pScrn, 0, 0);
 
-#ifdef USE_FB
 	if ((xf86LoadSubModule(pScrn, "fb") == NULL))
 	{
 		SMI_FreeRec(pScrn);
@@ -1203,35 +1189,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	}
 
 	xf86LoaderReqSymLists(fbSymbols, NULL);
-#else
-	/* Load bpp-specific modules */
-	switch (pScrn->bitsPerPixel)
-	{
-		case 8:
-			mod = "cfb";
-			reqSym = "cfbScreenInit";
-			break;
-
-		case 16:
-			mod = "cfb16";
-			reqSym = "cfb16ScreenInit";
-			break;
-
-		case 24:
-			mod = "cfb24";
-			reqSym = "cfb24ScreenInit";
-			break;
-	}
-
-	if (mod && (xf86LoadSubModule(pScrn, mod) == NULL))
-	{
-		SMI_FreeRec(pScrn);
-		LEAVE_PROC("SMI_PreInit");
-		return(FALSE);
-	}
-
-	xf86LoaderReqSymbols(reqSym, NULL);
-#endif
 	/* Load XAA if needed */
 	if (!pSmi->NoAccel || pSmi->hwcursor)
 	{
@@ -2132,9 +2089,6 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	 * as calling the framebuffer's ScreenInit() function.  If not, the visuals
 	 * will need to be setup before calling a fb ScreenInit() function and fixed
 	 * up after.
-	 *
-	 * For most PC hardware at depths >= 8, the defaults that cfb uses are not
-	 * appropriate.  In this driver, we fixup the visuals after.
 	 */
 
 	/*
@@ -2144,35 +2098,14 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 	/* Setup the visuals we support. */
 
-	/*
-	 * For bpp > 8, the default visuals are not acceptable because we only
-	 * support TrueColor and not DirectColor.  To deal with this, call
-	 * miSetVisualTypes with the appropriate visual mask.
-	 */
-#ifndef USE_FB
-	if (pScrn->bitsPerPixel > 8)
+	if (!miSetVisualTypes(pScrn->depth,
+			miGetDefaultVisualMask(pScrn->depth), pScrn->rgbBits,
+			pScrn->defaultVisual))
 	{
-		if (!miSetVisualTypes(pScrn->depth, TrueColorMask, pScrn->rgbBits,
-				pScrn->defaultVisual))
-		{
-			LEAVE_PROC("SMI_ScreenInit");
-			return(FALSE);
-		}
+		LEAVE_PROC("SMI_ScreenInit");
+		return(FALSE);
 	}
-	else
-#endif
-	{
-		if (!miSetVisualTypes(pScrn->depth,
-				miGetDefaultVisualMask(pScrn->depth), pScrn->rgbBits,
-				pScrn->defaultVisual))
-		{
-			LEAVE_PROC("SMI_ScreenInit");
-			return(FALSE);
-		}
-	}
-#ifdef USE_FB
 	if (!miSetPixmapDepths ()) return FALSE;
-#endif
 
 	if (!SMI_InternalScreenInit(scrnIndex, pScreen))
 	{
@@ -2201,10 +2134,8 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 		}
 	}
 
-#ifdef USE_FB
 	/* must be after RGB ordering fixed */
 	fbPictureInit(pScreen, 0, 0);
-#endif
  
 	/* CZ 18.06.2001: moved here from smi_accel.c to have offscreen
 	   framebuffer in NoAccel mode */
@@ -2411,29 +2342,12 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 			pSmi->FBBase, width, height, displayWidth));
 	switch (pScrn->bitsPerPixel)
 	{
-#ifdef USE_FB
 	case 8:
 	case 16:
 	case 24:
 	  ret = fbScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
 			     yDpi, displayWidth,pScrn->bitsPerPixel);
 	  break;
-#else
-	case 8:
-	  ret = cfbScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
-			      yDpi, displayWidth);
-	  break;
-
-	case 16:
-	  ret = cfb16ScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
-					yDpi, displayWidth);
-	  break;
-
-	case 24:
-	  ret = cfb24ScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
-				yDpi, displayWidth);
-	  break;
-#endif
 	default:
 	  xf86DrvMsg(scrnIndex, X_ERROR, "Internal error: invalid bpp (%d) "
 		     "in SMI_InternalScreenInit\n", pScrn->bitsPerPixel);
