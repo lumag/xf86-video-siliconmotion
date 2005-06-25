@@ -100,7 +100,7 @@ static void SMI_ProbeDDC(ScrnInfoPtr pScrn, int index);
  * this DriverRec be an upper-case version of the driver name.
  */
 
-DriverRec SILICONMOTION =
+_X_EXPORT DriverRec SILICONMOTION =
 {
 	SILICONMOTION_DRIVER_VERSION,
 	SILICONMOTION_DRIVER_NAME,
@@ -310,7 +310,7 @@ static XF86ModuleVersionInfo SMIVersRec =
  *
  * Its name has to be the driver name followed by ModuleData.
  */
-XF86ModuleData siliconmotionModuleData =
+_X_EXPORT XF86ModuleData siliconmotionModuleData =
 {
 	&SMIVersRec,
 	siliconmotionSetup,
