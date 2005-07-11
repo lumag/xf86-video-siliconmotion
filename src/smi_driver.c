@@ -28,6 +28,10 @@ authorization from The XFree86 Project or Silicon Motion.
 */
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_driver.c,v 1.36tsi Exp $ */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "xf86Resources.h"
 #include "xf86RAC.h"
 #include "xf86DDC.h"
