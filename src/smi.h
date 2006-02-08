@@ -151,9 +151,6 @@ typedef struct
 							   vgaHWMapMem was used
 							   successfully for
 							   this screen */
-	int			dacSpeedBpp;	/* Clock value */
-	int			minClock;	/* Mimimum clock */
-	int			maxClock;	/* Maximum clock */
 	int			MCLK;		/* Memory Clock  */
 	int			GEResetCnt;	/* Limit the number of errors
 						   printed using a counter */
