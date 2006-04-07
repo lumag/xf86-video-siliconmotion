@@ -88,10 +88,10 @@ static void SMI_ProbeDDC(ScrnInfoPtr pScrn, int index);
 
 #define SILICONMOTION_NAME          "Silicon Motion"
 #define SILICONMOTION_DRIVER_NAME   "siliconmotion"
-#define SILICONMOTION_VERSION_NAME  "1.3.1"
+#define SILICONMOTION_VERSION_NAME  "1.4.0"
 #define SILICONMOTION_VERSION_MAJOR 1
-#define SILICONMOTION_VERSION_MINOR 3
-#define SILICONMOTION_PATCHLEVEL    1
+#define SILICONMOTION_VERSION_MINOR 4
+#define SILICONMOTION_PATCHLEVEL    0
 #define SILICONMOTION_DRIVER_VERSION ((SILICONMOTION_VERSION_MAJOR << 24) | \
                                       (SILICONMOTION_VERSION_MINOR << 16) | \
                                       (SILICONMOTION_PATCHLEVEL))
