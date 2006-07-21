@@ -105,6 +105,13 @@ Default: on.
 .BI "Option \*qZoomOnLCD\*q \*q" boolean \*q
 Allow changing resolution on LCD (Ctrl-Alt-Plus and Ctrl-Alt-Minus).
 Default: off.
+.TP
+.BI "Option \*qDualhead\*q \*q" boolean \*q
+Enable dualhead mode.  Due to hardware limitations, dualhead is limited 
+to depth 16 and to the panel size and timings on both the flat panel and 
+the CRT and the CRT must be to the right of the flat panel.  Only lynx 
+chips are supported at the moment.
+Default: off.
 
 .PP
 The following video memory
