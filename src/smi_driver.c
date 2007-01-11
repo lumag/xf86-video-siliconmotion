@@ -1118,6 +1118,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	SMI_EnableVideo(pScrn);
 	SMI_UnmapMem(pScrn);
 
+	pSmi->IsSwitching = FALSE;
+
 	if (pSmi->Dualhead) {
 	    pScrn->display->virtualX = 2 * pSmi->lcdWidth;
 	    pScrn->display->virtualY = pSmi->lcdHeight;
@@ -1563,7 +1565,8 @@ SMI_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	vgaHWProtect(pScrn, TRUE);
 
 	/* Wait for engine to become idle */
-	WaitIdle();
+	if (pSmi->IsSwitching)
+	    WaitIdle();
 
 	if (pSmi->useBIOS && (pSmi->pInt10 != NULL)
 	    && (restore->mode != 0))
@@ -3179,10 +3182,13 @@ Bool
 SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
 {
 	Bool ret;
+	SMIPtr pSmi = SMIPTR(xf86Screens[scrnIndex]);
 
 	ENTER_PROC("SMI_SwitchMode");
 
+	pSmi->IsSwitching = TRUE;
 	ret = SMI_ModeInit(xf86Screens[scrnIndex], mode);
+	pSmi->IsSwitching = FALSE;
 
 	LEAVE_PROC("SMI_SwitchMode");
 	return(ret);

@@ -249,6 +249,8 @@ typedef struct
 
 	Bool			Dualhead;
 
+	Bool			IsSwitching; /* when switching modes */
+
 } SMIRec, *SMIPtr;
 
 #define SMIPTR(p) ((SMIPtr)((p)->driverPrivate))
