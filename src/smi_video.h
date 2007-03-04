@@ -88,15 +88,15 @@ typedef struct
 
 typedef struct
 {
-	FBAreaPtr	area;
-	Bool		isOn;
+    FBAreaPtr	area;
+    Bool	isOn;
 
 } SMI_OffscreenRec, *SMI_OffscreenPtr;
 
 typedef struct
 {
-	CARD8		address;
-	CARD8		data;
+    CARD8	address;
+    CARD8	data;
 
 } SMI_I2CDataRec, *SMI_I2CDataPtr;
 
