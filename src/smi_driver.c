@@ -1525,6 +1525,10 @@ SMI_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	    }
 	}
 
+	/* vclk1 */
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
+
 	if (pSmi->Dualhead) {
 
 	/* TFT panel uses FIFO1, DSTN panel uses FIFO1 for upper panel and 
@@ -2339,7 +2343,7 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     vgaHWPtr hwp = VGAHWPTR(pScrn);
     SMIPtr pSmi = SMIPTR(pScrn);
     unsigned char tmp;
-    int panelIndex, modeIndex, i;
+    int panelIndex, modeIndex, i, vclk;
 
     /* Store values to current mode register structs */
     SMIRegPtr new = &pSmi->ModeReg;
@@ -2518,6 +2522,14 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     if ((mode->HDisplay == 1024) && SMI_LYNXM_SERIES(pSmi->Chipset)) {
 	vganew->MiscOutReg &= ~0xC0;
     }
+
+    /* calculate vclk1 */
+    vclk = mode->Clock;
+    SMI_CommonCalcClock(pScrn->scrnIndex, vclk,
+			1, 1, 31, 0, 2,
+                        pScrn->clockRanges->minClock,
+                        pScrn->clockRanges->maxClock,
+                        &new->SR6C, &new->SR6D);
 
     /* dualhead */
     if (pSmi->Dualhead) {
