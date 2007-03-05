@@ -49,6 +49,7 @@ authorization from the XFree86 Project and Silicon Motion.
 #include "fb.h"
 
 #include "xaa.h"
+#include "exa.h"
 #include "xf86cmap.h"
 #include "xf86i2c.h"
 
@@ -179,7 +180,13 @@ typedef struct
 	
     CloseScreenProcPtr	CloseScreen;	/* Pointer used to save wrapped
 					   CloseScreen function */
-    XAAInfoRecPtr	AccelInfoRec;	/* XAA info Rec */
+    XAAInfoRecPtr	XAAInfoRec;	/* XAA info Rec */
+
+    /* EXA */
+    ExaDriverPtr	EXADriverPtr;
+    Bool		useEXA;	/* enable exa acceleration */
+    int			depth;	/* Pixmap color depth in bytes */
+
     pciVideoPtr		PciInfo;	/* PCI info vars */
     PCITAG		PciTag;
     int			Chipset;	/* Chip info, set using PCI
@@ -334,10 +341,13 @@ void SMI_CommonCalcClock(int scrnIndex, long freq, int min_m, int min_n1,
 Bool SMI_I2CInit(ScrnInfoPtr pScrn);
 
 /* smi_accel.c */
-Bool SMI_AccelInit(ScreenPtr pScrn);
+Bool SMI_XAAInit(ScreenPtr pScrn);
+Bool SMI_EXAInit(ScreenPtr pScrn);
 void SMI_AccelSync(ScrnInfoPtr pScrn);
 void SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file);
 void SMI_EngineReset(ScrnInfoPtr);
+void SMI_SetClippingRectangle(ScrnInfoPtr, int, int, int, int);
+void SMI_DisableClipping(ScrnInfoPtr);
 
 /* smi_hwcurs.c */
 Bool SMI_HWCursorInit(ScreenPtr pScrn);

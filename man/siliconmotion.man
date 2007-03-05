@@ -178,6 +178,17 @@ This will increase performance, especially for small fills/blits,
 because the driver does not have to poll the ViRGE before sending it 
 commands to make sure it is ready. It should work on most 
 recent PCI chipsets.  Default: off.
+.TP
+.BI "Option \*qAccelMethod\*q \*q" "string" \*q
+Chooses between available acceleration architectures.  Valid options are
+.B XAA
+and
+.B EXA.
+XAA is the traditional acceleration architecture and support for it is very
+stable.  EXA is a newer acceleration architecture with better performance for
+the Render and Composite extensions, but the rendering code for it is newer and
+possibly unstable.  The default is
+.B XAA.
 
 .PP
 The following additional

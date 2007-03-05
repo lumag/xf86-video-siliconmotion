@@ -69,14 +69,18 @@ authorization from the XFree86 Project and silicon Motion.
 
 typedef struct
 {
-	FBAreaPtr	area;
 	RegionRec	clip;
     /* Attributes */
     CARD32      Attribute[N_ATTRS];
-	CARD32		videoStatus;
-	Time		offTime;
-	Time		freeTime;
+    CARD32	videoStatus;
+    Time	offTime;
+    Time	freeTime;
     I2CDevRec   I2CDev;
+
+    /* Memory */
+    int		size;
+    void	*video_memory;
+    int		video_offset;
 
     /* Encodings */
     XF86VideoEncodingPtr        enc;
@@ -84,11 +88,12 @@ typedef struct
     int                         *norm;
     int                         *channel;
     int                         nenc,cenc;
+
 } SMI_PortRec, *SMI_PortPtr;
 
 typedef struct
 {
-    FBAreaPtr	area;
+    void	*surface_memory;
     Bool	isOn;
 
 } SMI_OffscreenRec, *SMI_OffscreenPtr;

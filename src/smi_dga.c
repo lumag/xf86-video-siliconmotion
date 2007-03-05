@@ -216,10 +216,10 @@ SMI_FillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h, unsigned long color)
 
     ENTER_PROC("SMI_FillRect");
 
-    if (pSmi->AccelInfoRec) {
-	(*pSmi->AccelInfoRec->SetupForSolidFill)(pScrn, color, GXcopy, ~0);
-	(*pSmi->AccelInfoRec->SubsequentSolidFillRect)(pScrn, x, y, w, h);
-	SET_SYNC_FLAG(pSmi->AccelInfoRec);
+    if (pSmi->XAAInfoRec) {
+	(*pSmi->XAAInfoRec->SetupForSolidFill)(pScrn, color, GXcopy, ~0);
+	(*pSmi->XAAInfoRec->SubsequentSolidFillRect)(pScrn, x, y, w, h);
+	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
     LEAVE_PROC("SMI_FillRect");
@@ -233,13 +233,13 @@ SMI_BlitRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 
     ENTER_PROC("SMI_BlitRect");
 
-    if (pSmi->AccelInfoRec) {
+    if (pSmi->XAAInfoRec) {
 	int xdir = ((srcx < dstx) && (srcy == dsty)) ? -1 : 1;
 	int ydir = (srcy < dsty) ? -1 : 1;
 
-	(*pSmi->AccelInfoRec->SetupForScreenToScreenCopy)(pScrn, xdir, ydir, GXcopy, ~0, -1);
-	(*pSmi->AccelInfoRec->SubsequentScreenToScreenCopy)(pScrn, srcx, srcy, dstx, dsty, w, h);
-	SET_SYNC_FLAG(pSmi->AccelInfoRec);
+	(*pSmi->XAAInfoRec->SetupForScreenToScreenCopy)(pScrn, xdir, ydir, GXcopy, ~0, -1);
+	(*pSmi->XAAInfoRec->SubsequentScreenToScreenCopy)(pScrn, srcx, srcy, dstx, dsty, w, h);
+	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
     LEAVE_PROC("SMI_BlitRect");
@@ -253,13 +253,13 @@ SMI_BlitTransRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 
     ENTER_PROC("SMI_BlitTraneRect");
 
-    if (pSmi->AccelInfoRec) {
+    if (pSmi->XAAInfoRec) {
 	int xdir = ((srcx < dstx) && (srcy == dsty)) ? -1 : 1;
 	int ydir = (srcy < dsty) ? -1 : 1;
 
-	(*pSmi->AccelInfoRec->SetupForScreenToScreenCopy)(pScrn, xdir, ydir, GXcopy, ~0, color);
-	(*pSmi->AccelInfoRec->SubsequentScreenToScreenCopy)(pScrn, srcx, srcy, dstx, dsty, w, h);
-	SET_SYNC_FLAG(pSmi->AccelInfoRec);
+	(*pSmi->XAAInfoRec->SetupForScreenToScreenCopy)(pScrn, xdir, ydir, GXcopy, ~0, color);
+	(*pSmi->XAAInfoRec->SubsequentScreenToScreenCopy)(pScrn, srcx, srcy, dstx, dsty, w, h);
+	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
     LEAVE_PROC("SMI_BlitTraneRect");

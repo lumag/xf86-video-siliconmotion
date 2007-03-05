@@ -164,6 +164,7 @@ typedef enum
     OPTION_USEBIOS,
     OPTION_ZOOMONLCD,
     OPTION_DUALHEAD,
+    OPTION_ACCELMETHOD,
     NUMBER_OF_OPTIONS
 } SMIOpts;
 
@@ -189,6 +190,7 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_USEBIOS,	     "UseBIOS",		  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ZOOMONLCD,	     "ZoomOnLCD",	  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, FALSE },
+    { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
     { -1,		     NULL,		  OPTV_NONE,	{0}, FALSE }
 };
 
@@ -229,6 +231,19 @@ static const char *xaaSymbols[] =
     "XAAGetFallbackOps",
     "XAAInit",
     "XAAGetPatternROP",
+    NULL
+};
+
+static const char *exaSymbols[] =
+{
+    "exaDriverAlloc",
+    "exaDriverInit",
+    "exaDriverFini",
+    "exaOffscreenAlloc",
+    "exaOffscreenFree",
+    "exaGetPixmapPitch",
+    "exaGetPixmapOffset",
+    "exaGetPixmapSize",
     NULL
 };
 
@@ -341,7 +356,7 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 	 * Tell the loader about symbols from other modules that this module
 	 * might refer to.
 	 */
-	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, ramdacSymbols,
+	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, exaSymbols, ramdacSymbols,
 					  ddcSymbols, i2cSymbols, int10Symbols, vbeSymbols,
 					  shadowSymbols, NULL);
 
@@ -1083,15 +1098,52 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	return FALSE;
     }
 
-    xf86LoaderReqSymLists(fbSymbols, NULL);
-    /* Load XAA if needed */
-    if (!pSmi->NoAccel || pSmi->hwcursor) {
-	if (!xf86LoadSubModule(pScrn, "xaa")) {
-	    SMI_FreeRec(pScrn);
-	    LEAVE_PROC("SMI_PreInit");
-	    return FALSE;
+    if (!pSmi->NoAccel) {
+	from = X_DEFAULT;
+	char *strptr;
+		
+	if ((strptr = (char *)xf86GetOptValString(pSmi->Options, OPTION_ACCELMETHOD))) {
+	    if (!xf86NameCmp(strptr,"XAA")) {
+		from = X_CONFIG;
+		pSmi->useEXA = FALSE;
+	    } else if(!xf86NameCmp(strptr,"EXA")) {
+		from = X_CONFIG;
+		pSmi->useEXA = TRUE;
+	    }
 	}
-	xf86LoaderReqSymLists(xaaSymbols, NULL);
+	
+	xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
+        	pSmi->useEXA ? "EXA" : "XAA");
+    }
+
+    xf86LoaderReqSymLists(fbSymbols, NULL);
+
+    /* Load XAA or EXA if needed */
+    if (!pSmi->NoAccel) {
+	if (!pSmi->useEXA) {
+	    if (!xf86LoadSubModule(pScrn, "xaa")) {
+		SMI_FreeRec(pScrn);
+		LEAVE_PROC("SMI_PreInit");
+		return FALSE;
+	    }
+	    xf86LoaderReqSymLists(xaaSymbols, NULL);
+	} else {
+	    XF86ModReqInfo req;
+	    int errmaj, errmin;
+
+	    memset(&req, 0, sizeof(XF86ModReqInfo));
+	    req.majorversion = 2;
+	    req.minorversion = 0;
+			
+	    if (!LoadSubModule(pScrn->module, "exa", NULL, NULL, NULL,
+				&req, &errmaj, &errmin)) {
+		LoaderErrorMsg(NULL, "exa", errmaj, errmin);
+		SMI_FreeRec(pScrn);
+		LEAVE_PROC("SMI_PreInit");
+		return FALSE;
+	    }
+	    xf86LoaderReqSymLists(exaSymbols, NULL);
+	}
     }
 
     /* Load ramdac if needed */
@@ -2016,7 +2068,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
  
     /* CZ 18.06.2001: moved here from smi_accel.c to have offscreen
        framebuffer in NoAccel mode */
-    {
+    if (!pSmi->useEXA) {
 	int numLines, maxLines;
 	BoxRec AvailFBArea;
  
@@ -2051,16 +2103,24 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	
     /* Initialize acceleration layer */
     if (!pSmi->NoAccel) {
-	if (!SMI_AccelInit(pScreen)) {
-	    LEAVE_PROC("SMI_ScreenInit");
-	    return FALSE;
+	if (!pSmi->useEXA) {
+	    if (!SMI_XAAInit(pScreen)) {
+		LEAVE_PROC("SMI_ScreenInit");
+		return FALSE;
+	    }
+	} else {
+	    if (!SMI_EXAInit(pScreen)) {
+		LEAVE_PROC("SMI_ScreenInit");
+		return FALSE;
+	    }
 	}
     }
 	
     miInitializeBackingStore(pScreen);
 	
     /* hardware cursor needs to wrap this layer */
-    SMI_DGAInit(pScreen);
+    if(!pSmi->NoAccel && !pSmi->useEXA)
+	SMI_DGAInit(pScreen);
 	
     /* Initialise cursor functions */
     miDCInitialize(pScreen, xf86GetPointerScreenFuncs());
@@ -2725,8 +2785,12 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
 	SMI_UnmapMem(pScrn);
     }
 
-    if (pSmi->AccelInfoRec != NULL) {
-	XAADestroyInfoRec(pSmi->AccelInfoRec);
+    if (pSmi->XAAInfoRec != NULL) {
+	XAADestroyInfoRec(pSmi->XAAInfoRec);
+    }
+    if (pSmi->EXADriverPtr) {
+	exaDriverFini(pScreen);
+	pSmi->EXADriverPtr = NULL;
     }
     if (pSmi->CursorInfoRec != NULL) {
 	xf86DestroyCursorInfoRec(pSmi->CursorInfoRec);

@@ -136,8 +136,10 @@ static void SMI_WaitForSync(ScrnInfoPtr pScrn);
         SMI_I2CDataPtr i2cData);*/
 
 static void SMI_InitOffscreenImages(ScreenPtr pScreen);
-static FBAreaPtr SMI_AllocateMemory(ScrnInfoPtr pScrn, FBAreaPtr area,
-		int numLines);
+static void SMI_VideoSave(ScreenPtr pScreen, ExaOffscreenArea *area);
+static CARD32 SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size);
+static void SMI_FreeMemory(ScrnInfoPtr pScrn, void *mem_struct);
+ 
 
 static int SMI_AllocSurface(ScrnInfoPtr pScrn,
 		int id, unsigned short width, unsigned short height,
@@ -1035,7 +1037,7 @@ SMI_PutVideo(
     BoxRec dstBox;
     INT32 x1, y1, x2, y2;
     int norm;
-    int areaHeight, width, height, fbPitch;
+    int size, width, height, fbPitch;
     int top, left;
 
     ENTER_PROC("SMI_PutVideo");
@@ -1200,11 +1202,11 @@ SMI_PutVideo(
     }
 
     do {
-	areaHeight = (vid_pitch * height + fbPitch - 1) / fbPitch;
-	DEBUG((VERBLEV, "SMI_AllocateMemory: vid_pitch=%d height=%d fbPitch=%d areaHeight=%d\n",
-	       vid_pitch, height, fbPitch, areaHeight));
-        pPort->area = SMI_AllocateMemory(pScrn, pPort->area, areaHeight);
-        if (pPort->area == NULL) {
+	size = vid_pitch * height;
+	DEBUG((VERBLEV, "SMI_AllocateMemory: vid_pitch=%d height=%d size=%d\n",
+		vid_pitch, height, size));
+	pPort->video_offset = SMI_AllocateMemory(pScrn, &pPort->video_memory, size);
+        if (pPort->video_offset == 0) {
 	    if ((cpr00 & 0x000C0000) == 0) {
 		/* height -> 1/2 height */
 		yscale = (128 * vid_h / drw_h) & 0xFF;
@@ -1234,14 +1236,14 @@ SMI_PutVideo(
 		}
 	    }
 	}
-    } while (pPort->area == NULL);
+    } while (pPort->video_offset == 0);
 
     DEBUG((VERBLEV, "xscale==%d yscale=%d width=%d height=%d\n",
 	   xscale, yscale, width, height));
 
     /* aaa whats this                     ----------------------v ?
     vid_address = (pPort->area->box.y1 * fbPitch) + ((y1 >> 16) * vid_pitch);*/
-    vid_address = (pPort->area->box.y1 * fbPitch);
+    vid_address = pPort->video_offset;
 
     DEBUG((VERBLEV, "test RegionsEqual\n"));
 #if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
@@ -1359,9 +1361,9 @@ SMI_StopVideo(
 /* #864		OUT_SEQ(pSmi, 0x21, IN_SEQ(pSmi, 0x21) | 0x04); */
 #endif
 	}
-        if (pPort->area != NULL) {
-            xf86FreeOffscreenArea(pPort->area);
-            pPort->area = NULL;
+        if (pPort->video_memory != NULL) {
+            SMI_FreeMemory(pScrn, pPort->video_memory);
+            pPort->video_memory = NULL;
 	}
         pPort->videoStatus = 0;
         /* pPort->i2cDevice = 0;aaa*/
@@ -1374,7 +1376,6 @@ SMI_StopVideo(
 
 	LEAVE_PROC("SMI_StopVideo");
 }
-
 
 static int
 SMI_SetPortAttribute(
@@ -1518,7 +1519,7 @@ SMI_PutImage(
     SMI_PortPtr pPort = (SMI_PortPtr) pSmi->ptrAdaptor->pPortPrivates[0].ptr;
     INT32 x1, y1, x2, y2;
     int bpp = 0;
-    int fbPitch, srcPitch, srcPitch2 = 0, dstPitch, areaHeight;
+    int srcPitch, srcPitch2 = 0, dstPitch, size;
     BoxRec dstBox;
     CARD32 offset, offset2 = 0, offset3 = 0, tmp;
     int left, top, nPixels, nLines;
@@ -1546,11 +1547,6 @@ SMI_PutImage(
     dstBox.x2 -= pScrn->frameX0;
     dstBox.y2 -= pScrn->frameY0;
 
-    if (pSmi->Bpp == 3) {
-	fbPitch = pSmi->Stride;
-    } else {
-	fbPitch = pSmi->Stride * pSmi->Bpp;
-    }
 
     switch (id) {
     case FOURCC_YV12:
@@ -1587,9 +1583,9 @@ SMI_PutImage(
 	break;
     }
 
-    areaHeight = ((dstPitch * height) + fbPitch - 1) / fbPitch;
-    pPort->area = SMI_AllocateMemory(pScrn, pPort->area, areaHeight);
-    if (pPort->area == NULL) {
+    size = dstPitch * height;
+    pPort->video_offset = SMI_AllocateMemory(pScrn, &pPort->video_memory, size);
+    if (pPort->video_offset == 0) {
 	LEAVE_PROC("SMI_PutImage");
 	return BadAlloc;
     }
@@ -1599,7 +1595,7 @@ SMI_PutImage(
     nPixels = ((((x2 + 0xFFFF) >> 16) + 1) & ~1) - left;
     left *= bpp;
 
-    offset = (pPort->area->box.y1 * fbPitch) + (top * dstPitch);
+    offset = pPort->video_offset + (top * dstPitch);
     dstStart = pSmi->FBBase + offset + left;
 
     switch(id) {
@@ -2042,8 +2038,8 @@ SMI_BlockHandler(
 	    }
 	} else {
             if (pPort->freeTime < currentTime.milliseconds) {
-                xf86FreeOffscreenArea(pPort->area);
-                pPort->area = NULL;
+		SMI_FreeMemory(pScrn, pPort->video_memory);
+                pPort->video_memory = NULL;
 	    }
             pPort->videoStatus = 0;
 	}
@@ -2151,55 +2147,118 @@ SMI_InitOffscreenImages(
     LEAVE_PROC("SMI_InitOffscreenImages");
 }
 
-static FBAreaPtr
+static void
+SMI_VideoSave(ScreenPtr pScreen, ExaOffscreenArea *area)
+{
+    ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
+    SMIPtr pSmi = SMIPTR(pScrn);
+    SMI_PortPtr pPort = pSmi->ptrAdaptor->pPortPrivates[0].ptr;
+	
+    ENTER_PROC("SMI_VideoSave");
+
+    if (pPort->video_memory == area)
+	pPort->video_memory = NULL;
+
+    LEAVE_PROC("SMI_VideoSave");
+}
+
+static CARD32
 SMI_AllocateMemory(
 	ScrnInfoPtr	pScrn,
-	FBAreaPtr	area,
-	int		numLines
+	void		**mem_struct,
+	int 		size
 )
 {
     ScreenPtr pScreen = screenInfo.screens[pScrn->scrnIndex];
+    SMIPtr pSmi = SMIPTR(pScrn);
+    int offset = 0;
 
     ENTER_PROC("SMI_AllocateMemory");
 
-    if (area != NULL) {
-	if ((area->box.y2 - area->box.y1) >= numLines) {
-            LEAVE_PROC("SMI_AllocateMemory (area->box.y2 - area->box.y1) >= numLines ok");
-	    return area;
+    if (pSmi->useEXA) {
+	ExaOffscreenArea *area = *mem_struct;
+
+	if (area != NULL) {
+	    if (area->size >= size)
+		return area->offset;
+
+	    exaOffscreenFree(pScrn->pScreen, area);
 	}
 
-	if (xf86ResizeOffscreenArea(area, pScrn->displayWidth, numLines)) {
-            LEAVE_PROC("SMI_AllocateMemory xf86ResizeOffscreenArea ok");
-	    return area;
+	area = exaOffscreenAlloc(pScrn->pScreen, size, 64, TRUE, SMI_VideoSave, NULL);
+
+	*mem_struct = area;
+	if (area == NULL)
+	    return 0;
+	offset = area->offset;
+    } else {
+	FBLinearPtr linear = *mem_struct;
+
+	/*  XAA allocates in units of pixels at the screen bpp,
+	 *  so adjust size appropriately.
+	 */
+	size = (size + pSmi->Bpp - 1) / pSmi->Bpp;
+
+	if (linear) {
+	    if (linear->size >= size)
+		return linear->offset * pSmi->Bpp;
+
+	    if (xf86ResizeOffscreenLinear(linear, size))
+		return linear->offset * pSmi->Bpp;
+
+		xf86FreeOffscreenLinear(linear);
+	    }
+			
+	    linear = xf86AllocateOffscreenLinear(pScreen, size, 16, NULL, NULL, NULL);
+	    *mem_struct = linear;
+
+	    if (!linear) {
+		int max_size;
+
+		xf86QueryLargestOffscreenLinear(pScreen, &max_size, 16, PRIORITY_EXTREME);
+		if (max_size < size) 
+		    return 0;
+			
+		xf86PurgeUnlockedOffscreenAreas(pScreen);
+
+		linear = xf86AllocateOffscreenLinear(pScreen, size, 16, NULL, NULL, NULL);
+		*mem_struct = linear;
+
+		if (!linear)
+		    return 0;
 	}
 
-	xf86FreeOffscreenArea(area);
-    }
-
-    area = xf86AllocateOffscreenArea(pScreen, pScrn->displayWidth, numLines, 0,
-				     NULL, NULL, NULL);
-
-    if (area == NULL) {
-	int maxW, maxH;
-
-	xf86QueryLargestOffscreenArea(pScreen, &maxW, &maxH, 0,
-				FAVOR_WIDTH_THEN_AREA, PRIORITY_EXTREME);
-
-	DEBUG((VERBLEV, "QueryLargestOffscreenArea maxW=%d maxH=%d displayWidth=%d numlines=%d\n",
-	       maxW, maxH, pScrn->displayWidth, numLines));
-	if ((maxW < pScrn->displayWidth) || (maxH < numLines)) {
-            LEAVE_PROC("SMI_AllocateMemory (maxW < pScrn->displayWidth) || (maxH < numLines)");
-	    return NULL;
-	}
-
-	xf86PurgeUnlockedOffscreenAreas(pScreen);
-	area = xf86AllocateOffscreenArea(pScreen, pScrn->displayWidth, numLines,
-				0, NULL, NULL, NULL);
+	DEBUG((VERBLEV, "offset = %p\n", offset));
     }
 
     DEBUG((VERBLEV, "area = %p\n", area));
     LEAVE_PROC("SMI_AllocateMemory");
-    return area;
+    return offset;
+}
+
+static void
+SMI_FreeMemory(
+	ScrnInfoPtr pScrn,
+	void *mem_struct
+)
+{
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER_PROC("SMI_FreeMemory");
+
+    if (pSmi->useEXA) {
+	ExaOffscreenArea *area = mem_struct;
+		
+	if (area != NULL) 
+	    exaOffscreenFree(pScrn->pScreen, area);
+    } else {
+	FBLinearPtr linear = mem_struct;
+		
+	if (linear != NULL) 
+	    xf86FreeOffscreenLinear(linear);
+    }
+
+    LEAVE_PROC("SMI_FreeMemory");
 }
 
 static int
@@ -2212,9 +2271,9 @@ SMI_AllocSurface(
 )
 {
     SMIPtr pSmi = SMIPTR(pScrn);
-    int numLines, pitch, fbPitch, bpp;
+    int pitch, bpp, offset, size;
+    void *surface_memory = NULL;
     SMI_OffscreenPtr ptrOffscreen;
-    FBAreaPtr area;
 
     ENTER_PROC("SMI_AllocSurface");
 
@@ -2223,13 +2282,6 @@ SMI_AllocSurface(
 	return BadAlloc;
     }
 
-    if (pSmi->Bpp == 3) {
-	fbPitch = pSmi->Stride;
-    } else {
-	fbPitch = pSmi->Stride * pSmi->Bpp;
-    }
-
-    width = (width + 1) & ~1;
     switch (id) {
     case FOURCC_YV12:
     case FOURCC_I420:
@@ -2248,26 +2300,27 @@ SMI_AllocSurface(
 	LEAVE_PROC("SMI_AllocSurface");
 	return BadAlloc;
     }
+
+    width = (width + 1) & ~1;
     pitch = (width * bpp + 15) & ~15;
+    size  = pitch * height;
 
-    numLines = ((height * pitch) + fbPitch - 1) / fbPitch;
-
-    area = SMI_AllocateMemory(pScrn, NULL, numLines);
-    if (area == NULL) {
+    offset = SMI_AllocateMemory(pScrn, &surface_memory, size);
+    if (offset == 0) {
 	LEAVE_PROC("SMI_AllocSurface");
 	return BadAlloc;
     }
 
     surface->pitches = xalloc(sizeof(int));
     if (surface->pitches == NULL) {
-	xf86FreeOffscreenArea(area);
+	SMI_FreeMemory(pScrn, surface_memory);
 	LEAVE_PROC("SMI_AllocSurface");
 	return BadAlloc;
     }
     surface->offsets = xalloc(sizeof(int));
     if (surface->offsets == NULL) {
 	xfree(surface->pitches);
-	xf86FreeOffscreenArea(area);
+	SMI_FreeMemory(pScrn, surface_memory);
 	LEAVE_PROC("SMI_AllocSurface");
 	return BadAlloc;
     }
@@ -2276,7 +2329,7 @@ SMI_AllocSurface(
     if (ptrOffscreen == NULL) {
 	xfree(surface->offsets);
 	xfree(surface->pitches);
-	xf86FreeOffscreenArea(area);
+	SMI_FreeMemory(pScrn, surface_memory);
 	LEAVE_PROC("SMI_AllocSurface");
 	return BadAlloc;
     }
@@ -2286,10 +2339,10 @@ SMI_AllocSurface(
     surface->width = width;
     surface->height = height;
     surface->pitches[0] = pitch;
-    surface->offsets[0] = area->box.y1 * fbPitch;
+    surface->offsets[0] = offset;
     surface->devPrivate.ptr = (pointer) ptrOffscreen;
 
-    ptrOffscreen->area = area;
+    ptrOffscreen->surface_memory = surface_memory;
     ptrOffscreen->isOn = FALSE;
 
     LEAVE_PROC("SMI_AllocSurface");
@@ -2301,6 +2354,7 @@ SMI_FreeSurface(
 	XF86SurfacePtr	surface
 )
 {
+    ScrnInfoPtr pScrn = surface->pScrn;
     SMI_OffscreenPtr ptrOffscreen = (SMI_OffscreenPtr) surface->devPrivate.ptr;
 
     ENTER_PROC("SMI_FreeSurface");
@@ -2309,7 +2363,7 @@ SMI_FreeSurface(
 	SMI_StopSurface(surface);
     }
 
-    xf86FreeOffscreenArea(ptrOffscreen->area);
+    SMI_FreeMemory(pScrn, ptrOffscreen->surface_memory);
     xfree(surface->pitches);
     xfree(surface->offsets);
     xfree(surface->devPrivate.ptr);
