@@ -82,6 +82,7 @@ SMI_EXAInit(ScreenPtr pScreen)
     /* Flags */
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
     if (pSmi->EXADriverPtr->memorySize > pSmi->EXADriverPtr->offScreenBase) {
+	/* Offscreen Pixmaps */
 	pSmi->EXADriverPtr->flags |= EXA_OFFSCREEN_PIXMAPS;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 			"EXA offscreen memory manager enabled.\n");
@@ -90,20 +91,12 @@ SMI_EXAInit(ScreenPtr pScreen)
 		   "Not enough video RAM for EXA offscreen memory manager.\n");
     }
 
-    /* Offscreen Pixmaps */
-    if (pScrn->bitsPerPixel == 24) {
-	pSmi->EXADriverPtr->maxX = 4096 / 3;
-
-	if (pSmi->Chipset == SMI_LYNX) {
-	    pSmi->EXADriverPtr->maxY = 4096 / 3;
-	}
-    } else {
-	pSmi->EXADriverPtr->maxX = 4096;
-	pSmi->EXADriverPtr->maxY = 4096;
-    }
+    /* 12 bit coordinates */
+    pSmi->EXADriverPtr->maxX = 4096;
+    pSmi->EXADriverPtr->maxY = 4096;
 
     pSmi->EXADriverPtr->pixmapPitchAlign  = 16;
-    pSmi->EXADriverPtr->pixmapOffsetAlign = 16;
+    pSmi->EXADriverPtr->pixmapOffsetAlign = 8;
 
     /* Sync */
     pSmi->EXADriverPtr->WaitMarker = SMI_EXASync;
@@ -146,6 +139,27 @@ SMI_EXASync(ScreenPtr pScreen, int marker)
     LEAVE_PROC("SMI_EXASync");
 }
 
+static CARD32
+SMI_DEDataFormat(PixmapPtr pPixmap) {
+    CARD32 DEDataFormat = 0;
+
+    switch (pPixmap->drawable.bitsPerPixel) {
+    case 8:
+	DEDataFormat = 0x00000000;
+	break;
+    case 16:
+	DEDataFormat = 0x00100000;
+	break;
+    case 24:
+	DEDataFormat = 0x00300000;
+	break;
+    case 32:
+	DEDataFormat = 0x00200000;
+	break;
+    }
+    return DEDataFormat;
+}
+
 /* ----------------------------------------------------- EXA Copy ---------------------------------------------- */
 
 CARD8 SMI_BltRop[16] =	/* table stolen from KAA */
@@ -174,22 +188,31 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 {
     ScrnInfoPtr pScrn = xf86Screens[pDstPixmap->drawable.pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
+    int src_pitch, dst_pitch;
+    unsigned long src_offset, dst_offset;
 
     ENTER_PROC("SMI_PrepareCopy");
     DEBUG((VERBLEV, "xdir=%d ydir=%d alu=%02X", xdir, ydir, alu));
 
+    /* Bit Mask not supported > 16 bpp */
+    if ((pSrcPixmap->drawable.bitsPerPixel > 16) && 
+	(!EXA_PM_IS_SOLID(&pSrcPixmap->drawable, planemask))) {
+	LEAVE_PROC("SMI_PrepareCopy");
+	return FALSE;
+    }
+
     /* calculate pitch in pixel unit */
-    int src_pitch  = exaGetPixmapPitch(pSrcPixmap) / pSmi->Bpp;
-    int dst_pitch  = exaGetPixmapPitch(pDstPixmap) / pSmi->Bpp;
+    src_pitch  = exaGetPixmapPitch(pSrcPixmap) / (pSrcPixmap->drawable.bitsPerPixel >> 3);
+    dst_pitch  = exaGetPixmapPitch(pDstPixmap) / (pDstPixmap->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
-    int src_offset = exaGetPixmapOffset(pSrcPixmap) / 8;
-    int dst_offset = exaGetPixmapOffset(pDstPixmap) / 8;
+    src_offset = exaGetPixmapOffset(pSrcPixmap) >> 3;
+    dst_offset = exaGetPixmapOffset(pDstPixmap) >> 3;
 
     pSmi->AccelCmd = SMI_BltRop[alu]
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
 
-    if (ydir < 0 || (ydir == 0 && xdir < 0)) {
+    if (xdir < 0 || (ydir < 0)) {
 	pSmi->AccelCmd |= SMI_RIGHT_TO_LEFT;
     }
 
@@ -197,24 +220,19 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
-    if (pScrn->bitsPerPixel == 24) {
-	/* Bit Mask not supported in 24 bit mode */
-	pSmi->depth = pSrcPixmap->drawable.depth;
-	if (!EXA_PM_IS_SOLID(pSmi, planemask)) {
-	    LEAVE_PROC("SMI_PrepareCopy");
-	    return FALSE;
-	}
-
+    if (pDstPixmap->drawable.bitsPerPixel == 24) {
 	src_pitch *= 3;
 	dst_pitch *= 3;
 	WaitQueue(3);
     } else {
 	WaitQueue(4);
-	/* Bit Mask (planemask) */
-	WRITE_DPR(pSmi, 0x28, planemask);
+	/* Bit Mask (planemask) - 16 bit only */
+	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
     }
     /* Destination and Source Row Pitch */
     WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
+    /* Drawing engine data format */
+    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pDstPixmap));
     /* Destination and Source Base Address (offset) */
     WRITE_DPR(pSmi, 0x40, src_offset);
     WRITE_DPR(pSmi, 0x44, dst_offset);
@@ -241,7 +259,7 @@ SMI_Copy(PixmapPtr pDstPixmap, int srcX, int srcY, int dstX,
 	dstY += height - 1;
     }
 
-    if (pScrn->bitsPerPixel == 24) {
+    if (pDstPixmap->drawable.bitsPerPixel == 24) {
 	srcX  *= 3;
 	dstX  *= 3;
 	width *= 3;
@@ -301,42 +319,46 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 {
     ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
+    int dst_pitch;
+    unsigned long dst_offset;
 
     ENTER_PROC("SMI_PrepareSolid");
     DEBUG((VERBLEV, "alu=%02X\n", alu));
 
+    /* Bit Mask not supported > 16 bpp */
+    if ((pPixmap->drawable.bitsPerPixel > 16) && 
+	(!EXA_PM_IS_SOLID(&pPixmap->drawable, planemask))) {
+	LEAVE_PROC("SMI_PrepareCopy");
+	return FALSE;
+    }
+
     /* calculate pitch in pixel unit */
-    int pitch  = exaGetPixmapPitch(pPixmap) / pSmi->Bpp;
+    dst_pitch  = exaGetPixmapPitch(pPixmap) / (pPixmap->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
-    int offset = exaGetPixmapOffset(pPixmap) / 8;
+    dst_offset = exaGetPixmapOffset(pPixmap) >> 3;
 
     pSmi->AccelCmd = SMI_SolidRop[alu]
-		   | SMI_BITBLT
+		   | SMI_RECT_FILL /* SMI_BITBLT */
 		   | SMI_START_ENGINE;
 
     WaitQueue(1);
     /* Destination Window Width */
-    WRITE_DPR(pSmi, 0x3C, (pitch << 16));
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16));
 
-    if (pScrn->bitsPerPixel == 24) {
-	/* Bit Mask not supported in 24 bit mode */
-	pSmi->depth = pPixmap->drawable.depth;
-	if (!EXA_PM_IS_SOLID(pSmi, planemask)) {
-	    LEAVE_PROC("SMI_PrepareSolid");
-	    return FALSE;
-	}
-
-	pitch *= 3;
+    if (pPixmap->drawable.bitsPerPixel == 24) {
+	dst_pitch *= 3;
 	WaitQueue(5);
     } else {
 	WaitQueue(6);
-	/* Bit Mask (planemask) */
-	WRITE_DPR(pSmi, 0x28, planemask);
+	/* Bit Mask (planemask) - 16 bit only */
+	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
     }
     /* Destination Row Pitch */
-    WRITE_DPR(pSmi, 0x12, pitch);
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16));
+    /* Drawing engine data format */
+    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pPixmap));
     /* Destination Base Address (offset) */
-    WRITE_DPR(pSmi, 0x44, offset);
+    WRITE_DPR(pSmi, 0x44, dst_offset);
     /* Foreground Color */
     WRITE_DPR(pSmi, 0x14, fg);
     /* Mono Pattern High and Low */
@@ -352,14 +374,15 @@ SMI_Solid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 {
     ScrnInfoPtr pScrn = xf86Screens[pPixmap->drawable.pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
+    int w, h;
 
     ENTER_PROC("SMI_Solid");
     DEBUG((VERBLEV, "x1=%d y1=%d x2=%d y2=%d\n", x1, y1, x2, y2));
 
-    int w = (x2 - x1);
-    int h = (y2 - y1);
+    w = (x2 - x1);
+    h = (y2 - y1);
 
-    if (pScrn->bitsPerPixel == 24) {
+    if (pPixmap->drawable.bitsPerPixel == 24) {
 	x1 *= 3;
 	w  *= 3;
 

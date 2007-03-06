@@ -2262,8 +2262,9 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
     case 8:
     case 16:
     case 24:
+    case 32:
 	ret = fbScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
-			   yDpi, displayWidth,pScrn->bitsPerPixel);
+			   yDpi, displayWidth, pScrn->bitsPerPixel);
 	break;
     default:
 	xf86DrvMsg(scrnIndex, X_ERROR, "Internal error: invalid bpp (%d) "

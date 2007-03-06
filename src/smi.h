@@ -185,7 +185,6 @@ typedef struct
     /* EXA */
     ExaDriverPtr	EXADriverPtr;
     Bool		useEXA;	/* enable exa acceleration */
-    int			depth;	/* Pixmap color depth in bytes */
 
     pciVideoPtr		PciInfo;	/* PCI info vars */
     PCITAG		PciTag;
