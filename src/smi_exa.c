@@ -75,7 +75,7 @@ SMI_EXAInit(ScreenPtr pScreen)
     SMI_EngineReset(pScrn);
 
     /* Memory Manager */
-    pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pScrn->fbOffset;
+    pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pSmi->FBOffset;
     pSmi->EXADriverPtr->memorySize = pSmi->FBReserved - 1024;
     pSmi->EXADriverPtr->offScreenBase = pSmi->width * pSmi->height * pSmi->Bpp + 1024;
 
