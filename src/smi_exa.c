@@ -444,26 +444,81 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 {
     ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
+    int i, j, dwords, Bpp, queue, dst_pitch;
+    CARD32 *srcp, *dataport;
+    unsigned long dst_offset;
 
     ENTER_PROC("SMI_UploadToScreen");
     DEBUG((VERBLEV, "x=%d y=%d w=%d h=%d src=%d src_pitch=%d\n",
 	   x, y, w, h, src, src_pitch));
 
-    char *dst = pDst->devPrivate.ptr;
-    int dst_pitch = exaGetPixmapPitch(pDst);
+    /* calculate pitch in pixel unit */
+    dst_pitch  = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
+    /* calculate offset in 8 byte (64 bit) unit */
+    dst_offset = exaGetPixmapOffset(pDst) >> 3;
+
+    Bpp = pDst->drawable.bitsPerPixel / 8;
+    dwords = (((w * Bpp) + 3) >> 2) * h;
+
+    pSmi->AccelCmd = 0xCC /* GXcopy */
+		   | SMI_HOSTBLT_WRITE
+		   | SMI_START_ENGINE;
+
+
+    WaitQueue(1);
+    /* Destination Window Width */
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16));
+
+    if (pDst->drawable.bitsPerPixel == 24) {
+	x *= 3;
+	w *= 3;
+	dst_pitch *= 3;
+	if (pSmi->Chipset == SMI_LYNX) {
+	    y *= 3;
+	}
+    }
+
+    WaitQueue(9);
+    /* Destination Row Pitch */
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16));
+    /* Drawing engine data format */
+    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pDst));
+    /* Destination Base Address (offset) */
+    WRITE_DPR(pSmi, 0x44, dst_offset);
+
+    /* set l/r clipping */
+    WRITE_DPR(pSmi, 0x2C, (0xFFFF0000 | x | 0x2000));
+    WRITE_DPR(pSmi, 0x30, (0xFFFF0000 | (x + w)));
+
+    WRITE_DPR(pSmi, 0x00, 0);
+    WRITE_DPR(pSmi, 0x04, (x << 16) | (y * 0xFFFF));
+    WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
+    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
+
+    srcp = (CARD32 *)src;
+    dataport = (CARD32 *)pSmi->DataPortBase;
+    queue = pSmi->DataPortSize;
+    while (dwords) {
+	if (queue < 4) {
+	    /* XXX: check if the hw is ok with this */
+	    dataport = (CARD32 *)pSmi->DataPortBase;
+	    queue = pSmi->DataPortSize;
+	}
+	memcpy(dataport, srcp, 4);
+	queue -= 4;
+	dwords--;
+	srcp++;
+	dataport++;
+    }
+
+    WaitQueue(1);
+    /* disable clipping */
+    WRITE_DPR(pSmi, 0x2C, 0);
 
     exaWaitSync(pDst->drawable.pScreen);
 
-    dst += (y * dst_pitch) + (x * pSmi->Bpp);
-    w   *= pSmi->Bpp;
-
-    while (h--) {
-	memcpy(dst, src, w);
-	src += src_pitch;
-	dst += dst_pitch;
-    }
+    LEAVE_PROC("SMI_UploadToScreen");
 
     return TRUE;
-    LEAVE_PROC("SMI_UploadToScreen");
 }
 
