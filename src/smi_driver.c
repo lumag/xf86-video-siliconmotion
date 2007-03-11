@@ -555,9 +555,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     /*
      * The first thing we should figure out is the depth, bpp, etc.
-     * We support only 24bpp layouts, so indicate that.
      */
-    if (!xf86SetDepthBpp(pScrn, 0, 0, 0, Support24bppFb)) {
+    if (!xf86SetDepthBpp(pScrn, 0, 0, 0, Support32bppFb)) {
 	LEAVE_PROC("SMI_PreInit");
 	return FALSE;
     }
