@@ -338,7 +338,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     dst_offset = exaGetPixmapOffset(pPixmap) >> 3;
 
     pSmi->AccelCmd = SMI_SolidRop[alu]
-		   | SMI_RECT_FILL /* SMI_BITBLT */
+		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
 
     WaitQueue(1);
