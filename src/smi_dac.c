@@ -90,7 +90,7 @@ SMI_CommonCalcClock(int scrnIndex, long freq, int min_m, int min_n1,
 	 ((double)(best_m) / (double)(best_n1) / (1 << best_n2)) * BASE_FREQ,
 	 best_m, best_n1, best_n2));
 
-    *ndiv = best_n1 | (best_n2 << 6);
+    *ndiv = best_n1 | (best_n2 << 7);
     *mdiv = best_m;
 }
 
