@@ -1331,6 +1331,12 @@ SMI_Save(ScrnInfoPtr pScrn)
     save->SR81 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
     save->SRA0 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0);
 
+    /* vclk1 */
+    save->SR6C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C);
+    save->SR6D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D);
+    /* vclk1 control */
+    save->SR68 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68);
+
     if (pSmi->Dualhead) {
 	/* dualhead stuff */
 	save->SR22 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22);
@@ -1345,11 +1351,8 @@ SMI_Save(ScrnInfoPtr pScrn)
 	save->SR4A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4A);
 	save->SR4B = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4B);
 	save->SR4C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C);
-	/* PLL stuff */
-	save->SR68 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68);
+	/* PLL2 stuff */
 	save->SR69 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69);
-	save->SR6C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C);
-	save->SR6D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D);
 	save->SR6E = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E);
 	save->SR6F = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F);
     }
@@ -1578,6 +1581,7 @@ SMI_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	}
 
 	/* vclk1 */
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
 
@@ -1588,12 +1592,9 @@ SMI_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	 * -- AGD
 	 */
 
-	    /* PLL regs */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
+	    /* PLL2 regs */
 
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
 
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E, restore->SR6E);
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F, restore->SR6F);
@@ -2591,12 +2592,12 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
                         pScrn->clockRanges->minClock,
                         pScrn->clockRanges->maxClock,
                         &new->SR6C, &new->SR6D);
+    /* use vclk1 */
+    new->SR68 = 0x54;
 
     /* dualhead */
     if (pSmi->Dualhead) {
 	/* PLL controls */
-	/* set CRT to vclk */
-	new->SR68 = 0x54;
 	/* set LCD to vclk2 */
 	new->SR69 = 0x04;
 
