@@ -112,8 +112,10 @@ SMI_EXAInit(ScreenPtr pScreen)
     pSmi->EXADriverPtr->DoneSolid = SMI_DoneSolid;
 
     /* DFS & UTS */
+#if 0
     pSmi->EXADriverPtr->UploadToScreen = SMI_UploadToScreen;
     pSmi->EXADriverPtr->DownloadFromScreen = SMI_DownloadFromScreen;
+#endif
 
     if(!exaDriverInit(pScreen, pSmi->EXADriverPtr)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "exaDriverInit failed.\n");
@@ -216,7 +218,7 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 	pSmi->AccelCmd |= SMI_RIGHT_TO_LEFT;
     }
 
-    WaitQueue(1);
+    WaitQueue(6);
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
@@ -224,11 +226,15 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 	src_pitch *= 3;
 	dst_pitch *= 3;
 	WaitQueue(3);
-    } else {
-	WaitQueue(4);
-	/* Bit Mask (planemask) - 16 bit only */
-	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
     }
+
+    /* Bit Mask (planemask) - 16 bit only */
+    if (pSrcPixmap->drawable.bitsPerPixel == 16) {
+	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
+    } else {
+	WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
+    }
+
     /* Destination and Source Row Pitch */
     WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
     /* Drawing engine data format */
@@ -341,23 +347,27 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
 
-    WaitQueue(1);
+    WaitQueue(8);
     /* Destination Window Width */
-    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16));
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
     if (pPixmap->drawable.bitsPerPixel == 24) {
 	dst_pitch *= 3;
-	WaitQueue(5);
-    } else {
-	WaitQueue(6);
-	/* Bit Mask (planemask) - 16 bit only */
-	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
     }
+
+    /* Bit Mask (planemask) - 16 bit only */
+    if (pPixmap->drawable.bitsPerPixel == 16) {
+	WRITE_DPR(pSmi, 0x28, planemask | 0xFFFF0000);
+    } else {
+	WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
+    }
+
     /* Destination Row Pitch */
-    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16));
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
     /* Drawing engine data format */
     WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pPixmap));
-    /* Destination Base Address (offset) */
+    /* Source and Destination Base Address (offset) */
+    WRITE_DPR(pSmi, 0x40, dst_offset);
     WRITE_DPR(pSmi, 0x44, dst_offset);
     /* Foreground Color */
     WRITE_DPR(pSmi, 0x14, fg);
