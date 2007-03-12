@@ -212,13 +212,13 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 
     pSmi->AccelCmd = SMI_BltRop[alu]
 		   | SMI_BITBLT
-		   | SMI_START_ENGINE;
+		   | SMI_QUICK_START;
 
     if (xdir < 0 || (ydir < 0)) {
 	pSmi->AccelCmd |= SMI_RIGHT_TO_LEFT;
     }
 
-    WaitQueue(6);
+    WaitQueue(7);
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
@@ -242,6 +242,8 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     /* Destination and Source Base Address (offset) */
     WRITE_DPR(pSmi, 0x40, src_offset);
     WRITE_DPR(pSmi, 0x44, dst_offset);
+
+    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
 
     LEAVE_PROC("SMI_PrepareCopy");
     return TRUE;
@@ -281,11 +283,10 @@ SMI_Copy(PixmapPtr pDstPixmap, int srcX, int srcY, int dstX,
 	}
     }
 
-    WaitQueue(4);
+    WaitQueue(3);
     WRITE_DPR(pSmi, 0x00, (srcX  << 16) + (srcY & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (dstX  << 16) + (dstY & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (width << 16) + (height & 0xFFFF));
-    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
 
     LEAVE_PROC("SMI_Copy");
 }
@@ -345,9 +346,9 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 
     pSmi->AccelCmd = SMI_SolidRop[alu]
 		   | SMI_BITBLT
-		   | SMI_START_ENGINE;
+		   | SMI_QUICK_START;
 
-    WaitQueue(9);
+    WaitQueue(10);
     /* Destination Window Width */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
@@ -375,6 +376,8 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     WRITE_DPR(pSmi, 0x34, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x38, 0xFFFFFFFF);
 
+    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
+
     LEAVE_PROC("SMI_PrepareSolid");
     return TRUE;
 }
@@ -401,10 +404,9 @@ SMI_Solid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 	}
     }
 
-    WaitQueue(3);
+    WaitQueue(2);
     WRITE_DPR(pSmi, 0x04, (x1 << 16) | (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w  << 16) | (h  & 0xFFFF));
-    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
 
     LEAVE_PROC("SMI_Solid");
 }
@@ -472,7 +474,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 
     pSmi->AccelCmd = 0xCC /* GXcopy */
 		   | SMI_HOSTBLT_WRITE
-		   | SMI_START_ENGINE;
+		   | SMI_QUICK_START;
 
 
     WaitQueue(1);
@@ -500,10 +502,11 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     WRITE_DPR(pSmi, 0x2C, (0xFFFF0000 | x | 0x2000));
     WRITE_DPR(pSmi, 0x30, (0xFFFF0000 | (x + w)));
 
+    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y * 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
-    WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
+
 
     srcp = (CARD32 *)src;
     dataport = (CARD32 *)pSmi->DataPortBase;
