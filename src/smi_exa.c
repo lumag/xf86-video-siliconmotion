@@ -347,7 +347,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
 
-    WaitQueue(8);
+    WaitQueue(9);
     /* Destination Window Width */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
