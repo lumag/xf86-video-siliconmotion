@@ -226,7 +226,6 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     if (pDstPixmap->drawable.bitsPerPixel == 24) {
 	src_pitch *= 3;
 	dst_pitch *= 3;
-	WaitQueue(3);
     }
 
     /* Bit Mask (planemask) - 16 bit only */
