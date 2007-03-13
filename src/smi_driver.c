@@ -2563,7 +2563,7 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     if (pSmi->MCLK > 0) {
 	SMI_CommonCalcClock(pScrn->scrnIndex, pSmi->MCLK,
-			    1, 1, 31, 0, 2,
+			    1, 1, 63, 0, 2,
                             pScrn->clockRanges->minClock,
                             pScrn->clockRanges->maxClock,
                             &new->SR6A, &new->SR6B);
@@ -2586,11 +2586,20 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     /* calculate vclk1 */
     vclk = mode->Clock;
-    SMI_CommonCalcClock(pScrn->scrnIndex, vclk,
-			1, 1, 31, 0, 2,
+    if (SMI_LYNX_SERIES(pSmi->Chipset)) {
+        SMI_CommonCalcClock(pScrn->scrnIndex, vclk,
+			1, 1, 63, 0, 2,
                         pScrn->clockRanges->minClock,
                         pScrn->clockRanges->maxClock,
                         &new->SR6C, &new->SR6D);
+    } else {
+        SMI_CommonCalcClock(pScrn->scrnIndex, vclk,
+			1, 1, 63, 0, 1,
+                        pScrn->clockRanges->minClock,
+                        pScrn->clockRanges->maxClock,
+                        &new->SR6C, &new->SR6D);
+    }
+
     /* use vclk1 */
     new->SR68 = 0x54;
 

@@ -41,6 +41,8 @@ SMI_CommonCalcClock(int scrnIndex, long freq, int min_m, int min_n1,
 		    int max_n1, int min_n2, int max_n2, long freq_min, 
 		    long freq_max, unsigned char *mdiv, unsigned char *ndiv)
 {
+    ScrnInfoPtr pScrn = xf86Screens[scrnIndex];
+    SMIPtr pSmi = SMIPTR(pScrn);
     double div, diff, best_diff;
     unsigned int m;
     unsigned char n1, n2;
@@ -90,7 +92,14 @@ SMI_CommonCalcClock(int scrnIndex, long freq, int min_m, int min_n1,
 	 ((double)(best_m) / (double)(best_n1) / (1 << best_n2)) * BASE_FREQ,
 	 best_m, best_n1, best_n2));
 
-    *ndiv = best_n1 | (best_n2 << 7);
+    if (SMI_LYNX_SERIES(pSmi->Chipset)) {
+	*ndiv = best_n1 | (best_n2 << 6);
+    } else {
+	*ndiv = best_n1 | (best_n2 << 7);
+	if (freq > 120000)
+	    *ndiv |= 1 << 6;
+    }
+
     *mdiv = best_m;
 }
 

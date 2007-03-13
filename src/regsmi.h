@@ -40,13 +40,13 @@ authorization from the XFree86 Project and SIlicon Motion.
 /* Chip tags */
 #define PCI_SMI_VENDOR_ID	PCI_VENDOR_SMI
 #define SMI_UNKNOWN			0
-#define SMI_LYNX			PCI_CHIP_SMI910
-#define SMI_LYNXE			PCI_CHIP_SMI810
-#define SMI_LYNX3D			PCI_CHIP_SMI820
-#define SMI_LYNXEM			PCI_CHIP_SMI710
+#define SMI_LYNX		PCI_CHIP_SMI910
+#define SMI_LYNXE		PCI_CHIP_SMI810
+#define SMI_LYNX3D		PCI_CHIP_SMI820
+#define SMI_LYNXEM		PCI_CHIP_SMI710
 #define SMI_LYNXEMplus		PCI_CHIP_SMI712
-#define SMI_LYNX3DM			PCI_CHIP_SMI720
-#define SMI_COUGAR3DR       PCI_CHIP_SMI731
+#define SMI_LYNX3DM		PCI_CHIP_SMI720
+#define SMI_COUGAR3DR           PCI_CHIP_SMI731
 
 /* I/O Functions */
 static __inline__ CARD8
