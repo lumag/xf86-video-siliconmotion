@@ -332,6 +332,10 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     ENTER_PROC("SMI_PrepareSolid");
     DEBUG((VERBLEV, "alu=%02X\n", alu));
 
+    /* HW ignores alpha */
+    if (pPixmap->drawable.bitsPerPixel == 32)
+	return FALSE;
+
     /* Bit Mask not supported > 16 bpp */
     if ((pPixmap->drawable.bitsPerPixel > 16) && 
 	(!EXA_PM_IS_SOLID(&pPixmap->drawable, planemask))) {
