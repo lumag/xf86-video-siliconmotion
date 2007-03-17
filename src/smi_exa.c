@@ -77,8 +77,8 @@ SMI_EXAInit(ScreenPtr pScreen)
 
     /* Memory Manager */
     pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pSmi->FBOffset;
-    pSmi->EXADriverPtr->memorySize = pSmi->FBReserved - 1024;
-    pSmi->EXADriverPtr->offScreenBase = pSmi->width * pSmi->height * pSmi->Bpp + 1024;
+    pSmi->EXADriverPtr->memorySize = pSmi->FBReserved;
+    pSmi->EXADriverPtr->offScreenBase = pSmi->width * pSmi->height * pSmi->Bpp;
 
     /* Flags */
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
@@ -485,7 +485,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 
     /* calculate pitch in pixel unit */
     dst_pitch  = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
-    source_pitch = aligned_pitch / (pDst->drawable.bitsPerPixel >> 3);
+    source_pitch = src_pitch / (pDst->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
     dst_offset = exaGetPixmapOffset(pDst) >> 3;
 
