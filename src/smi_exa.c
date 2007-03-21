@@ -514,7 +514,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     /* Drawing engine data format */
     WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pDst));
     /* Source and Destination Base Address (offset) */
-    WRITE_DPR(pSmi, 0x44, 0);
+    WRITE_DPR(pSmi, 0x40, 0);
     WRITE_DPR(pSmi, 0x44, dst_offset);
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
