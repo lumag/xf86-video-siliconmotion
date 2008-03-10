@@ -31,6 +31,8 @@ authorization from the XFree86 Project and Silicon Motion.
 #ifndef _SMI_H
 #define _SMI_H
 
+#include "smi_pcirename.h"
+
 #include <string.h>
 #include <stdio.h>
 
@@ -187,7 +189,9 @@ typedef struct
     Bool		useEXA;	/* enable exa acceleration */
 
     pciVideoPtr		PciInfo;	/* PCI info vars */
+#ifndef XSERVER_LIBPCIACCESS
     PCITAG		PciTag;
+#endif
     int			Chipset;	/* Chip info, set using PCI
 					   above */
     int			ChipRev;

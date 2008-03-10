@@ -447,10 +447,12 @@ SMI_Probe(DriverPtr drv, int flags)
 	return FALSE;
     }
 
+#ifndef XSERVER_LIBPCIACCESS
     if (xf86GetPciVideoInfo() == NULL) {
 	LEAVE_PROC("SMI_Probe");
 	return FALSE;
     }
+#endif
 
     numUsed = xf86MatchPciInstances(SILICONMOTION_NAME, PCI_SMI_VENDOR_ID,
 				    SMIChipsets, SMIPciChipsets, devSections,
@@ -821,7 +823,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		   pSmi->Chipset);
     } else {
 	from = X_PROBED;
-	pSmi->Chipset = pSmi->PciInfo->chipType;
+	pSmi->Chipset = PCI_DEV_DEVICE_ID(pSmi->PciInfo);
 	pScrn->chipset = (char *) xf86TokenToString(SMIChipsets, pSmi->Chipset);
     }
 
@@ -830,7 +832,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "ChipRev override: %d\n",
 		   pSmi->ChipRev);
     } else {
-	pSmi->ChipRev = pSmi->PciInfo->chipRev;
+        pSmi->ChipRev = PCI_DEV_REVISION(pSmi->PciInfo);
     }
     xfree(pEnt);
 
@@ -854,8 +856,10 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     xf86DrvMsg(pScrn->scrnIndex, from, "Chipset: \"%s\"\n", pScrn->chipset);
 
+#ifndef XSERVER_LIBPCIACCESS
     pSmi->PciTag = pciTag(pSmi->PciInfo->bus, pSmi->PciInfo->device,
 		   	  pSmi->PciInfo->func);
+#endif
 
     pSmi->Dualhead = FALSE;
     if (xf86ReturnOptValBool(pSmi->Options, OPTION_DUALHEAD, FALSE) &&
@@ -1785,30 +1789,43 @@ SMI_MapMem(ScrnInfoPtr pScrn)
     /* Map the Lynx register space */
     switch (pSmi->Chipset) {
     default:
-	memBase = pSmi->PciInfo->memBase[0] + 0x400000;
+      memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
 	pSmi->MapSize = 0x10000;
 	break;
     case SMI_COUGAR3DR:
-	memBase = pSmi->PciInfo->memBase[1];
+        memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
 	pSmi->MapSize = 0x200000;
 	break;
     case SMI_LYNX3D:
-	memBase = pSmi->PciInfo->memBase[0] + 0x680000;
+	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x680000;
 	pSmi->MapSize = 0x180000;
 	break;
     case SMI_LYNXEM:
     case SMI_LYNXEMplus:
-	memBase = pSmi->PciInfo->memBase[0] + 0x400000;
+	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
 	pSmi->MapSize = 0x400000;
 	break;
     case SMI_LYNX3DM:
-	memBase = pSmi->PciInfo->memBase[0];
+	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
 	pSmi->MapSize = 0x200000;
 	break;
     }
+#ifndef XSERVER_LIBPCIACCESS
     pSmi->MapBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, pSmi->PciTag,
 				  memBase, pSmi->MapSize);
-
+#else
+    {
+      void** result = (void**)&pSmi->MapBase;
+      int err = pci_device_map_range(pSmi->PciInfo,
+				     memBase,
+				     pSmi->MapSize,
+				     PCI_DEV_MAP_FLAG_WRITABLE,
+				     result);
+      
+      if (err) 
+	return FALSE;
+    }
+#endif
     if (pSmi->MapBase == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Internal error: could not map "
 		   "MMIO registers.\n");
@@ -1872,7 +1889,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 		   "DataPort=%p - %p\n", pSmi->DataPortBase,
 		   pSmi->DataPortBase + pSmi->DataPortSize - 1);
 
-    pScrn->memPhysBase = pSmi->PciInfo->memBase[0];
+    pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
 
     SMI_EnableMmio(pScrn);
 
@@ -1887,11 +1904,26 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
 
+#ifndef XSERVER_LIBPCIACCESS
 	pSmi->FBBase = xf86MapPciMem(pScrn->scrnIndex,
 				     VIDMEM_FRAMEBUFFER,
 				     pSmi->PciTag,
 				     pScrn->memPhysBase + pSmi->fbMapOffset,
 				     pSmi->videoRAMBytes);
+#else
+	{
+	  void** result = (void**)&pSmi->FBBase;
+	  int err = pci_device_map_range(pSmi->PciInfo,
+					 pScrn->memPhysBase + pSmi->fbMapOffset,
+					 pSmi->videoRAMBytes,
+					 PCI_DEV_MAP_FLAG_WRITABLE |
+					 PCI_DEV_MAP_FLAG_WRITE_COMBINE,
+					 result);
+	  
+	  if (err) 
+	    return FALSE;
+	}
+#endif
 	    
 	if (pSmi->FBBase == NULL) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Internal error: could not "
