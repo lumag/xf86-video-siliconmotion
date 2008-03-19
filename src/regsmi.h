@@ -26,7 +26,6 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and SIlicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/regsmi.h,v 1.2 2002/01/25 21:56:09 tsi Exp $ */
 
 #ifndef _REGSMI_H
 #define _REGSMI_H

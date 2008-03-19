@@ -26,7 +26,6 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from the XFree86 Project and silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_accel.c,v 1.7tsi Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
