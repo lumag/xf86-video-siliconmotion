@@ -1146,7 +1146,7 @@ SMI_PutVideo(
 	  Bit 10     = 0: Interlace Data Capture                = disabled
 	  Bit 13..11 = 010: Frame Skip Enable                   = skip every other frame
 	*/
-	cpr00 |= 0x01000801;
+	cpr00 |= 0x01001001;
     }
 
     if (pSmi->ByteSwap)
