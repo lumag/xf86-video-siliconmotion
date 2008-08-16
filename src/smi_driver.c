@@ -879,9 +879,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	}
     }
 
-    SMI_MapMem(pScrn);
-    SMI_DisableVideo(pScrn);
-
     hwp = VGAHWPTR(pScrn);
     vgaIOBase  = hwp->IOBase;
     vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
@@ -889,6 +886,57 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     xf86ErrorFVerb(VERBLEV, "\tSMI_PreInit vgaCRIndex=%x, vgaIOBase=%x, "
 		   "MMIOBase=%p\n", vgaCRIndex, vgaIOBase, hwp->MMIOBase);
+
+    /* Next go on to detect amount of installed ram */
+    config = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x71);
+
+    /* And compute the amount of video memory and offscreen memory */
+    pSmi->videoRAMKBytes = 0;
+
+    pScrn->videoRam=pScrn->confScreen->device->videoRam;
+    if (!pScrn->videoRam) {
+	switch (pSmi->Chipset) {
+	default:
+	{
+	    int mem_table[4] = { 1, 2, 4, 0 };
+	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
+	    break;
+	}
+	case SMI_LYNX3D:
+	{
+	    int mem_table[4] = { 0, 2, 4, 6 };
+	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024 + 512;
+	    break;
+	}
+	case SMI_LYNX3DM:
+	{
+	    int mem_table[4] = { 16, 2, 4, 8 };
+	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
+	    break;
+	}
+	case SMI_COUGAR3DR:
+	{
+	    /* DANGER - Cougar3DR BIOS is broken - hardcode video ram size */
+	    /* per instructions from Silicon Motion engineers */
+	    pSmi->videoRAMKBytes = 16 * 1024;
+	    break;
+        }
+	}
+	pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
+	pScrn->videoRam     = pSmi->videoRAMKBytes;
+
+	xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "videoram: %dkB\n",
+		   pSmi->videoRAMKBytes);
+    } else {
+	pSmi->videoRAMKBytes = pScrn->videoRam;
+	pSmi->videoRAMBytes  = pScrn->videoRam * 1024;
+
+	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "videoram: %dk\n",
+		   pSmi->videoRAMKBytes);
+    }
+
+    SMI_MapMem(pScrn);
+    SMI_DisableVideo(pScrn);
 
     /* detect the panel size */
     SMI_DetectPanelSize(pScrn);
@@ -952,54 +1000,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    SMI_UnmapMem(pScrn);
 	    return FALSE;
 	}
-    }
-
-
-    /* Next go on to detect amount of installed ram */
-    config = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x71);
-
-    /* And compute the amount of video memory and offscreen memory */
-    pSmi->videoRAMKBytes = 0;
-
-    if (!pScrn->videoRam) {
-	switch (pSmi->Chipset) {
-	default:
-	{
-	    int mem_table[4] = { 1, 2, 4, 0 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
-	    break;
-	}
-	case SMI_LYNX3D:
-	{
-	    int mem_table[4] = { 0, 2, 4, 6 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024 + 512;
-	    break;
-	}
-	case SMI_LYNX3DM:
-	{
-	    int mem_table[4] = { 16, 2, 4, 8 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
-	    break;
-	}
-	case SMI_COUGAR3DR:
-	{
-	    /* DANGER - Cougar3DR BIOS is broken - hardcode video ram size */
-	    /* per instructions from Silicon Motion engineers */
-	    pSmi->videoRAMKBytes = 16 * 1024;
-	    break;
-        }
-	}
-	pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
-	pScrn->videoRam     = pSmi->videoRAMKBytes;
-
-	xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "videoram: %dkB\n",
-		   pSmi->videoRAMKBytes);
-    } else {
-	pSmi->videoRAMKBytes = pScrn->videoRam;
-	pSmi->videoRAMBytes  = pScrn->videoRam * 1024;
-
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "videoram: %dk\n",
-		   pSmi->videoRAMKBytes);
     }
 
     /* Detect current MCLK and print it for user */
