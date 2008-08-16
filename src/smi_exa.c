@@ -56,6 +56,8 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int sr
 Bool
 SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst, int dst_pitch);
 
+#define PIXMAP_FORMAT(pixmap) SMI_DEDataFormat(pixmap->drawable.bitsPerPixel)
+
 Bool
 SMI_EXAInit(ScreenPtr pScreen)
 {
@@ -76,9 +78,13 @@ SMI_EXAInit(ScreenPtr pScreen)
     SMI_EngineReset(pScrn);
 
     /* Memory Manager */
-    pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pSmi->FBOffset;
+    if(pSmi->shadowFB){
+       pSmi->EXADriverPtr->memoryBase = pSmi->FBBase; /* The shadow framebuffer is located at offset 0 */
+    }else{
+       pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pSmi->FBOffset;
+    }
     pSmi->EXADriverPtr->memorySize = pSmi->FBReserved;
-    pSmi->EXADriverPtr->offScreenBase = pSmi->width * pSmi->height * pSmi->Bpp;
+    pSmi->EXADriverPtr->offScreenBase = pScrn->displayWidth * pSmi->height * pSmi->Bpp;
 
     /* Flags */
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
@@ -148,27 +154,6 @@ SMI_EXASync(ScreenPtr pScreen, int marker)
     WaitIdleEmpty();
 
     LEAVE_PROC("SMI_EXASync");
-}
-
-static CARD32
-SMI_DEDataFormat(PixmapPtr pPixmap) {
-    CARD32 DEDataFormat = 0;
-
-    switch (pPixmap->drawable.bitsPerPixel) {
-    case 8:
-	DEDataFormat = 0x00000000;
-	break;
-    case 16:
-	DEDataFormat = 0x00100000;
-	break;
-    case 24:
-	DEDataFormat = 0x00300000;
-	break;
-    case 32:
-	DEDataFormat = 0x00200000;
-	break;
-    }
-    return DEDataFormat;
 }
 
 /* ----------------------------------------------------- EXA Copy ---------------------------------------------- */
@@ -246,7 +231,7 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     /* Destination and Source Row Pitch */
     WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
     /* Drawing engine data format */
-    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pDstPixmap));
+    WRITE_DPR(pSmi, 0x1C, PIXMAP_FORMAT(pDstPixmap));
     /* Destination and Source Base Address (offset) */
     WRITE_DPR(pSmi, 0x40, src_offset);
     WRITE_DPR(pSmi, 0x44, dst_offset);
@@ -378,7 +363,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     /* Destination Row Pitch */
     WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
     /* Drawing engine data format */
-    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pPixmap));
+    WRITE_DPR(pSmi, 0x1C, PIXMAP_FORMAT(pPixmap));
     /* Source and Destination Base Address (offset) */
     WRITE_DPR(pSmi, 0x40, dst_offset);
     WRITE_DPR(pSmi, 0x44, dst_offset);
@@ -512,7 +497,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     /* Source and Destination Row Pitch */
     WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (source_pitch & 0xFFFF));
     /* Drawing engine data format */
-    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pDst));
+    WRITE_DPR(pSmi, 0x1C,PIXMAP_FORMAT(pDst));
     /* Source and Destination Base Address (offset) */
     WRITE_DPR(pSmi, 0x40, 0);
     WRITE_DPR(pSmi, 0x44, dst_offset);

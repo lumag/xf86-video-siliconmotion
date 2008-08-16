@@ -84,6 +84,7 @@ static unsigned int SMI_ddc1Read(ScrnInfoPtr pScrn);
 static void SMI_FreeScreen(int ScrnIndex, int flags);
 static void SMI_ProbeDDC(ScrnInfoPtr pScrn, int index);
 static void SMI_DetectPanelSize(ScrnInfoPtr pScrn);
+static Bool SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr);
 
 
 #define SILICONMOTION_NAME          "Silicon Motion"
@@ -164,6 +165,7 @@ typedef enum
     OPTION_ZOOMONLCD,
     OPTION_DUALHEAD,
     OPTION_ACCELMETHOD,
+    OPTION_RANDRROTATION,
     NUMBER_OF_OPTIONS
 } SMIOpts;
 
@@ -190,6 +192,7 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_ZOOMONLCD,	     "ZoomOnLCD",	  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
+    { OPTION_RANDRROTATION,  "RandRRotation",     OPTV_BOOLEAN, {0}, FALSE },
     { -1,		     NULL,		  OPTV_NONE,	{0}, FALSE }
 };
 
@@ -696,6 +699,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	pSmi->MCLK = 0;
     }
 
+    if(!pSmi->randrRotation && xf86GetOptValBool(pSmi->Options, OPTION_RANDRROTATION, &pSmi->randrRotation)){
+       xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "RandRRotation %s.\n",
+       pSmi->randrRotation ? "enabled" : "disabled");
+    }
+
     from = X_DEFAULT;
     pSmi->hwcursor = TRUE;
     if (xf86GetOptValBool(pSmi->Options, OPTION_HWCURSOR, &pSmi->hwcursor)) {
@@ -705,12 +713,22 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	pSmi->hwcursor = FALSE;
 	from = X_CONFIG;
     }
-    xf86DrvMsg(pScrn->scrnIndex, from, "Using %s Cursor\n",
-	       pSmi->hwcursor ? "Hardware" : "Software");
+    if(pSmi->hwcursor && pSmi->randrRotation){
+       xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "RandRRotation enabled: Disabling hardware cursor.\n");
+       pSmi->hwcursor = FALSE;
+    }else{
+       xf86DrvMsg(pScrn->scrnIndex, from, "Using %s Cursor\n",
+                  pSmi->hwcursor ? "Hardware" : "Software");
+    }
 
     if (xf86GetOptValBool(pSmi->Options, OPTION_SHADOW_FB, &pSmi->shadowFB)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "ShadowFB %s.\n",
 		   pSmi->shadowFB ? "enabled" : "disabled");
+    }
+
+    if(!pSmi->shadowFB && pSmi->randrRotation){
+       xf86DrvMsg(pScrn->scrnIndex, X_INFO, "RandRRotation enabled: Enabling ShadowFB.\n");
+       pSmi->shadowFB = TRUE;
     }
 
 #if 1 /* PDR#932 */
@@ -1230,8 +1248,8 @@ SMI_EnterVT(int scrnIndex, int flags)
 
 	box.x1 = 0;
 	box.y1 = 0;
-	box.x2 = pScrn->virtualY;
-	box.y2 = pScrn->virtualX;
+	box.x2 = pSmi->width;
+	box.y2 = pSmi->height;
 	if (pSmi->Chipset == SMI_COUGAR3DR) {
 	    SMI_RefreshArea730(pScrn, 1, &box);
 	} else {
@@ -2051,6 +2069,12 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Zero the frame buffer, #258 */
     memset(pSmi->FBBase, 0, pSmi->videoRAMBytes);
 
+
+    /* Callback for RandR rotation */
+    pScrn->DriverFunc    = SMI_DriverFunc;
+    if(pSmi->randrRotation)
+       pSmi->rotate=0;
+
     /* Initialize the first mode */
     if (!SMI_ModeInit(pScrn, pScrn->currentMode)) {
 	LEAVE_PROC("SMI_ScreenInit");
@@ -2111,8 +2135,9 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (!pSmi->useEXA) {
 	int numLines, maxLines;
 	BoxRec AvailFBArea;
- 
-	maxLines = pSmi->FBReserved / (pSmi->width * pSmi->Bpp);
+	RegionRec AvailFBRegion;
+
+	maxLines = pSmi->FBReserved / (pScrn->displayWidth * pSmi->Bpp);
 	if (pSmi->rotate) {
 	    numLines = maxLines;
 	} else {
@@ -2129,14 +2154,20 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	}
  
 	AvailFBArea.x1 = 0;
-	AvailFBArea.y1 = 0;
-	AvailFBArea.x2 = pSmi->width;
+	if(pSmi->randrRotation) /* The rotated mode could need more memory */
+	   AvailFBArea.y1= max(((pScrn->virtualX * pSmi->Bpp + 15) & ~15)*pScrn->virtualY,
+	   ((pScrn->virtualY * pSmi->Bpp + 15) & ~15)*pScrn->virtualX)/(pScrn->virtualX*pSmi->Bpp);
+	else
+	   AvailFBArea.y1 = pScrn->virtualY;
+	AvailFBArea.x2 = pScrn->virtualX;
 	AvailFBArea.y2 = numLines;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		   "FrameBuffer Box: %d,%d - %d,%d\n",
 		   AvailFBArea.x1, AvailFBArea.y1, AvailFBArea.x2,
 		   AvailFBArea.y2);
-	xf86InitFBManager(pScreen, &AvailFBArea);
+	REGION_INIT(pScreen,&AvailFBRegion,&AvailFBArea,1);
+	xf86InitFBManagerRegion(pScreen, &AvailFBRegion);
+	REGION_UNINIT(pScreen,&AvailFBRegion);
     }
     /* end CZ */
 	
@@ -2239,7 +2270,7 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
-    int width, height, displayWidth;
+    int width, height;
     int bytesPerPixel = pScrn->bitsPerPixel / 8;
     int xDpi, yDpi;
     int ret;
@@ -2251,26 +2282,21 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 	height       = pScrn->virtualX;
 	xDpi         = pScrn->yDpi;
 	yDpi         = pScrn->xDpi;
-	displayWidth = ((width * bytesPerPixel + 15) & ~15) / bytesPerPixel;
     } else {
 	width        = pScrn->virtualX;
 	height       = pScrn->virtualY;
 	xDpi		 = pScrn->xDpi;
 	yDpi		 = pScrn->yDpi;
-	displayWidth = pScrn->displayWidth;
     }
+    pScrn->displayWidth = ((width * bytesPerPixel + 15) & ~15) / bytesPerPixel;
 
     if (pSmi->shadowFB) {
 	pSmi->ShadowWidth      = width;
 	pSmi->ShadowHeight     = height;
-	pSmi->ShadowWidthBytes = (width * bytesPerPixel + 15) & ~15;
-	if (bytesPerPixel == 3) {
-	    pSmi->ShadowPitch = ((height * 3) << 16)
-			      | pSmi->ShadowWidthBytes;
-	} else {
-	    pSmi->ShadowPitch = (height << 16)
-			      | (pSmi->ShadowWidthBytes / bytesPerPixel);
-	}
+	pSmi->ShadowWidthBytes = pScrn->displayWidth*bytesPerPixel;
+	pSmi->screenStride = ((pScrn->virtualX * pSmi->Bpp + 15) & ~15)/ pSmi->Bpp;
+	if(pScrn->bitsPerPixel==24)
+	   pSmi->screenStride *= 3;
 
 	pSmi->saveBufferSize = pSmi->ShadowWidthBytes * pSmi->ShadowHeight;
 	pSmi->FBReserved -= pSmi->saveBufferSize;
@@ -2282,10 +2308,9 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		   "Shadow: width=%d height=%d "
-		   "offset=0x%08lX pitch=0x%08X\n",
+		   "offset=0x%08lX\n",
 		   pSmi->ShadowWidth, pSmi->ShadowHeight,
-		   (unsigned long)pSmi->FBOffset,
-		   pSmi->ShadowPitch);
+	           (unsigned long)pSmi->FBOffset);
     } else {
 	pSmi->FBOffset = 0;
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
@@ -2297,14 +2322,14 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
      */
 
     DEBUG((VERBLEV, "\tInitializing FB @ 0x%08X for %dx%d (%d)\n",
-	   pSmi->FBBase, width, height, displayWidth));
+	   pSmi->FBBase, width, height, pScrn->displayWidth));
     switch (pScrn->bitsPerPixel) {
     case 8:
     case 16:
     case 24:
     case 32:
 	ret = fbScreenInit(pScreen, pSmi->FBBase, width, height, xDpi,
-			   yDpi, displayWidth, pScrn->bitsPerPixel);
+			   yDpi, pScrn->displayWidth, pScrn->bitsPerPixel);
 	break;
     default:
 	xf86DrvMsg(scrnIndex, X_ERROR, "Internal error: invalid bpp (%d) "
@@ -2368,13 +2393,13 @@ SMI_ValidMode(int scrnIndex, DisplayModePtr mode, Bool verbose, int flags)
     }
 
 #if 1 /* PDR#944 */
-    if (pSmi->rotate) {
-	if ((mode->HDisplay != pSmi->lcdWidth) ||
-	    (mode->VDisplay != pSmi->lcdHeight)) {
-	    LEAVE_PROC("SMI_ValidMode");
-	    return MODE_PANEL;
-	}
-    }
+/*     if (pSmi->rotate) { */
+/* 	if ((mode->HDisplay != pSmi->lcdWidth) || */
+/* 	    (mode->VDisplay != pSmi->lcdHeight)) { */
+/* 	    LEAVE_PROC("SMI_ValidMode"); */
+/* 	    return MODE_PANEL; */
+/* 	} */
+/*     } */
 #endif
 
     LEAVE_PROC("SMI_ValidMode");
@@ -2393,23 +2418,11 @@ SMI_DPRInit(ScrnInfoPtr pScrn)
     SMIRegPtr new = &pSmi->ModeReg;
 
     /* Set DPR registers */
-    pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
-    switch (pScrn->bitsPerPixel) {
-    case 8:
-	DEDataFormat = 0x00000000;
-	break;
-    case 16:
-	pSmi->Stride >>= 1;
-	DEDataFormat = 0x00100000;
-	break;
-    case 24:
-	DEDataFormat = 0x00300000;
-	break;
-    case 32:
-	pSmi->Stride >>= 2;
-	DEDataFormat = 0x00200000;
-	break;
-    }
+    pSmi->Stride = ((pSmi->width * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
+    if(pScrn->bitsPerPixel==24)
+       pSmi->Stride *= 3;
+
+    DEDataFormat=SMI_DEDataFormat(pScrn->bitsPerPixel);
 
     for (i = 0; i < sizeof(xyAddress) / sizeof(xyAddress[0]); i++) {
 	if (pSmi->rotate) {
@@ -2433,8 +2446,13 @@ SMI_DPRInit(ScrnInfoPtr pScrn)
     new->DPR2C = 0;
     new->DPR30 = 0;
     new->DPR3C = (pSmi->Stride << 16) | pSmi->Stride;
-    new->DPR40 = pSmi->FBOffset >> 3;
-    new->DPR44 = pSmi->FBOffset >> 3;
+    if(pSmi->shadowFB){
+       new->DPR40 = 0;
+       new->DPR44 = 0; /* The shadow framebuffer is located at offset 0 */
+    }else{
+       new->DPR40 = pSmi->FBOffset >> 3;
+       new->DPR44 = pSmi->FBOffset >> 3;
+   }
 
 }
 
@@ -2804,6 +2822,8 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
     SMI_WriteMode(pScrn, vganew, new);
 
     /* Adjust the viewport */
+    pScrn->frameX1=pScrn->frameX0 + pScrn->currentMode->HDisplay - 1;
+    pScrn->frameY1=pScrn->frameY0 + pScrn->currentMode->VDisplay - 1;
     SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
     LEAVE_PROC("SMI_ModeInit");
@@ -3361,3 +3381,72 @@ SMI_ddc1(int scrnIndex)
     return success;
 }
 
+static void SMI_SetShadowDimensions(ScrnInfoPtr pScrn,int width,int height){
+    SMIPtr pSmi = SMIPTR(pScrn);
+    pScrn->displayWidth=width;
+    pSmi->ShadowWidth  = pSmi->width = width;
+    pSmi->ShadowHeight = pSmi->height= height;
+    pSmi->ShadowWidthBytes = width * pSmi->Bpp;
+    pSmi->saveBufferSize = pSmi->ShadowWidthBytes * height;
+    pSmi->Stride = ((pScrn->displayWidth * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
+    if(pScrn->bitsPerPixel==24)
+       pSmi->Stride*=3;
+    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),width,height,-1,-1,width*pSmi->Bpp,NULL);
+    if(pSmi->EXADriverPtr){
+       pSmi->EXADriverPtr->offScreenBase = pScrn->displayWidth * pSmi->height * pSmi->Bpp;
+    }
+}
+
+static Bool
+SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr){
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER_PROC("SMI_DriverFunc");
+    if(op==RR_GET_INFO){
+       if(pSmi->randrRotation)
+	  ((xorgRRRotation*)ptr)->RRRotations = RR_Rotate_0 | RR_Rotate_90 | RR_Rotate_270;
+       else
+	  ((xorgRRRotation*)ptr)->RRRotations = RR_Rotate_0;
+
+    }else if(op==RR_SET_CONFIG){
+       if(!pSmi->randrRotation){
+	  LEAVE_PROC("SMI_DriverFunc");
+	  return FALSE;
+       }
+
+       xorgRRConfig rconf= ((xorgRRRotation*)ptr)->RRConfig;
+       if(rconf.rotation==RR_Rotate_0){
+	  if(pSmi->rotate!=0){
+	     if(pSmi->PointerMoved != NULL){
+		pScrn->PointerMoved = pSmi->PointerMoved;
+		pSmi->PointerMoved  = NULL;
+	     }
+	     SMI_SetShadowDimensions(pScrn,rconf.width,rconf.height);
+	  }
+	  pSmi->rotate=0;
+       }else if(rconf.rotation==RR_Rotate_90 || rconf.rotation==RR_Rotate_270){
+	  if(pSmi->rotate==0){
+	     if(pSmi->PointerMoved == NULL){
+		pSmi->PointerMoved  = pScrn->PointerMoved;
+		pScrn->PointerMoved = SMI_PointerMoved;
+	     }
+	     SMI_SetShadowDimensions(pScrn,rconf.height,rconf.width);
+	  }
+
+	  if(rconf.rotation==RR_Rotate_90)
+	     pSmi->rotate=SMI_ROTATE_CCW;
+	  else
+	     pSmi->rotate=SMI_ROTATE_CW;
+
+       }else{
+	  LEAVE_PROC("SMI_DriverFunc");
+	  return FALSE;
+       }
+    }else{
+       LEAVE_PROC("SMI_DriverFunc");
+       return FALSE;
+    }
+
+    LEAVE_PROC("SMI_DriverFunc");
+    return TRUE;
+}

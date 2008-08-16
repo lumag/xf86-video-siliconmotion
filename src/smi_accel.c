@@ -83,24 +83,10 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 
     ENTER_PROC("SMI_EngineReset");
 
-    pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
-
-    switch (pScrn->bitsPerPixel) {
-    case 8:
-	DEDataFormat = 0x00000000;
-	break;
-    case 16:
-	pSmi->Stride >>= 1;
-	DEDataFormat = 0x00100000;
-	break;
-    case 24:
-	DEDataFormat = 0x00300000;
-	break;
-    case 32:
-	pSmi->Stride >>= 2;
-	DEDataFormat = 0x00200000;
-	break;
-    }
+    pSmi->Stride = ((pSmi->width * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
+    if(pScrn->bitsPerPixel==24)
+       pSmi->Stride *= 3;
+    DEDataFormat = SMI_DEDataFormat(pScrn->bitsPerPixel);
 
     for (i = 0; i < sizeof(xyAddress) / sizeof(xyAddress[0]); i++) {
 	if (pSmi->rotate) {
@@ -122,8 +108,13 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
     WRITE_DPR(pSmi, 0x24, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
-    WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
-    WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
+    if(pSmi->shadowFB){
+       WRITE_DPR(pSmi, 0x40, 0);
+       WRITE_DPR(pSmi, 0x44, 0);  /* The shadow framebuffer is located at offset 0 */
+    }else{
+       WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
+       WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
+    }
 
     SMI_DisableClipping(pScrn);
 
@@ -198,5 +189,26 @@ SMI_DisableClipping(ScrnInfoPtr pScrn)
     WRITE_DPR(pSmi, 0x30, pSmi->ScissorsRight);
 
     LEAVE_PROC("SMI_DisableClipping");
+}
+
+CARD32
+SMI_DEDataFormat(int bpp) {
+    CARD32 DEDataFormat = 0;
+
+    switch (bpp) {
+    case 8:
+	DEDataFormat = 0x00000000;
+	break;
+    case 16:
+	DEDataFormat = 0x00100000;
+	break;
+    case 24:
+	DEDataFormat = 0x00300000;
+	break;
+    case 32:
+	DEDataFormat = 0x00200000;
+	break;
+    }
+    return DEDataFormat;
 }
 

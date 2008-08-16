@@ -220,7 +220,9 @@ typedef struct
     Bool		shadowFB;	/* Flag if shadow buffer is
 						   used */
     int			rotate;		/* Rotation flags */
-    int			ShadowPitch;	/* Pitch of shadow buffer */
+    Bool                randrRotation;  /* Allow RandR rotation */
+    CARD32              screenStride;   /* Stride of the on-screen framebuffer */
+                                        /* when using a shadow fb*/
     int			ShadowWidthBytes;	/* Width of shadow
 						   buffer in bytes */
     int			ShadowWidth;	/* Width of shadow buffer in
@@ -350,6 +352,7 @@ void SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file);
 void SMI_EngineReset(ScrnInfoPtr);
 void SMI_SetClippingRectangle(ScrnInfoPtr, int, int, int, int);
 void SMI_DisableClipping(ScrnInfoPtr);
+CARD32 SMI_DEDataFormat(int bpp);
 
 /* smi_hwcurs.c */
 Bool SMI_HWCursorInit(ScreenPtr pScrn);

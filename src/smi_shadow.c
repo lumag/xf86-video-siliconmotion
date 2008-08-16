@@ -68,17 +68,20 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	return;
     }
 
-    if (pSmi->rotate) {
-	/* IF we need to do rotation, setup the hardware here. */
-	WaitIdleEmpty();
-	WRITE_DPR(pSmi, 0x10, pSmi->ShadowPitch);
-	WRITE_DPR(pSmi, 0x3C, pSmi->ShadowPitch);
-	WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
-    }
+    WaitIdleEmpty();
+    if(pSmi->useEXA)  /* Some other function may have set SMI_QUICK_START  */
+       WRITE_DPR(pSmi, 0x0C, 0);
+
+    WRITE_DPR(pSmi, 0x10, ((pSmi->screenStride) << 16) | (pSmi->Stride));
+    WRITE_DPR(pSmi, 0x3C, ((pSmi->screenStride) << 16) | (pSmi->Stride));
+
+    WRITE_DPR(pSmi, 0x40, 0); /*Source offset = Shadow FB*/
+    WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3); /* Destination = Screen FB*/
+
+    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pScrn->bitsPerPixel));
 
     /* #672 */
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(1);
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     }
@@ -159,13 +162,10 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	pbox++;
     }
 
-    if (pSmi->rotate) {
-	/* If we did a rotation, we need to restore the hardware state here. */
-	WaitIdleEmpty();
-	WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
-	WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
-	WRITE_DPR(pSmi, 0x44, 0);
-    }
+    WaitIdleEmpty();
+    WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
+    WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
+    WRITE_DPR(pSmi, 0x44, 0);
 
     LEAVE_PROC("SMI_RefreshArea");
 }
@@ -187,17 +187,20 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	return;
     }
 
-    if (pSmi->rotate) {
-	/* IF we need to do rotation, setup the hardware here. */
-	WaitIdleEmpty();
-	WRITE_DPR(pSmi, 0x10, pSmi->ShadowPitch);
-	WRITE_DPR(pSmi, 0x3C, pSmi->ShadowPitch);
-	WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
-    }
+    WaitIdleEmpty();
+    if(pSmi->useEXA)  /* Some other function may have set SMI_QUICK_START  */
+       WRITE_DPR(pSmi, 0x0C, 0);
+
+    WRITE_DPR(pSmi, 0x10, ((pSmi->screenStride) << 16) | (pSmi->Stride));
+    WRITE_DPR(pSmi, 0x3C, ((pSmi->screenStride) << 16) | (pSmi->Stride));
+
+    WRITE_DPR(pSmi, 0x40, 0); /*Source offset = Shadow FB*/
+    WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3); /* Destination = Screen FB*/
+
+    WRITE_DPR(pSmi, 0x1C, SMI_DEDataFormat(pScrn->bitsPerPixel));
 
     /* #672 */
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(1);
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     }
@@ -300,13 +303,10 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	pbox++;
     }
 
-    if (pSmi->rotate) {
-	/* If we did a rotation, we need to restore the hardware state here. */
-	WaitIdleEmpty();
-	WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
-	WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
-	WRITE_DPR(pSmi, 0x44, 0);
-    }
+    WaitIdleEmpty();
+    WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
+    WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
+    WRITE_DPR(pSmi, 0x44, 0);
 
     LEAVE_PROC("SMI_RefreshArea730");
 }
