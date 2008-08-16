@@ -1193,6 +1193,11 @@ SMI_EnterVT(int scrnIndex, int flags)
     SMI_MapMem(pScrn);
     SMI_Save(pScrn);
 
+    /* FBBase may have changed after remapping the memory */
+    pScrn->pixmapPrivate.ptr=pSmi->FBBase;
+    if(pSmi->useEXA)
+       pSmi->EXADriverPtr->memoryBase=pSmi->FBBase;
+
     /* #670 */
     if (pSmi->shadowFB) {
 	pSmi->FBOffset = pSmi->savedFBOffset;
