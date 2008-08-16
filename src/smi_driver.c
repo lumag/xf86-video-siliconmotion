@@ -791,14 +791,16 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	return FALSE;
     }
 
-    if (xf86LoadSubModule(pScrn,"int10")) {
-	xf86LoaderReqSymLists(int10Symbols,NULL);
-	pSmi->pInt10 = xf86InitInt10(pEnt->index);
-    }
+    if(pSmi->useBIOS){
+       if (xf86LoadSubModule(pScrn,"int10")) {
+	  xf86LoaderReqSymLists(int10Symbols,NULL);
+	  pSmi->pInt10 = xf86InitInt10(pEnt->index);
+       }
 	
-    if (pSmi->pInt10 && xf86LoadSubModule(pScrn, "vbe")) {
-	xf86LoaderReqSymLists(vbeSymbols, NULL);
-	pVbe = VBEInit(pSmi->pInt10, pEnt->index);
+       if (pSmi->pInt10 && xf86LoadSubModule(pScrn, "vbe")) {
+	  xf86LoaderReqSymLists(vbeSymbols, NULL);
+	  pVbe = VBEInit(pSmi->pInt10, pEnt->index);
+       }
     }
 
     pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
@@ -982,9 +984,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     	}
     }
 
-    vbeFree(pVbe);
-    xf86FreeInt10(pSmi->pInt10);
-    pSmi->pInt10 = NULL;
+    if(pSmi->useBIOS){
+       vbeFree(pVbe);
+       xf86FreeInt10(pSmi->pInt10);
+       pSmi->pInt10 = NULL;
+    }
 
     /*
      * If the driver can do gamma correction, it should call xf86SetGamma()
@@ -2032,7 +2036,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
 	
-    if (!pSmi->pInt10) {
+    if (!pSmi->pInt10 && pSmi->useBIOS) {
 	pSmi->pInt10 = xf86InitInt10(pEnt->index);
     }
 
