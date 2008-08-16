@@ -434,8 +434,8 @@ SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h,
 
     exaWaitSync(pSrc->drawable.pScreen);
 
-    src += (y * src_pitch) + (x * pSmi->Bpp);
-    w   *= pSmi->Bpp;
+    src += (y * src_pitch) + (x * pSrc->drawable.bitsPerPixel/8);
+    w   *= pSrc->drawable.bitsPerPixel/8;
 
     while (h--) {
 	memcpy(dst, src, w);
@@ -443,8 +443,8 @@ SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h,
 	dst += dst_pitch;
     }
 
-    return TRUE;
     LEAVE_PROC("SMI_DownloadFromScreen");
+    return TRUE;
 }
 
 Bool
@@ -453,7 +453,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 {
     ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
     SMIPtr pSmi = SMIPTR(pScrn);
-    int dst_pitch, source_pitch, align, aligned_pitch;
+    int dst_pixelpitch, src_pixelpitch, align, aligned_pitch;
     unsigned long dst_offset;
 
     ENTER_PROC("SMI_UploadToScreen");
@@ -466,11 +466,11 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 	align = 128 / pDst->drawable.bitsPerPixel;
     }
 
-    aligned_pitch = (src_pitch + align - 1) & ~(align - 1);
+    aligned_pitch = ((w*pDst->drawable.bitsPerPixel >> 3) + align - 1) & ~(align - 1);
 
     /* calculate pitch in pixel unit */
-    dst_pitch  = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
-    source_pitch = src_pitch / (pDst->drawable.bitsPerPixel >> 3);
+    dst_pixelpitch  = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
+    src_pixelpitch = src_pitch / (pDst->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
     dst_offset = exaGetPixmapOffset(pDst) >> 3;
 
@@ -483,19 +483,19 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 
     WaitQueue(7);
     /* Destination and Source Window Widths */
-    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (source_pitch & 0xFFFF));
+    WRITE_DPR(pSmi, 0x3C, (dst_pixelpitch << 16) | (src_pixelpitch & 0xFFFF));
 
     if (pDst->drawable.bitsPerPixel == 24) {
 	x *= 3;
 	w *= 3;
-	dst_pitch *= 3;
+	dst_pixelpitch *= 3;
 	if (pSmi->Chipset == SMI_LYNX) {
 	    y *= 3;
 	}
     }
 
     /* Source and Destination Row Pitch */
-    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (source_pitch & 0xFFFF));
+    WRITE_DPR(pSmi, 0x10, (dst_pixelpitch << 16) | (src_pixelpitch & 0xFFFF));
     /* Drawing engine data format */
     WRITE_DPR(pSmi, 0x1C,PIXMAP_FORMAT(pDst));
     /* Source and Destination Base Address (offset) */
@@ -504,11 +504,11 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
     WRITE_DPR(pSmi, 0x00, 0);
-    WRITE_DPR(pSmi, 0x04, (x << 16) | (y * 0xFFFF));
+    WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
 
     while (h--) {
-	WaitQueue(aligned_pitch);
+/* 	WaitQueue(aligned_pitch); */
 	memcpy(pSmi->DataPortBase, src, aligned_pitch);
 	src += src_pitch;
     }
