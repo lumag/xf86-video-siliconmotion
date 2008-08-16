@@ -82,6 +82,37 @@ The default value can be set with the driver option Interlaced
 
 #define MAKE_ATOM(a)	MakeAtom(a, sizeof(a) - 1, TRUE)
 
+#define ROTATE_COORDS(x,y) do{			\
+      long x0=x;				\
+      if(pSmi->rotate==SMI_ROTATE_CCW){		\
+	 x = pScrn->virtualY - y; y = x0;	\
+      }else{					\
+	 x = y; y = pScrn->virtualX - x0;	\
+      }						\
+   }while(0)
+
+#define UNROTATE_COORDS(x,y) do{		\
+      long x0=x;				\
+      if(pSmi->rotate==SMI_ROTATE_CW){		\
+	 x = pScrn->virtualX - y; y = x0;	\
+      }else{					\
+	 x = y; y = pScrn->virtualY - x0;	\
+      }						\
+   }while(0)
+
+#define ROTATE_DIMS(w,h) do{ long w0=w; w=h; h=w0; } while(0)
+#define UNROTATE_DIMS(w,h) ROTATE_DIMS(w,h)
+
+#define ROTATE_BOX(b) do{						\
+      if(pSmi->rotate==SMI_ROTATE_CCW) ROTATE_DIMS(b.y1,b.y2);		\
+      else ROTATE_DIMS(b.x1,b.x2);					\
+      ROTATE_COORDS(b.x1,b.y1); ROTATE_COORDS(b.x2,b.y2); } while(0)
+#define UNROTATE_BOX(b) do{						\
+      if(pSmi->rotate==SMI_ROTATE_CW) ROTATE_DIMS(b.y1,b.y2);		\
+      else ROTATE_DIMS(b.x1,b.x2);					\
+      UNROTATE_COORDS(b.x1,b.y1); UNROTATE_COORDS(b.x2,b.y2); } while(0)
+
+
 #if SMI_USE_VIDEO
 #include "dixstruct.h"
 
@@ -586,12 +617,12 @@ SMI_InitVideo(ScreenPtr pScreen)
 
     DEBUG((VERBLEV, "numAdaptors=%d\n", numAdaptors));
 
-    if (psmi->rotate == 0)
-    {
+/*     if (psmi->rotate == 0) */
+/*     { */
         newAdaptor = SMI_SetupVideo(pScreen);
         DEBUG((VERBLEV, "newAdaptor=%p\n", newAdaptor));
         SMI_InitOffscreenImages(pScreen);
-    }
+/*     } */
 
     if (newAdaptor != NULL) {
         if (numAdaptors == 0) {
@@ -807,7 +838,7 @@ SMI_SetupVideo(ScreenPtr pScreen)
 		     ;
 
     ptrAdaptor->flags = VIDEO_OVERLAID_IMAGES
-		      | VIDEO_CLIP_TO_VIEWPORT
+/* 		      | VIDEO_CLIP_TO_VIEWPORT */
 		      ;
 
     ptrAdaptor->name = "Silicon Motion Lynx Series Video Engine";
@@ -1473,6 +1504,14 @@ SMI_PutImage(
 
     ENTER_PROC("SMI_PutImage");
 
+    if(pSmi->rotate){
+       /* As we cannot display it rotated, we pretend it has */
+       /* the rotated dimensions to do the clipping... */
+       ROTATE_DIMS(src_x,src_y);
+       ROTATE_DIMS(src_w,src_h);
+       ROTATE_DIMS(width,height);
+    }
+
     x1 = src_x;
     y1 = src_y;
     x2 = src_x + src_w;
@@ -1486,6 +1525,17 @@ SMI_PutImage(
     if (!SMI_ClipVideo(pScrn, &dstBox, &x1, &y1, &x2, &y2, clipBoxes, width, height)) {
 	LEAVE_PROC("SMI_PutImage");
 	return Success;
+    }
+
+    if(pSmi->rotate){
+       /* Now, transform the coordinates back */
+       /* to the physical (unrotated) frame */
+       UNROTATE_DIMS(x1,y1);
+       UNROTATE_DIMS(x2,y2);
+       UNROTATE_BOX(dstBox);
+       UNROTATE_DIMS(src_w,src_h);
+       UNROTATE_DIMS(drw_w,drw_h);
+       UNROTATE_DIMS(width,height);
     }
 
     dstBox.x1 -= pScrn->frameX0;
@@ -1711,16 +1761,28 @@ SMI_ClipVideo(
 )
 {
     ScreenPtr pScreen = pScrn->pScreen;
+    SMIPtr pSmi = SMIPTR(pScrn);
     INT32 vscale, hscale;
-    BoxPtr extents = REGION_EXTENTS(pScreen, reg);
     int diff;
 
     ENTER_PROC("SMI_ClipVideo");
 
     DEBUG((VERBLEV, "ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16));
+
+    /* Rotate the viewport before clipping  */
+    RegionRec VPReg;
+    BoxRec VPBox = { pScrn->frameX0 , pScrn->frameY0,
+		     pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
+    if(pSmi->rotate)
+       ROTATE_BOX(VPBox);
+    REGION_INIT(pScreen, &VPReg, &VPBox, 1);
+    REGION_INTERSECT(pScreen, reg, reg, &VPReg);
+    REGION_UNINIT(pScreen, &VPReg);
+    BoxPtr extents = REGION_EXTENTS(pScreen, reg);
+
     /* PDR#941 */
-    extents->x1 = max(extents->x1, pScrn->frameX0);
-    extents->y1 = max(extents->y1, pScrn->frameY0);
+    extents->x1 = max(extents->x1, VPBox.x1);
+    extents->y1 = max(extents->y1, VPBox.y1);
 
     hscale = ((*x2 - *x1) << 16) / (dst->x2 - dst->x1);
     vscale = ((*y2 - *y1) << 16) / (dst->y2 - dst->y1);
@@ -2072,7 +2134,7 @@ SMI_InitOffscreenImages(
 
     offscreenImages->image = SMI_VideoImages;
     offscreenImages->flags = VIDEO_OVERLAID_IMAGES
-			   | VIDEO_CLIP_TO_VIEWPORT;
+                         /*| VIDEO_CLIP_TO_VIEWPORT*/;
     offscreenImages->alloc_surface = SMI_AllocSurface;
     offscreenImages->free_surface = SMI_FreeSurface;
     offscreenImages->display = SMI_DisplaySurface;
