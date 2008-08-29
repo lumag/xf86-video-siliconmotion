@@ -913,8 +913,8 @@ SMI_SetupVideo(ScreenPtr pScreen)
     smiPortPtr->I2CDev.SlaveAddr = SAA7111;
     smiPortPtr->I2CDev.pI2CBus = pSmi->I2C;
 
-    
-    if (xf86I2CDevInit(&(smiPortPtr->I2CDev))) {
+
+    if (!IS_MSOC(pSmi) && xf86I2CDevInit(&(smiPortPtr->I2CDev))) {
 	
 	if (xf86I2CWriteVec(&(smiPortPtr->I2CDev), SAA7111InitData, ENTRIES(SAA7111InitData) / 2)) {
 	    xvEncoding   = MAKE_ATOM(XV_ENCODING_NAME);
@@ -1241,7 +1241,9 @@ SMI_PutVideo(
     width = (x2 - x1) >> 16;
     height = (y2 - y1) >> 16;
 
-    OUT_SEQ(pSmi, 0x21, IN_SEQ(pSmi, 0x21) & ~0x04);
+    if (!IS_MSOC(pSmi)) {
+	OUT_SEQ(pSmi, 0x21, IN_SEQ(pSmi, 0x21) & ~0x04);
+    }
     WRITE_VPR(pSmi, 0x54, READ_VPR(pSmi, 0x54) | 0x00200000);
 #if 0
 	SMI_WaitForSync(pScrn);
@@ -1327,6 +1329,9 @@ SMI_StopVideo(
 	if (pPort->videoStatus & CLIENT_VIDEO_ON) {
 	    if (pSmi->Chipset == SMI_COUGAR3DR) {
 		WRITE_FPR(pSmi, FPR00, READ_FPR(pSmi, 0x00) & ~(FPR00_VWIENABLE));
+	    }
+	    else if (IS_MSOC(pSmi)) {
+		WRITE_DCR(pSmi, DCR40, READ_DCR (pSmi, DCR40) & ~0x00000004);
 	    } else {
 		WRITE_VPR(pSmi, 0x00, READ_VPR(pSmi, 0x00) & ~0x01000008);
 	    }

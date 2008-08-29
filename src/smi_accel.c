@@ -32,11 +32,13 @@ authorization from the XFree86 Project and silicon Motion.
 #endif
 
 #include "smi.h"
+#include "smi_501.h"
 
 void
 SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
+    unsigned int	iTempVal;
     CARD8 tmp;
 
     ENTER_PROC("SMI_GEReset");
@@ -49,12 +51,20 @@ SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
 	WaitIdleEmpty();
     }
 
-    tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp | 0x30);
+    if (IS_MSOC(pSmi)) {
+	iTempVal = READ_SCR(pSmi, SCR00) & ~0x00003000;
+	WRITE_SCR (pSmi, SCR00, iTempVal | 0x00003000);
+	WRITE_SCR (pSmi, SCR00, iTempVal);
+    }
+    else {
+	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp | 0x30);
+    }
 
     WaitIdleEmpty();
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp);
+    if (!IS_MSOC(pSmi))
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp);
     SMI_EngineReset(pScrn);
 
     LEAVE_PROC("SMI_GEReset");
