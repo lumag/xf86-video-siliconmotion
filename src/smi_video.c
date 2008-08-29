@@ -66,7 +66,11 @@ The default value can be set with the driver option Interlaced
 */
 
 
-
+#ifdef XF86_VERSION_CURRENT
+#  if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
+#    define REGION_EQUAL(pScreen, r1, r2)	RegionsEqual(r1, r2))
+#  endif
+#endif
 
 #undef MIN
 #undef ABS
@@ -1223,11 +1227,7 @@ SMI_PutVideo(
     vid_address = pPort->video_offset;
 
     DEBUG((VERBLEV, "test RegionsEqual\n"));
-#if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
-    if (!RegionsEqual(&pPort->clip, clipBoxes))
-#else
     if (!REGION_EQUAL(pScrn->pScreen, &pPort->clip, clipBoxes))
-#endif
     {
 	DEBUG((VERBLEV, "RegionCopy\n"));
         REGION_COPY(pScrn->pScreen, &pPort->clip, clipBoxes);
@@ -1620,11 +1620,7 @@ SMI_PutImage(
         break;
     }
 
-#if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
-    if (!RegionsEqual(&pPort->clip, clipBoxes))
-#else
     if (!REGION_EQUAL(pScrn->pScreen, &pPort->clip, clipBoxes))
-#endif
     {
         REGION_COPY(pScrn->pScreen, &pPort->clip, clipBoxes);
 	xf86XVFillKeyHelper(pScrn->pScreen, pPort->Attribute[XV_COLORKEY],
