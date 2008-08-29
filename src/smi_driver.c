@@ -39,6 +39,7 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "shadowfb.h"
 
 #include "smi.h"
+#include "smi_501.h"
 
 #include "globals.h"
 #define DPMS_SERVER
@@ -97,6 +98,9 @@ static Bool SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr);
                                       (SILICONMOTION_VERSION_MINOR << 16) | \
                                       (SILICONMOTION_PATCHLEVEL))
 
+/* for dualhead */
+int gSMIEntityIndex = -1;
+
 /*
  * This contains the functions needed by the server after loading the
  * driver module.  It must be supplied, and gets added the driver list by
@@ -126,6 +130,7 @@ static SymTabRec SMIChipsets[] =
     { PCI_CHIP_SMI712, "LynxEM+" },
     { PCI_CHIP_SMI720, "Lynx3DM" },
     { PCI_CHIP_SMI731, "Cougar3DR" },
+    { PCI_CHIP_SMI501, "MSOC"	},
     { -1,             NULL      }
 };
 
@@ -139,6 +144,7 @@ static PciChipsets SMIPciChipsets[] =
     { PCI_CHIP_SMI712,	PCI_CHIP_SMI712,	RES_SHARED_VGA },
     { PCI_CHIP_SMI720,	PCI_CHIP_SMI720,	RES_SHARED_VGA },
     { PCI_CHIP_SMI731,	PCI_CHIP_SMI731,	RES_SHARED_VGA },
+    { PCI_CHIP_SMI501,	PCI_CHIP_SMI501,	RES_UNDEFINED  },
     { -1,				-1,					RES_UNDEFINED  }
 };
 
@@ -378,6 +384,17 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 
 #endif /* XFree86LOADER */
 
+static SMIRegPtr
+SMIEntPriv(ScrnInfoPtr pScrn)
+{
+    DevUnion *pPriv;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    pPriv = xf86GetEntityPrivate(pSmi->pEnt->index, gSMIEntityIndex);
+
+    return pPriv->ptr;
+}
+
 static Bool
 SMI_GetRec(ScrnInfoPtr pScrn)
 {
@@ -470,27 +487,57 @@ SMI_Probe(DriverPtr drv, int flags)
     if (flags & PROBE_DETECT) {
 		foundScreen = TRUE;
     } else {
+	ScrnInfoPtr	pScrn;
+	EntityInfoPtr	pEnt;
+
 	for (i = 0; i < numUsed; i++) {
-	    /* Allocate a ScrnInfoRec and claim the slot */
-	    ScrnInfoPtr pScrn = xf86AllocateScreen(drv, 0);
+	    if ((pScrn = xf86ConfigPciEntity(NULL, 0, usedChips[i],
+					     SMIPciChipsets, NULL,
+					     NULL, NULL, NULL, NULL))) {
+		pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
+		pScrn->driverName    = SILICONMOTION_DRIVER_NAME;
+		pScrn->name	     = SILICONMOTION_NAME;
+		pScrn->Probe	     = SMI_Probe;
+		pScrn->PreInit	     = SMI_PreInit;
+		pScrn->ScreenInit    = SMI_ScreenInit;
+		pScrn->SwitchMode    = SMI_SwitchMode;
+		pScrn->AdjustFrame   = SMI_AdjustFrame;
+		pScrn->EnterVT	     = SMI_EnterVT;
+		pScrn->LeaveVT	     = SMI_LeaveVT;
+		pScrn->FreeScreen    = SMI_FreeScreen;
+		pScrn->ValidMode     = SMI_ValidMode;
+		foundScreen	     = TRUE;
 
-	    /* Fill in what we can of the ScrnInfoRec */
-	    pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
-	    pScrn->driverName	 = SILICONMOTION_DRIVER_NAME;
-	    pScrn->name		 = SILICONMOTION_NAME;
-	    pScrn->Probe	 = SMI_Probe;
-	    pScrn->PreInit	 = SMI_PreInit;
-	    pScrn->ScreenInit	 = SMI_ScreenInit;
-	    pScrn->SwitchMode	 = SMI_SwitchMode;
-	    pScrn->AdjustFrame	 = SMI_AdjustFrame;
-	    pScrn->EnterVT	 = SMI_EnterVT;
-	    pScrn->LeaveVT	 = SMI_LeaveVT;
-	    pScrn->FreeScreen	 = SMI_FreeScreen;
-	    pScrn->ValidMode	 = SMI_ValidMode;
-	    foundScreen		 = TRUE;
+		if ((pEnt = xf86GetEntityInfo(usedChips[i]))) {
+		    if (pEnt->chipset == PCI_CHIP_SMI501) {
+			DevUnion	*pPriv;
+			SMIRegPtr	 pSMIEnt;
+			int		 instance;
 
-	    xf86ConfigActivePciEntity(pScrn, usedChips[i], SMIPciChipsets, NULL,
-				      NULL, NULL, NULL, NULL);
+			xf86SetEntitySharable(usedChips[i]);
+			if (gSMIEntityIndex < 0)
+			    gSMIEntityIndex = xf86AllocateEntityPrivateIndex();
+
+			pPriv = xf86GetEntityPrivate(pScrn->entityList[0],
+						     gSMIEntityIndex);
+			if (!pPriv->ptr) {
+			    pPriv->ptr = xnfcalloc(sizeof (SMIRegRec), 1);
+			    pSMIEnt = pPriv->ptr;
+			    pSMIEnt->DualHead = FALSE;
+			    instance = 0;
+			}
+			else {
+			    pSMIEnt = pPriv->ptr;
+			    pSMIEnt->DualHead = TRUE;
+			    instance = 1;
+			}
+			xf86SetEntityInstanceForScreen(pScrn,
+						       pScrn->entityList[0],
+						       instance);
+		    }
+		    xfree(pEnt);
+		}
+	    }
 	}
     }
     xfree(usedChips);

@@ -102,6 +102,7 @@ typedef struct
     /* PLL controls */
     CARD8   SR68, SR69, SR6C, SR6D, SR6E, SR6F;
 
+    Bool	DualHead;
 } SMIRegRec, *SMIRegPtr;
 
 /* Global PDEV structure. */
