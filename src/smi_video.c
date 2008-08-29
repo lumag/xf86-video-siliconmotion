@@ -157,6 +157,11 @@ static Bool SMI_ClipVideo(ScrnInfoPtr pScrn, BoxPtr dst,
 static void SMI_DisplayVideo(ScrnInfoPtr pScrn, int id, int offset,
 		short width, short height, int pitch, int x1, int y1, int x2, int y2,
 		BoxPtr dstBox, short vid_w, short vid_h, short drw_w, short drw_h);
+static void SMI_DisplayVideo0501(ScrnInfoPtr pScrn, int id, int offset,
+				 short width, short height, int pitch,
+				 int x1, int y1, int x2, int y2,
+				 BoxPtr dstBox, short vid_w, short vid_h,
+				 short drw_w, short drw_h);
 static void SMI_DisplayVideo0730(ScrnInfoPtr pScrn, int id, int offset,
 		short width, short height, int pitch, int x1, int y1, int x2, int y2,
 		BoxPtr dstBox, short vid_w, short vid_h, short drw_w, short drw_h);
@@ -393,6 +398,51 @@ static XF86ImageRec SMI_VideoImages[] =
     },
 };
 
+
+/**************************************************************************/
+static XF86ImageRec SMI501_VideoImages[] = {
+    XVIMAGE_YUY2,
+    XVIMAGE_YV12,
+    XVIMAGE_I420,
+    {
+     FOURCC_RV16,		/* id                                           */
+     XvRGB,			/* type                                         */
+     LSBFirst,			/* byte_order                           */
+     {'R', 'V', '1', '6',
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00},	/* guid                                         */
+     16,			/* bits_per_pixel                       */
+     XvPacked,			/* format                                       */
+     1,				/* num_planes                           */
+     16,			/* depth                                        */
+     0x001F, 0x07E0, 0xF800,	/* red_mask, green, blue        */
+     0, 0, 0,			/* y_sample_bits, u, v          */
+     0, 0, 0,			/* horz_y_period, u, v          */
+     0, 0, 0,			/* vert_y_period, u, v          */
+     {'R', 'V', 'B'},		/* component_order                      */
+     XvTopToBottom		/* scaline_order                        */
+     },
+    {
+     FOURCC_RV32,		/* id                                           */
+     XvRGB,			/* type                                         */
+     LSBFirst,			/* byte_order                           */
+     {'R', 'V', '3', '2',
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00},	/* guid                                         */
+     32,			/* bits_per_pixel                       */
+     XvPacked,			/* format                                       */
+     1,				/* num_planes                           */
+     24,			/* depth                                        */
+     0x0000FF, 0x00FF00, 0xFF0000,	/* red_mask, green, blue        */
+     0, 0, 0,			/* y_sample_bits, u, v          */
+     0, 0, 0,			/* horz_y_period, u, v          */
+     0, 0, 0,			/* vert_y_period, u, v          */
+     {'R', 'V', 'B'},		/* component_order                      */
+     XvTopToBottom		/* scaline_order                        */
+     },
+};
 
 /**************************************************************************/
 
@@ -871,11 +921,17 @@ SMI_SetupVideo(ScreenPtr pScreen)
     ptrAdaptor->nAttributes = nElems(SMI_VideoAttributes);
     ptrAdaptor->pAttributes = SMI_VideoAttributes;
 
-    ptrAdaptor->nImages = nElems(SMI_VideoImages);
-    ptrAdaptor->pImages = SMI_VideoImages;
+    if (IS_MSOC(pSmi)) {
+	ptrAdaptor->nImages = nElems(SMI501_VideoImages);
+	ptrAdaptor->pImages = SMI501_VideoImages;
+    }
+    else {
+	ptrAdaptor->nImages = nElems(SMI_VideoImages);
+	ptrAdaptor->pImages = SMI_VideoImages;
+    }
 
 #if SMI_USE_CAPTURE
-    if (pSmi->Chipset == SMI_COUGAR3DR)
+    if (pSmi->Chipset == SMI_COUGAR3DR || IS_MSOC(pSmi))
 	ptrAdaptor->PutVideo = NULL;
     else
 	ptrAdaptor->PutVideo = SMI_PutVideo;
@@ -1625,19 +1681,23 @@ SMI_PutImage(
         break;
     }
 
-    if (!REGION_EQUAL(pScrn->pScreen, &pPort->clip, clipBoxes))
-    {
-        REGION_COPY(pScrn->pScreen, &pPort->clip, clipBoxes);
+    if (IS_MSOC(pSmi) ||
+	!REGION_EQUAL(pScrn->pScreen, &pPort->clip, clipBoxes)) {
+	REGION_COPY(pScrn->pScreen, &pPort->clip, clipBoxes);
 	xf86XVFillKeyHelper(pScrn->pScreen, pPort->Attribute[XV_COLORKEY],
 			    clipBoxes);
     }
 
-    if (pSmi->Chipset != SMI_COUGAR3DR)
-	SMI_DisplayVideo(pScrn, id, offset, width, height, dstPitch, x1, y1, x2, y2,
-			 &dstBox, src_w, src_h, drw_w, drw_h);
-    else
+    if (pSmi->Chipset == SMI_COUGAR3DR)
 	SMI_DisplayVideo0730(pScrn, id, offset, width, height, dstPitch, x1, y1, x2, y2,
 			     &dstBox, src_w, src_h, drw_w, drw_h);
+    else if (IS_MSOC(pSmi))
+	SMI_DisplayVideo0501(pScrn, id, offset, width, height, dstPitch,
+			     x1, y1, x2, y2, &dstBox, src_w, src_h, drw_w,
+			     drw_h);
+    else
+	SMI_DisplayVideo(pScrn, id, offset, width, height, dstPitch, x1, y1, x2, y2,
+			 &dstBox, src_w, src_h, drw_w, drw_h);
 
     pPort->videoStatus = CLIENT_VIDEO_ON;
     LEAVE_PROC("SMI_PutImage");
@@ -1945,6 +2005,84 @@ SMI_DisplayVideo(
 }
 
 static void
+SMI_DisplayVideo0501(ScrnInfoPtr pScrn,
+		     int id,
+		     int offset,
+		     short width,
+		     short height,
+		     int pitch,
+		     int x1,
+		     int y1,
+		     int x2,
+		     int y2,
+		     BoxPtr dstBox,
+		     short vid_w, short vid_h, short drw_w, short drw_h)
+{
+    SMIPtr	pSmi = SMIPTR (pScrn);
+    CARD32	dcr40;
+    int		hstretch, vstretch;
+
+    ENTER_PROC("SMI_DisplayVideo0501");
+
+    dcr40 = READ_DCR(pSmi, DCR40) & ~0x00003FFF;
+
+    switch (id) {
+	case FOURCC_YV12:
+	case FOURCC_I420:
+	case FOURCC_YUY2:
+	    dcr40 |= 0x3;
+	    break;
+
+	case FOURCC_RV16:
+	    dcr40 |= 0x1;
+	    break;
+
+	case FOURCC_RV32:
+	    dcr40 |= 0x2;
+	    break;
+    }
+
+
+    if (drw_w > vid_w) {	/*  Horizontal Stretch */
+	hstretch = (40960 * vid_w / drw_w + 5) / 10;
+	dcr40 |= 1 << 8;
+    }
+    else {			/*  Horizontal Shrink */
+
+	hstretch = ((40960 * drw_w / vid_w + 5) / 10) | 0x8000;
+    }
+
+    if (drw_h > vid_h) {	/* Vertical Stretch */
+	vstretch = (40960 * vid_h / drw_h + 5) / 10;
+	dcr40 |= 1 << 9;
+    }
+    else {			/* Vertical Shrink */
+
+	vstretch = ((40960 * drw_h / vid_h + 5) / 10) | 0x8000;
+    }
+#if 0
+    SMI_WaitForSync(pScrn);
+#endif
+
+    /* Set Color Key Enable bit */
+
+    WRITE_DCR(pSmi, DCR00, READ_DCR(pSmi, DCR00) | (1 << 9));
+    WRITE_DCR(pSmi, DCR50, dstBox->x1 | (dstBox->y1 << 16));
+    WRITE_DCR(pSmi, DCR54, dstBox->x2 | (dstBox->y2 << 16));
+    WRITE_DCR(pSmi, DCR44, offset);
+
+    WRITE_DCR(pSmi, DCR48, pitch | (pitch << 16));
+    WRITE_DCR(pSmi, DCR4C, offset + (pitch * height));
+    WRITE_DCR(pSmi, DCR58, (vstretch << 16) | hstretch);
+    WRITE_DCR(pSmi, DCR5C, 0x00000000);
+    WRITE_DCR(pSmi, DCR60, 0x00EDEDED);
+
+    WRITE_DCR(pSmi, DCR40, dcr40 | (1 << 2));
+
+    LEAVE_PROC("SMI_DisplayVideo0501");
+}
+
+static void
 SMI_DisplayVideo0730(
 	ScrnInfoPtr	pScrn,
 	int		id,
@@ -2039,6 +2177,9 @@ SMI_BlockHandler(
             if (pPort->offTime < currentTime.milliseconds) {
 		if (pSmi->Chipset == SMI_COUGAR3DR) {
 		    WRITE_FPR(pSmi, FPR00, READ_FPR(pSmi, 0x00) & ~(FPR00_VWIENABLE));
+		}
+		else if (IS_MSOC(pSmi)) {
+		    WRITE_DCR(pSmi, DCR40, READ_DCR(pSmi, DCR40) & ~0x00000004);
 		} else {
 		    WRITE_VPR(pSmi, 0x00, READ_VPR(pSmi, 0x00) & ~0x00000008);
 		}
@@ -2427,16 +2568,24 @@ SMI_DisplaySurface(
     xf86XVFillKeyHelper(surface->pScrn->pScreen,
 			pPort->Attribute[XV_COLORKEY], clipBoxes);
 
-    if (pSmi->Chipset != SMI_COUGAR3DR) {
-	SMI_ResetVideo(surface->pScrn);
-	SMI_DisplayVideo(surface->pScrn, surface->id, surface->offsets[0],
-			 surface->width, surface->height, surface->pitches[0], x1, y1, x2,
-			 y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
-    } else {
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
 	SMI_ResetVideo(surface->pScrn);
 	SMI_DisplayVideo0730(surface->pScrn, surface->id, surface->offsets[0],
 			     surface->width, surface->height, surface->pitches[0], x1, y1, x2,
 			     y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
+    }
+    else if (IS_MSOC(pSmi)) {
+	SMI_ResetVideo (surface->pScrn);
+	SMI_DisplayVideo0501(surface->pScrn, surface->id,
+			     surface->offsets[0], surface->width,
+			     surface->height, surface->pitches[0], x1, y1,
+			     x2, y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
+    }
+    else {
+	SMI_ResetVideo(surface->pScrn);
+	SMI_DisplayVideo(surface->pScrn, surface->id, surface->offsets[0],
+			 surface->width, surface->height, surface->pitches[0], x1, y1, x2,
+			 y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
     }
 
     ptrOffscreen->isOn = TRUE;
@@ -2506,6 +2655,14 @@ SetKeyReg(SMIPtr pSmi, int reg, int value)
 {
     if (pSmi->Chipset == SMI_COUGAR3DR) {
 	WRITE_FPR(pSmi, reg, value);
+    }
+    else if (IS_MSOC(pSmi)) {
+	/* We don't change the color mask, and we don't do brightness.  IF
+	 * they write to the colorkey register, we'll write the value to the
+	 * 501 colorkey register */
+	if (FPR04 == reg) {	/* Only act on colorkey value writes */
+	    WRITE_DCR (pSmi, DCR08, value);	/* ColorKey register is DCR08 */
+	}
     } else {
 	WRITE_VPR(pSmi, reg, value);
     }
