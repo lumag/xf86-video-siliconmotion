@@ -1662,11 +1662,6 @@ SMI_PutImage(
 	tmp = ((top >> 1) * srcPitch2) + (left >> 2);
 	offset2 += tmp;
 	offset3 += tmp;
-	if (id == FOURCC_I420) {
-	   tmp = offset2;
-	   offset2 = offset3;
-	   offset3 = tmp;
-	}
 	nLines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
 	xf86XVCopyYUV12ToPacked(buf + (top * srcPitch) + (left >> 1), 
 				buf + offset2, buf + offset3, dstStart,
