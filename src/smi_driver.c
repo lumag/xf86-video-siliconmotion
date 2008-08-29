@@ -87,7 +87,7 @@ static void SMI_DetectPanelSize(ScrnInfoPtr pScrn);
 static Bool SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr);
 
 
-#define SILICONMOTION_NAME          "Silicon Motion"
+#define SILICONMOTION_NAME		"SMI"
 #define SILICONMOTION_DRIVER_NAME   "siliconmotion"
 #define SILICONMOTION_VERSION_NAME  PACKAGE_VERSION
 #define SILICONMOTION_VERSION_MAJOR PACKAGE_VERSION_MAJOR
