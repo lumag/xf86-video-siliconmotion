@@ -89,6 +89,9 @@ SMI_XAAInit(ScreenPtr pScreen)
 
     infoPtr->Sync = SMI_AccelSync;
 
+    if (xf86IsEntityShared(pScrn->entityList[0]))
+	infoPtr->RestoreAccelState = SMI_EngineReset;
+
     /* Screen to screen copies */
     infoPtr->ScreenToScreenCopyFlags = NO_PLANEMASK
 				     | ONLY_TWO_BITBLT_DIRECTIONS;
@@ -237,6 +240,10 @@ SMI_SetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int ydir, int rop,
     DEBUG((VERBLEV, "xdir=%d ydir=%d rop=%02X trans=%08X\n", xdir, ydir,
 	   rop, trans));
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24)
+	trans = lswapl(trans);
+#endif
     pSmi->AccelCmd = XAAGetCopyROP(rop)
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
@@ -293,6 +300,7 @@ SMI_SubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
     }
 
     WaitQueue(4);
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, (x1 << 16) + (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (x2 << 16) + (y2 & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w  << 16) + (h  & 0xFFFF));
@@ -318,6 +326,19 @@ SMI_SetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop,
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24) {
+	/* because of the BGR values are in the MSB bytes,
+	 * 'white' is not possible and -1 has a different meaning.
+	 * As a work around (assuming white is more used as
+	 * light yellow (#FFFF7F), we handle this as beining white.
+	 * Thanks to the SM501 not being able to work in MSB on PCI
+	 * on the PowerPC */
+	if (color == 0x7FFFFFFF)
+	    color = -1;
+	color = lswapl(color);
+    }
+#endif
     if (pSmi->ClipTurnedOn) {
 	WaitQueue(4);
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
@@ -349,7 +370,16 @@ SMI_SubsequentSolidFillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h)
 	}
     }
 
+    if (IS_MSOC(pSmi)) {
+	/* Clip to prevent negative screen coordinates */
+	if (x < 0)
+	    x = 0;
+	if (y < 0)
+	    y = 0;
+    }
+
     WaitQueue(3);
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -389,6 +419,7 @@ SMI_SubsequentSolidHorVertLine(ScrnInfoPtr pScrn, int x, int y, int len,
     }
 
     WaitQueue(3);
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -409,6 +440,16 @@ SMI_SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg,
     ENTER_PROC("SMI_SetupForCPUToScreenColorExpandFill");
     DEBUG((VERBLEV, "fg=%08X bg=%08X rop=%02X\n", fg, bg, rop));
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24) {
+	/* see remark elswere */
+	if (fg == 0x7FFFFFFF)
+	    fg = -1;
+	fg = lswapl(fg);
+	bg = lswapl(bg);
+    }
+#endif
+
     pSmi->AccelCmd = XAAGetCopyROP(rop)
 		   | SMI_HOSTBLT_WRITE
 		   | SMI_SRC_MONOCHROME
@@ -422,6 +463,10 @@ SMI_SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg,
 	WRITE_DPR(pSmi, 0x18, ~fg);
 	WRITE_DPR(pSmi, 0x20, fg);
     } else {
+#if __BYTE_ORDER == __BIG_ENDIAN
+	if (bg == 0xFFFFFF7F)
+	    bg = -1;
+#endif
 	WaitQueue(2);
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, bg);
@@ -463,6 +508,7 @@ SMI_SubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int x, int y, int w,
 	    WaitQueue(4);
 	}
     }
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
@@ -485,6 +531,14 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
     DEBUG((VERBLEV, "patx=%08X paty=%08X fg=%08X bg=%08X rop=%02X\n", patx,
 	   paty, fg, bg, rop));
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24) {
+	if (fg == 0x7FFFFFFF)
+	    fg = -1;
+	fg = lswapl(fg);
+	bg = lswapl(bg);
+    }
+#endif
     pSmi->AccelCmd = XAAGetPatternROP(rop)
 		   | SMI_BITBLT
 		   | SMI_START_ENGINE;
@@ -503,6 +557,10 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 	WRITE_DPR(pSmi, 0x34, patx);
 	WRITE_DPR(pSmi, 0x38, paty);
     } else {
+#if __BYTE_ORDER == __BIG_ENDIAN
+	if (bg == 0xFFFFFF7F)
+	    bg = -1;
+#endif
 	WaitQueue(4);
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, bg);
@@ -531,6 +589,7 @@ SMI_SubsequentMono8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
     }
 
     WaitQueue(3);
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -557,6 +616,10 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 		   | SMI_COLOR_PATTERN
 		   | SMI_START_ENGINE;
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24)
+	trans_color = lswapl(trans_color);
+#endif
     if (pScrn->bitsPerPixel <= 16) {
 	/* PDR#950 */
 	CARD8* pattern = pSmi->FBBase + (patx + paty * pSmi->Stride) * pSmi->Bpp;
@@ -576,6 +639,9 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 	WaitQueue(1);
 	WRITE_DPR(pSmi, 0x00, (patx << 16) | (paty & 0xFFFF));
     }
+
+    WaitQueue(1);
+    CHECK_SECONDARY(pSmi);
 
     if (trans_color == -1) {
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
@@ -612,6 +678,7 @@ SMI_SubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
     }
 
     WaitQueue(3);
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));	/* PDR#950 */
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -634,11 +701,19 @@ SMI_SetupForImageWrite(ScrnInfoPtr pScrn, int rop, unsigned int planemask,
     DEBUG((VERBLEV, "rop=%02X trans_color=%08X bpp=%d depth=%d\n", rop,
 	   trans_color, bpp, depth));
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    if (pScrn->depth >= 24)
+	trans_color = lswapl(trans_color);
+#endif
     pSmi->AccelCmd = XAAGetCopyROP(rop)
 		   | SMI_HOSTBLT_WRITE
 		   | SMI_START_ENGINE;
 
     if (trans_color != -1) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+	if (trans_color == 0xFFFFFF7F)
+	    trans_color = -1;
+#endif
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
 
 	WaitQueue(1);
@@ -681,6 +756,7 @@ SMI_SubsequentImageWriteRect(ScrnInfoPtr pScrn, int x, int y, int w, int h,
 	    WaitQueue(4);
 	}
     }
+    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y * 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));

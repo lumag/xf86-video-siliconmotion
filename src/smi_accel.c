@@ -79,6 +79,26 @@ SMI_AccelSync(ScrnInfoPtr pScrn)
     ENTER_PROC("SMI_AccelSync");
 
     WaitIdleEmpty(); /* #161 */
+    if (IS_MSOC(pSmi)) {
+	int	i, dwVal;
+
+	for (i = 0x1000000; i > 0; i--) {
+	    dwVal = regRead32(pSmi, CMD_INTPR_STATUS);
+	    if (FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  2D_ENGINE) == CMD_INTPR_STATUS_2D_ENGINE_IDLE &&
+		FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  2D_FIFO) == CMD_INTPR_STATUS_2D_FIFO_EMPTY &&
+		FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  2D_SETUP) == CMD_INTPR_STATUS_2D_SETUP_IDLE &&
+		FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  CSC_STATUS) == CMD_INTPR_STATUS_CSC_STATUS_IDLE &&
+		FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  2D_MEMORY_FIFO) == CMD_INTPR_STATUS_2D_MEMORY_FIFO_EMPTY &&
+		FIELD_GET(dwVal, CMD_INTPR_STATUS,
+			  COMMAND_FIFO) == CMD_INTPR_STATUS_COMMAND_FIFO_EMPTY)
+		break;
+	}
+    }
 
     LEAVE_PROC("SMI_AccelSync");
 }
@@ -125,6 +145,7 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
        WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
        WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
     }
+    CHECK_SECONDARY(pSmi);
 
     SMI_DisableClipping(pScrn);
 
@@ -160,6 +181,11 @@ SMI_SetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right,
 	    top    *= 3;
 	    bottom *= 3;
 	}
+    }
+
+    if (IS_MSOC(pSmi)) {
+	++right;
+	++bottom;
     }
 
     pSmi->ScissorsLeft = (top << 16) | (left & 0xFFFF) | 0x2000;
