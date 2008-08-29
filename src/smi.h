@@ -145,6 +145,8 @@ typedef struct
     CARD8 *		VPRBase;	/* Base of VPR registers */
     CARD8 *		CPRBase;	/* Base of CPR registers */
     CARD8 *		FPRBase;    /* Base of FPR registers - for 0730 chipset */
+    CARD8 *		DCRBase;		/* Base of DCR registers - for 0501 chipset */
+    CARD8 *		SCRBase;        /* Base of SCR registers - for 0501 chipset */
     CARD8 *		DataPortBase;	/* Base of data port */
     int			DataPortSize;	/* Size of data port */
     CARD8 *		IOBase;		/* Base of MMIO VGA ports */
@@ -259,6 +261,8 @@ typedef struct
     CARD8		DACmask;
 
     Bool		Dualhead;
+    Bool		IsSecondary;
+    EntityInfoPtr	pEnt;
 
     Bool		IsSwitching; /* when switching modes */
 

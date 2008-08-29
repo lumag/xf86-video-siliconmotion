@@ -30,6 +30,8 @@ siliconmotion_drv_ladir = @moduledir@/drivers
 
 siliconmotion_drv_la_SOURCES = \
          regsmi.h \
+         smi_501.c \
+         smi_501.h \
          smi_accel.c \
          smi_xaa.c \
          smi_exa.c \
