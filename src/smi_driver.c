@@ -1327,7 +1327,7 @@ SMI_LeaveVT(int scrnIndex, int flags)
 
     ENTER_PROC("SMI_LeaveVT");
 
-    if (IS_MSOC(pSmi)) {
+    if (!IS_MSOC(pSmi)) {
 	hwp = VGAHWPTR(pScrn);
 	vgaSavePtr = &hwp->SavedReg;
     }

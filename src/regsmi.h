@@ -120,14 +120,16 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define READ_SCR(pSmi, scr)		MMIO_IN32(pSmi->SCRBase, scr)
 
 #define CHECK_SECONDARY(pSmi)						\
-    if (IS_MSOC(pSmi) && !(pSmi)->IsSecondary) {			\
-	WRITE_DPR(pSmi, 0x40, 0);					\
-	WRITE_DPR(pSmi, 0x44, 0);					\
-    }									\
-    else {								\
-	WRITE_DPR(pSmi, 0x40, pScrn->fbOffset / 16 << 4);		\
-	WRITE_DPR(pSmi, 0x44, pScrn->fbOffset / 16 << 4);		\
-    }
+   if(IS_MSOC(pSmi)){							\
+       if ((pSmi)->IsSecondary) {					\
+	   WRITE_DPR(pSmi, 0x40, pScrn->fbOffset / 16 << 4);		\
+	   WRITE_DPR(pSmi, 0x44, pScrn->fbOffset / 16 << 4);		\
+       }								\
+       else {								\
+	   WRITE_DPR(pSmi, 0x40, 0);					\
+	   WRITE_DPR(pSmi, 0x44, 0);					\
+       }								\
+   }
 
 /* 2D Engine commands */
 #define SMI_TRANSPARENT_SRC	0x00000100
@@ -176,13 +178,13 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define MAXLOOP 0x100000	/* timeout value for engine waits */
 
 #define ENGINE_IDLE()							\
-    IS_MSOC(pSmi) ?							\
+   (IS_MSOC(pSmi) ?							\
 	(READ_SCR(pSmi, SCR00) & 0x00080000) == 0 :			\
-	(VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x08) == 0
+        (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x08) == 0)
 #define FIFO_EMPTY()							\
-    IS_MSOC(pSmi) ?							\
+   (IS_MSOC(pSmi) ?							\
 	READ_SCR(pSmi, SCR00) & 0x00100000 :				\
-	VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x10
+        VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x10)
 
 /* Wait until "v" queue entries are free */
 /**** FIXME
