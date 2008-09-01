@@ -66,12 +66,6 @@ The default value can be set with the driver option Interlaced
 */
 
 
-#ifdef XF86_VERSION_CURRENT
-#  if XF86_VERSION_CURRENT < XF86_VERSION_NUMERIC(4,3,99,0,0)
-#    define REGION_EQUAL(pScreen, r1, r2)	RegionsEqual(r1, r2))
-#  endif
-#endif
-
 #undef MIN
 #undef ABS
 #undef CLAMP
