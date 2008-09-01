@@ -48,6 +48,8 @@ authorization from The XFree86 Project or Silicon Motion.
 /*
  * Internals
  */
+static Bool SMI_MapMmio(ScrnInfoPtr pScrn);
+static Bool SMI_DetectMem(ScrnInfoPtr pScrn);
 static void SMI_EnableMmio(ScrnInfoPtr pScrn);
 static void SMI_DisableMmio(ScrnInfoPtr pScrn);
 
@@ -564,7 +566,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     double real;
     ClockRangePtr clockRanges;
     char *s;
-    unsigned char config, m, n, shift;
+    unsigned char m, n, shift;
     int mclk;
     vgaHWPtr hwp;
     int vgaCRIndex, vgaIOBase;
@@ -999,56 +1001,9 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		       "MMIOBase=%p\n", vgaCRIndex, vgaIOBase, hwp->MMIOBase);
     }
 
-    /* Next go on to detect amount of installed ram */
-    if (IS_MSOC(pSmi))
-	config = -1;
-    else
-	config = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x71);
-
-    /* And compute the amount of video memory and offscreen memory */
-    pSmi->videoRAMKBytes = 0;
-
-    if ((pScrn->videoRam = pScrn->confScreen->device->videoRam)) {
-	pSmi->videoRAMKBytes = pScrn->videoRam;
-	pSmi->videoRAMBytes  = pScrn->videoRam * 1024;
-    }
-    else if (!IS_MSOC(pSmi)) {
-	switch (pSmi->Chipset) {
-	default:
-	{
-	    int mem_table[4] = { 1, 2, 4, 0 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
-	    break;
-	}
-	case SMI_LYNX3D:
-	{
-	    int mem_table[4] = { 0, 2, 4, 6 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024 + 512;
-	    break;
-	}
-	case SMI_LYNX3DM:
-	{
-	    int mem_table[4] = { 16, 2, 4, 8 };
-	    pSmi->videoRAMKBytes = mem_table[(config >> 6)] * 1024;
-	    break;
-	}
-	case SMI_COUGAR3DR:
-	{
-	    /* DANGER - Cougar3DR BIOS is broken - hardcode video ram size */
-	    /* per instructions from Silicon Motion engineers */
-	    pSmi->videoRAMKBytes = 16 * 1024;
-	    break;
-	}
-	}
-	pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
-	pScrn->videoRam     = pSmi->videoRAMKBytes;
-    }
-
-    xf86DrvMsg(pScrn->scrnIndex, X_PROBED, "videoram: %dkB\n",
-	       pSmi->videoRAMKBytes);
-
+    SMI_MapMmio(pScrn);
+    SMI_DetectMem(pScrn);
     SMI_MapMem(pScrn);
-
     SMI_DisableVideo(pScrn);
 
     /* detect the panel size */
@@ -1919,119 +1874,117 @@ SMI_DetectPanelSize(ScrnInfoPtr pScrn)
 }
 
 static Bool
-SMI_MapMem(ScrnInfoPtr pScrn)
+SMI_MapMmio(ScrnInfoPtr pScrn)
 {
-    SMIPtr pSmi = SMIPTR(pScrn);
-    vgaHWPtr hwp;
-    CARD32 memBase;
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    CARD32	memBase;
 
-    ENTER_PROC("SMI_MapMem");
-
-    /* Map the Lynx register space */
     switch (pSmi->Chipset) {
-    default:
-      memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
-	pSmi->MapSize = 0x10000;
-	break;
-    case SMI_COUGAR3DR:
-        memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
-	pSmi->MapSize = 0x200000;
-	break;
-    case SMI_LYNX3D:
-	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x680000;
-	pSmi->MapSize = 0x180000;
-	break;
-    case SMI_LYNXEM:
-    case SMI_LYNXEMplus:
-	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
-	pSmi->MapSize = 0x400000;
-	break;
-    case SMI_LYNX3DM:
-	memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
-	pSmi->MapSize = 0x200000;
-	break;
-    case SMI_MSOC:
-        memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
-	pSmi->MapSize = 0x200000;
-	break;
+	case SMI_COUGAR3DR:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
+	    pSmi->MapSize = 0x200000;
+	    break;
+	case SMI_LYNX3D:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x680000;
+	    pSmi->MapSize = 0x180000;
+	    break;
+	case SMI_LYNXEM:
+	case SMI_LYNXEMplus:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
+	    pSmi->MapSize = 0x400000;
+	    break;
+	case SMI_LYNX3DM:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
+	    pSmi->MapSize = 0x200000;
+	    break;
+	case SMI_MSOC:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
+	    pSmi->MapSize = 0x200000;
+	    break;
+	default:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
+	    pSmi->MapSize = 0x10000;
+	    break;
     }
+
 #ifndef XSERVER_LIBPCIACCESS
     pSmi->MapBase = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, pSmi->PciTag,
 				  memBase, pSmi->MapSize);
 #else
     {
-      void** result = (void**)&pSmi->MapBase;
-      int err = pci_device_map_range(pSmi->PciInfo,
-				     memBase,
-				     pSmi->MapSize,
-				     PCI_DEV_MAP_FLAG_WRITABLE,
-				     result);
-      
-      if (err) 
-	return FALSE;
+	void	**result = (void**)&pSmi->MapBase;
+	int	  err = pci_device_map_range(pSmi->PciInfo,
+					     memBase,
+					     pSmi->MapSize,
+					     PCI_DEV_MAP_FLAG_WRITABLE,
+					     result);
+
+	if (err)
+	    return (FALSE);
     }
 #endif
+
     if (pSmi->MapBase == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Internal error: could not map "
 		   "MMIO registers.\n");
-	LEAVE_PROC("SMI_MapMem");
-	return FALSE;
+	return (FALSE);
     }
 
     switch (pSmi->Chipset) {
-    default:
-	pSmi->DPRBase = pSmi->MapBase + 0x8000;
-	pSmi->VPRBase = pSmi->MapBase + 0xC000;
-	pSmi->CPRBase = pSmi->MapBase + 0xE000;
-	pSmi->IOBase  = NULL;
-	pSmi->DataPortBase = pSmi->MapBase;
-	pSmi->DataPortSize = 0x8000;
-	break;
-    case SMI_COUGAR3DR:
-	pSmi->DPRBase = pSmi->MapBase + 0x000000;
-	pSmi->VPRBase = pSmi->MapBase + 0x000800;
-	pSmi->CPRBase = pSmi->MapBase + 0x001000;
-	pSmi->FPRBase = pSmi->MapBase + 0x005800;
-	pSmi->IOBase  = pSmi->MapBase + 0x0C0000;
-	pSmi->DataPortBase = pSmi->MapBase + 0x100000;
-	pSmi->DataPortSize = 0x100000;
-	break;
-    case SMI_LYNX3D:
-	pSmi->DPRBase = pSmi->MapBase + 0x000000;
-	pSmi->VPRBase = pSmi->MapBase + 0x000800;
-	pSmi->CPRBase = pSmi->MapBase + 0x001000;
-	pSmi->IOBase  = pSmi->MapBase + 0x040000;
-	pSmi->DataPortBase = pSmi->MapBase + 0x080000;
-	pSmi->DataPortSize = 0x100000;
-	break;
-    case SMI_LYNXEM:
-    case SMI_LYNXEMplus:
-	pSmi->DPRBase = pSmi->MapBase + 0x008000;
-	pSmi->VPRBase = pSmi->MapBase + 0x00C000;
-	pSmi->CPRBase = pSmi->MapBase + 0x00E000;
-	pSmi->IOBase  = pSmi->MapBase + 0x300000;
-	pSmi->DataPortBase = pSmi->MapBase /*+ 0x100000*/;
-	pSmi->DataPortSize = 0x8000 /*0x200000*/;
-	break;
-    case SMI_LYNX3DM:
-	pSmi->DPRBase = pSmi->MapBase + 0x000000;
-	pSmi->VPRBase = pSmi->MapBase + 0x000800;
-	pSmi->CPRBase = pSmi->MapBase + 0x001000;
-	pSmi->IOBase  = pSmi->MapBase + 0x0C0000;
-	pSmi->DataPortBase = pSmi->MapBase + 0x100000;
-	pSmi->DataPortSize = 0x100000;
-	break;
-    case SMI_MSOC:
-	pSmi->DPRBase = pSmi->MapBase + 0x100000;
-	pSmi->VPRBase = pSmi->MapBase + 0x000000;
-	pSmi->CPRBase = pSmi->MapBase + 0x090000;
-	pSmi->DCRBase = pSmi->MapBase + 0x080000;
-	pSmi->SCRBase = pSmi->MapBase + 0x000000;
-	pSmi->IOBase = 0;
-	pSmi->DataPortBase = pSmi->MapBase + 0x110000;
-	pSmi->DataPortSize = 0x10000;
-	break;
+	case SMI_COUGAR3DR:
+	    pSmi->DPRBase = pSmi->MapBase + 0x000000;
+	    pSmi->VPRBase = pSmi->MapBase + 0x000800;
+	    pSmi->CPRBase = pSmi->MapBase + 0x001000;
+	    pSmi->FPRBase = pSmi->MapBase + 0x005800;
+	    pSmi->IOBase  = pSmi->MapBase + 0x0C0000;
+	    pSmi->DataPortBase = pSmi->MapBase + 0x100000;
+	    pSmi->DataPortSize = 0x100000;
+	    break;
+	case SMI_LYNX3D:
+	    pSmi->DPRBase = pSmi->MapBase + 0x000000;
+	    pSmi->VPRBase = pSmi->MapBase + 0x000800;
+	    pSmi->CPRBase = pSmi->MapBase + 0x001000;
+	    pSmi->IOBase  = pSmi->MapBase + 0x040000;
+	    pSmi->DataPortBase = pSmi->MapBase + 0x080000;
+	    pSmi->DataPortSize = 0x100000;
+	    break;
+	case SMI_LYNXEM:
+	case SMI_LYNXEMplus:
+	    pSmi->DPRBase = pSmi->MapBase + 0x008000;
+	    pSmi->VPRBase = pSmi->MapBase + 0x00C000;
+	    pSmi->CPRBase = pSmi->MapBase + 0x00E000;
+	    pSmi->IOBase  = pSmi->MapBase + 0x300000;
+	    pSmi->DataPortBase = pSmi->MapBase /*+ 0x100000*/;
+	    pSmi->DataPortSize = 0x8000 /*0x200000*/;
+	    break;
+	case SMI_LYNX3DM:
+	    pSmi->DPRBase = pSmi->MapBase + 0x000000;
+	    pSmi->VPRBase = pSmi->MapBase + 0x000800;
+	    pSmi->CPRBase = pSmi->MapBase + 0x001000;
+	    pSmi->IOBase  = pSmi->MapBase + 0x0C0000;
+	    pSmi->DataPortBase = pSmi->MapBase + 0x100000;
+	    pSmi->DataPortSize = 0x100000;
+	    break;
+	case SMI_MSOC:
+	    pSmi->DPRBase = pSmi->MapBase + 0x100000;
+	    pSmi->VPRBase = pSmi->MapBase + 0x000000;
+	    pSmi->CPRBase = pSmi->MapBase + 0x090000;
+	    pSmi->DCRBase = pSmi->MapBase + 0x080000;
+	    pSmi->SCRBase = pSmi->MapBase + 0x000000;
+	    pSmi->IOBase = 0;
+	    pSmi->DataPortBase = pSmi->MapBase + 0x110000;
+	    pSmi->DataPortSize = 0x10000;
+	    break;
+	default:
+	    pSmi->DPRBase = pSmi->MapBase + 0x8000;
+	    pSmi->VPRBase = pSmi->MapBase + 0xC000;
+	    pSmi->CPRBase = pSmi->MapBase + 0xE000;
+	    pSmi->IOBase  = NULL;
+	    pSmi->DataPortBase = pSmi->MapBase;
+	    pSmi->DataPortSize = 0x8000;
+	    break;
     }
+
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 		   "Physical MMIO at 0x%08lX\n", (unsigned long)memBase);
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
@@ -2044,9 +1997,17 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 		   "DataPort=%p - %p\n", pSmi->DataPortBase,
 		   pSmi->DataPortBase + pSmi->DataPortSize - 1);
 
-    pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
+    return (TRUE);
+}
 
-    if (pSmi->videoRAMBytes == 0 && IS_MSOC(pSmi)) {
+static Bool
+SMI_DetectMem(ScrnInfoPtr pScrn)
+{
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
+    if ((pScrn->videoRam = pScrn->confScreen->device->videoRam))
+	pSmi->videoRAMKBytes = pScrn->videoRam;
+    else if (IS_MSOC(pSmi)) {
 	unsigned int	value;
 	unsigned int	total_memory;
 
@@ -2062,10 +2023,57 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	    total_memory = 8 * 1024;
 
 	pSmi->videoRAMKBytes = total_memory - FB_RESERVE4USB;
-	pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
-	pScrn->videoRam = pSmi->videoRAMKBytes;
-	pSmi->FBReserved = pSmi->videoRAMBytes - 4096;
+    }
+    else {
+	unsigned char	 config;
+	static int	 lynx3d_table[4]  = {  0, 2, 4, 6 };
+	static int	 lynx3dm_table[4] = { 16, 2, 4, 8 };
+	static int	 default_table[4] = {  1, 2, 4, 0 };
 
+	config = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x71);
+	switch (pSmi->Chipset) {
+	    case SMI_LYNX3D:
+		pSmi->videoRAMKBytes = lynx3d_table[config >> 6] * 1024 + 512;
+		break;
+	    case SMI_LYNX3DM:
+		pSmi->videoRAMKBytes = lynx3dm_table[(config >> 6)] * 1024;
+		break;
+	    case SMI_COUGAR3DR:
+		/* DANGER - Cougar3DR BIOS is broken - hardcode video ram size
+		 * per instructions from Silicon Motion engineers */
+		pSmi->videoRAMKBytes = 16 * 1024;
+		break;
+	    default:
+		pSmi->videoRAMKBytes = default_table[(config >> 6)] * 1024;
+		break;
+	}
+    }
+
+    pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
+    pScrn->videoRam     = pSmi->videoRAMKBytes;
+    xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
+	       "videoram: %dkB\n", pSmi->videoRAMKBytes);
+
+    return (TRUE);
+}
+
+static Bool
+SMI_MapMem(ScrnInfoPtr pScrn)
+{
+    SMIPtr pSmi = SMIPTR(pScrn);
+    vgaHWPtr hwp;
+    CARD32 memBase;
+
+    ENTER_PROC("SMI_MapMem");
+
+    if (pSmi->MapBase == NULL && SMI_MapMmio(pScrn) == FALSE) {
+	LEAVE_PROC("SMI_MapMem");
+	return (FALSE);
+    }
+
+    pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
+
+    if (IS_MSOC(pSmi)) {
 	if (pSmi->IsSecondary) {
 	    pSmi->FBOffset = 0;
 	    pScrn->fbOffset = pSmi->fbMapOffset = pScrn->videoRam * 1024;
@@ -2075,88 +2083,80 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	    pScrn->fbOffset = pSmi->fbMapOffset = 0;
 	}
     }
-    else
+    else {
 	SMI_EnableMmio(pScrn);
 
-    if (pSmi->videoRAMBytes) {
-	/* Map the frame buffer */
 	if (pSmi->Chipset == SMI_LYNX3DM) 
 	    pSmi->fbMapOffset = 0x200000;
 	else
 	    pSmi->fbMapOffset = 0x0;
 
-	if (!IS_MSOC(pSmi)) {
-	    pSmi->FBOffset = 0;
-	    pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
-	}
-
-#ifndef XSERVER_LIBPCIACCESS
-	pSmi->FBBase = xf86MapPciMem(pScrn->scrnIndex,
-				     VIDMEM_FRAMEBUFFER,
-				     pSmi->PciTag,
-				     pScrn->memPhysBase + pSmi->fbMapOffset,
-				     pSmi->videoRAMBytes);
-#else
-	{
-	  void** result = (void**)&pSmi->FBBase;
-	  int err = pci_device_map_range(pSmi->PciInfo,
-					 pScrn->memPhysBase + pSmi->fbMapOffset,
-					 pSmi->videoRAMBytes,
-					 PCI_DEV_MAP_FLAG_WRITABLE |
-					 PCI_DEV_MAP_FLAG_WRITE_COMBINE,
-					 result);
-	  
-	  if (err) 
-	    return FALSE;
-	}
-#endif
-	    
-	if (pSmi->FBBase == NULL) {
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Internal error: could not "
-		       "map framebuffer.\n");
-	    LEAVE_PROC("SMI_MapMem");
-	    return FALSE;
-	}
-
-	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
-		       "Physical frame buffer at 0x%08lX offset: 0x%08lX\n",
-		       pScrn->memPhysBase, pScrn->fbOffset);
-	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
-		       "Logical frame buffer at %p - %p\n", pSmi->FBBase,
-		       pSmi->FBBase + pSmi->videoRAMBytes - 1);
-
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		   "Cursor Offset: %08lX\n",
-		   (unsigned long)pSmi->FBCursorOffset);
-
-	/* set up the fifo reserved space */
-	if (IS_MSOC(pSmi)) {
-	    pSmi->FBCursorOffset = pSmi->videoRAMBytes - 2048;
-	    pSmi->FBReserved = pSmi->videoRAMBytes - 4096;
-	}
-	else {
-	    /* Set up offset to hwcursor memory area.  It's a 1K chunk at the end of
-	     * the frame buffer.
-	    */
-	    pSmi->FBCursorOffset = pSmi->videoRAMBytes - 1024;
-	    if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x30) & 0x01)/* #1074 */ {
-		CARD32 fifoOffset = 0;
-		fifoOffset |= VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x46) << 3;
-		fifoOffset |= VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x47) << 11;
-		fifoOffset |= (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x49)
-			       & 0x1C) << 17;
-		pSmi->FBReserved = fifoOffset;	/* PDR#1074 */
-	    }
-	    else
-		pSmi->FBReserved = pSmi->videoRAMBytes - 2048;
-	}
-
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Reserved: %08lX\n",
-		   (unsigned long)pSmi->FBReserved);
-
+	pSmi->FBOffset = 0;
+	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
     }
 
-    if (!IS_MSOC(pSmi)) {
+#ifndef XSERVER_LIBPCIACCESS
+    pSmi->FBBase = xf86MapPciMem(pScrn->scrnIndex,
+				 VIDMEM_FRAMEBUFFER,
+				 pSmi->PciTag,
+				 pScrn->memPhysBase + pSmi->fbMapOffset,
+				 pSmi->videoRAMBytes);
+#else
+    {
+	void	**result = (void**)&pSmi->FBBase;
+	int	  err = pci_device_map_range(pSmi->PciInfo,
+					     pScrn->memPhysBase +
+						 pSmi->fbMapOffset,
+					     pSmi->videoRAMBytes,
+					     PCI_DEV_MAP_FLAG_WRITABLE |
+					     PCI_DEV_MAP_FLAG_WRITE_COMBINE,
+					     result);
+
+	if (err)
+	    return FALSE;
+    }
+#endif
+
+    if (pSmi->FBBase == NULL) {
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "Internal error: could not map framebuffer.\n");
+	LEAVE_PROC("SMI_MapMem");
+	return (FALSE);
+    }
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Physical frame buffer at 0x%08lX offset: 0x%08lX\n",
+		   pScrn->memPhysBase, pScrn->fbOffset);
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Logical frame buffer at %p - %p\n", pSmi->FBBase,
+		   pSmi->FBBase + pSmi->videoRAMBytes - 1);
+
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+	       "Cursor Offset: %08lX\n", (unsigned long)pSmi->FBCursorOffset);
+
+    /* set up the fifo reserved space */
+    if (IS_MSOC(pSmi)) {
+	pSmi->FBCursorOffset = pSmi->videoRAMBytes - 2048;
+	pSmi->FBReserved = pSmi->videoRAMBytes - 4096;
+    }
+    else {
+	/* Set up offset to hwcursor memory area.  It's a 1K chunk at the end of
+	 * the frame buffer.
+	 */
+	pSmi->FBCursorOffset = pSmi->videoRAMBytes - 1024;
+	if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x30) & 0x01)/* #1074 */ {
+	    CARD32 fifoOffset = 0;
+	    fifoOffset |= VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				       0x46) << 3;
+	    fifoOffset |= VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				       0x47) << 11;
+	    fifoOffset |= (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+					0x49) & 0x1C) << 17;
+	    pSmi->FBReserved = fifoOffset;	/* PDR#1074 */
+	}
+	else
+	    pSmi->FBReserved = pSmi->videoRAMBytes - 2048;
+
 	/* Assign hwp->MemBase & IOBase here */
 	hwp = VGAHWPTR(pScrn);
 	if (pSmi->IOBase != NULL)
@@ -2173,6 +2173,9 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	    pSmi->PrimaryVidMapped = TRUE;
 	}
     }
+
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Reserved: %08lX\n",
+	       (unsigned long)pSmi->FBReserved);
 
     LEAVE_PROC("SMI_MapMem");
     return TRUE;
@@ -2197,10 +2200,16 @@ SMI_UnmapMem(ScrnInfoPtr pScrn)
 
     SMI_DisableMmio(pScrn);
 
-    xf86UnMapVidMem(pScrn->scrnIndex, (pointer) pSmi->MapBase, pSmi->MapSize);
-    if (pSmi->FBBase != NULL) {
+    if (pSmi->MapBase) {
+	xf86UnMapVidMem(pScrn->scrnIndex, (pointer)pSmi->MapBase,
+			pSmi->MapSize);
+	pSmi->MapBase = NULL;
+    }
+
+    if (pSmi->FBBase) {
 	xf86UnMapVidMem(pScrn->scrnIndex, (pointer) pSmi->FBBase,
 			pSmi->videoRAMBytes);
+	pSmi->FBBase != NULL;
     }
 
     LEAVE_PROC("SMI_UnmapMem");
