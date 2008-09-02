@@ -215,8 +215,6 @@ typedef enum _panel_state_t {
 /******************************************************************************
  *			F U N C T I O N   P R O T O T Y P E S
  ******************************************************************************/
-/* Set gate and power mode. */
-void setPower(SMIPtr pSmi, unsigned int nGates, unsigned int nClock);
 /* Set DPMS state. */
 void setDPMS(SMIPtr pSmi, DPMS_t state);
 /* Calculate memory clock settings of input clock. */
@@ -308,46 +306,16 @@ void setDPMS(SMIPtr pSmi, DPMS_t state);
 )
 
 /* Sets the same mode both on panel and crt */
-void SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-	     unsigned int fMode, unsigned int nHertz, display_t display,
-	     int fbPitch, int bpp);
-/* Initialize the panel hardware module */
+Bool SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
 
-/* Initialize the CRT hardware module */
-void crtInit(pinit_crt init);
-/* Enable CRT gamma control (RGB 5:6:5 and RGB 8:8:8 modes only) */
-void crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-		unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp);
-/* Get and/or set CRT DPMS.*/
-unsigned int crtDPMS(int nDPMS);
-/* Set CRT frame buffer pointer. */
-void crtSetTiming(unsigned int nHDisplay, unsigned int nHTotal,
-		  unsigned int nHSyncStart, unsigned int nHSyncEnd,
-		  unsigned int nVDisplay, unsigned int nVTotal,
-		  unsigned int nVSyncStart, unsigned int nVSyncEnd,
-		  unsigned int nPixelClock, unsigned int nHPolarity,
-		  unsigned int nVPolarity);
-/* Get CRT LUT palette. */
-void crtHwcInit(pinit_crt_hwc init);
-/* Enable CRT hardware cursor */
-void crtHwcEnable(void);
-/* Disable CRT hardware cursor */
-void crtHwcDisable(void);
-/* Set CRT pointer shape and/or colors. */
-void crtPointerShape(unsigned char *pShape, int nWidth, int nHeight,
-		     int nHotX, int nHotY, RGB rgbColor[3]);
-/* Set CRT cursor on-screen position. */
-void crtPointerPosition(int nX, int nY, int nTopSelect, int nLeftSelect);
-/* Set CRT cursor on-screen position. */
-void crtHwcSetPosition(int nX, int nY, int nTopSelect, int nLeftSelect);
-/* Set CRT cursor colors */
-void crtHwcSetColors(RGB rgbColor[HWC_NUM_COLORS]);
+unsigned int regRead32(SMIPtr pSmi, unsigned int nOffset);
+void regWrite32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData);
 
-/* Route Panel data to CRT for Simultaneous mode */
-void panelUseCRT(SMIPtr pSmi, BOOL bEnable);
 
-void panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-		  unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp);
+/* FIXME does something use it? */
+void DisableOverlay(SMIPtr pSmi);
+void EnableOverlay(SMIPtr pSmi);
+
 
 /* REGISTER DEFINITIONS */
 

@@ -51,7 +51,30 @@ authorization from The XFree86 Project or Silicon Motion.
 /*
  * Forward definitions for the functions that make up the driver.
  */
-static void panelPowerSequence(SMIPtr pSmi, panel_state_t on_off, int vsync_delay);
+static int roundDiv(int num, int denom);
+static int findClock(int requested_clock, clock_select_t *clock,
+		     display_t display);
+static mode_table_t *findMode(mode_table_t *mode_table, int width, int height,
+			      int refresh_rate);
+static void adjustMode(mode_table_t *vesaMode, mode_table_t *mode,
+		       display_t display);
+static void setModeRegisters(reg_table_t *register_table, mode_table_t *mode,
+			     display_t display, int bpp, int fbPitch);
+static void programMode(SMIPtr pSmi, reg_table_t *register_table);
+static void SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
+		    unsigned int fMode, unsigned int nHertz, display_t display,
+		    int fbPitch, int bpp);
+static void panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
+			 unsigned int fMode, unsigned int nHertz, int fbPitch,
+			 int bpp);
+static void crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
+		       unsigned int fMode, unsigned int nHertz, int fbPitch,
+		       int bpp);
+static void setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock);
+static void panelWaitVSync(SMIPtr pSmi, int vsync_count);
+static void panelPowerSequence(SMIPtr pSmi, panel_state_t on_off,
+			       int vsync_delay);
+static void panelUseCRT(SMIPtr pSmi, BOOL bEnable);
 
 /*
  * Add comment here about this module.
@@ -89,6 +112,28 @@ mode_table_t mode_table[] = {
 };
 
 
+Bool
+SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
+{
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER_PROC("SMI501_SetMode");
+
+    /* FIXME */
+    mode->VRefresh = 60;
+
+    if (pSmi->IsSecondary)
+	crtSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
+    else
+	panelSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
+
+    panelUseCRT(pSmi, TRUE);	/* Enable both outputs simultaneously */
+    LEAVE_PROC("SMI501_SetMode");
+
+    return TRUE;
+
+}
+
 /**********************************************************************
  * regRead32
  *    Read the value of the 32-bit register specified by nOffset
@@ -116,7 +161,7 @@ regWrite32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData)
 
 
 /* Perform a rounded division. */
-int
+static int
 roundDiv(int num, int denom)
 {
     /* n / d + 1 / 2 = (2n + d) / 2d */
@@ -124,7 +169,7 @@ roundDiv(int num, int denom)
 }
 
 /* Finds clock closest to the requested. */
-int
+static int
 findClock(int requested_clock, clock_select_t *clock, display_t display)
 {
     int	mclk;
@@ -162,7 +207,7 @@ findClock(int requested_clock, clock_select_t *clock, display_t display)
 
 
 /* Finds the requested mode in the mode table. */
-mode_table_t *
+static mode_table_t *
 findMode(mode_table_t *mode_table, int width, int height, int refresh_rate)
 {
     /* Walk the entire mode table. */
@@ -182,7 +227,7 @@ findMode(mode_table_t *mode_table, int width, int height, int refresh_rate)
 }
 
 /* Converts the VESA timing into Voyager timing. */
-void
+static void
 adjustMode(mode_table_t *vesaMode, mode_table_t *mode, display_t display)
 {
     int			blank_width, sync_start, sync_width;
@@ -226,7 +271,7 @@ adjustMode(mode_table_t *vesaMode, mode_table_t *mode, display_t display)
 }
 
 /* Fill the register structure. */
-void
+static void
 setModeRegisters(reg_table_t *register_table, mode_table_t *mode,
 		 display_t display, int bpp, int fbPitch)
 {
@@ -357,7 +402,7 @@ setModeRegisters(reg_table_t *register_table, mode_table_t *mode,
 }
 
 /* Program the mode with the registers specified. */
-void
+static void
 programMode(SMIPtr pSmi, reg_table_t *register_table)
 {
     unsigned int	value, gate, clock;
@@ -590,7 +635,7 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
     }
 }
 
-void
+static void
 SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
 	unsigned int fMode, unsigned int nHertz, display_t display,
 	int fbPitch, int bpp)
@@ -614,7 +659,7 @@ SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
     }
 }
 
-void
+static void
 panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
 	     unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp)
 {
@@ -622,7 +667,7 @@ panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
 	    fbPitch, bpp);
 }
 
-void
+static void
 crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
 	   unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp)
 {
@@ -638,7 +683,7 @@ crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
  *
  */
 /* Program new power mode. */
-void
+static void
 setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock)
 {
     unsigned int	gate_reg, clock_reg;
@@ -856,7 +901,7 @@ panelPowerSequence(SMIPtr pSmi, panel_state_t on_off, int vsync_delay)
  *    Nothing
  *
  **********************************************************************/
-void
+static void
 panelUseCRT(SMIPtr pSmi, BOOL bEnable)
 {
     unsigned int	panel_ctrl = 0;

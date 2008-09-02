@@ -1818,25 +1818,23 @@ SMI_ClipVideo(
 	INT32		height
 )
 {
-    ScreenPtr pScreen = pScrn->pScreen;
     SMIPtr pSmi = SMIPTR(pScrn);
     INT32 vscale, hscale;
     int diff;
+    RegionRec	VPReg;
+    BoxRec	VPBox = { pScrn->frameX0 , pScrn->frameY0,
+			  pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
+    BoxPtr	extents = REGION_EXTENTS(pScrn->pScreen, reg);
 
     ENTER_PROC("SMI_ClipVideo");
-
     DEBUG((VERBLEV, "ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16));
 
     /* Rotate the viewport before clipping  */
-    RegionRec VPReg;
-    BoxRec VPBox = { pScrn->frameX0 , pScrn->frameY0,
-		     pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
     if(pSmi->rotate)
        ROTATE_BOX(VPBox);
-    REGION_INIT(pScreen, &VPReg, &VPBox, 1);
-    REGION_INTERSECT(pScreen, reg, reg, &VPReg);
-    REGION_UNINIT(pScreen, &VPReg);
-    BoxPtr extents = REGION_EXTENTS(pScreen, reg);
+    REGION_INIT(pScrn->pScreen, &VPReg, &VPBox, 1);
+    REGION_INTERSECT(pScrn->pScreen, reg, reg, &VPReg);
+    REGION_UNINIT(pScrn->pScreen, &VPReg);
 
     /* PDR#941 */
     extents->x1 = max(extents->x1, VPBox.x1);
@@ -1918,9 +1916,9 @@ SMI_ClipVideo(
     if ((dst->x1 != extents->x1) || (dst->y1 != extents->y1) ||
 	(dst->x2 != extents->x2) || (dst->y2 != extents->y2)) {
 	RegionRec clipReg;
-	REGION_INIT(pScreen, &clipReg, dst, 1);
-	REGION_INTERSECT(pScreen, reg, reg, &clipReg);
-	REGION_UNINIT(pScreen, &clipReg);
+	REGION_INIT(pScrn->pScreen, &clipReg, dst, 1);
+	REGION_INTERSECT(pScrn->pScreen, reg, reg, &clipReg);
+	REGION_UNINIT(pScrn->pScreen, &clipReg);
     }
 
     DEBUG((VERBLEV, "ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16));

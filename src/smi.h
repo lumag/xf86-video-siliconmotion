@@ -350,14 +350,18 @@ void SMI_CommonCalcClock(int scrnIndex, long freq, int min_m, int min_n1,
 Bool SMI_I2CInit(ScrnInfoPtr pScrn);
 
 /* smi_accel.c */
-Bool SMI_XAAInit(ScreenPtr pScrn);
-Bool SMI_EXAInit(ScreenPtr pScrn);
 void SMI_AccelSync(ScrnInfoPtr pScrn);
 void SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file);
 void SMI_EngineReset(ScrnInfoPtr);
 void SMI_SetClippingRectangle(ScrnInfoPtr, int, int, int, int);
 void SMI_DisableClipping(ScrnInfoPtr);
 CARD32 SMI_DEDataFormat(int bpp);
+
+/* smi_xaa.c */
+Bool SMI_XAAInit(ScreenPtr pScrn);
+
+/* smi_exa.c */
+Bool SMI_EXAInit(ScreenPtr pScrn);
 
 /* smi_hwcurs.c */
 Bool SMI_HWCursorInit(ScreenPtr pScrn);

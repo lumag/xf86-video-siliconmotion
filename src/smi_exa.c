@@ -422,15 +422,12 @@ Bool
 SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h,
 		       char *dst, int dst_pitch)
 {
-    ScrnInfoPtr pScrn = xf86Screens[pSrc->drawable.pScreen->myNum];
-    SMIPtr pSmi = SMIPTR(pScrn);
+    unsigned char *src = pSrc->devPrivate.ptr;
+    int src_pitch = exaGetPixmapPitch(pSrc);
 
     ENTER_PROC("SMI_DownloadFromScreen");
     DEBUG((VERBLEV, "x=%d y=%d w=%d h=%d dst=%d dst_pitch=%d\n",
 	   x, y, w, h, dst, dst_pitch));
-
-    unsigned char *src = pSrc->devPrivate.ptr;
-    int src_pitch = exaGetPixmapPitch(pSrc);
 
     exaWaitSync(pSrc->drawable.pScreen);
 

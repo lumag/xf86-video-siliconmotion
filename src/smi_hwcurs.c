@@ -351,14 +351,14 @@ SMI_LoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
 	    WRITE_DCR(pSmi, DCRF0, pSmi->FBCursorOffset);
 	    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 			   "Primary FBCursorOffset at 0x%08X\n",
-			   pSmi->FBCursorOffset);
+			   (unsigned int)pSmi->FBCursorOffset);
 	}
 	else {
 	    /* CRT   HWC Addr */
 	    WRITE_DCR(pSmi, DCR230, pSmi->videoRAMBytes + pSmi->FBCursorOffset);
 	    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 			   "Secondary FBCursorOffset at 0x%08X\n",
-			   pSmi->FBCursorOffset);
+			   (unsigned int)pSmi->FBCursorOffset);
 	}
     }
     else {

@@ -89,9 +89,6 @@ static void SMI_ProbeDDC(ScrnInfoPtr pScrn, int index);
 static void SMI_DetectPanelSize(ScrnInfoPtr pScrn);
 static Bool SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr);
 
-static Bool SMI_MSOCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-
-
 /*
  * xf86VDrvMsgVerb prints up to 14 characters prefix, where prefix has the
  * format "%s(%d): " so, use name "SMI" instead of "Silicon Motion"
@@ -393,17 +390,6 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 }
 
 #endif /* XFree86LOADER */
-
-static SMIRegPtr
-SMIEntPriv(ScrnInfoPtr pScrn)
-{
-    DevUnion *pPriv;
-    SMIPtr pSmi = SMIPTR(pScrn);
-
-    pPriv = xf86GetEntityPrivate(pSmi->pEnt->index, gSMIEntityIndex);
-
-    return pPriv->ptr;
-}
 
 static Bool
 SMI_GetRec(ScrnInfoPtr pScrn)
@@ -965,8 +951,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	pSmi->pEnt = xf86GetEntityInfo(pScrn->entityList[pScrn->numEntities - 1]);
 
 	if (xf86IsEntityShared(pSmi->pEnt->index)) {
-	    SMIRegPtr pSMIEnt = SMIEntPriv(pScrn);
-
 	    pSmi->Dualhead = TRUE;
 	    if (xf86IsPrimInitDone(pSmi->pEnt->index))
 		pSmi->IsSecondary = TRUE;
@@ -1172,10 +1156,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     if (!pSmi->NoAccel) {
-	from = X_DEFAULT;
 	char *strptr;
-		
-	if ((strptr = (char *)xf86GetOptValString(pSmi->Options, OPTION_ACCELMETHOD))) {
+
+	from = X_DEFAULT;
+	if ((strptr = (char *)xf86GetOptValString(pSmi->Options,
+						  OPTION_ACCELMETHOD))) {
 	    if (!xf86NameCmp(strptr,"XAA")) {
 		from = X_CONFIG;
 		pSmi->useEXA = FALSE;
@@ -2080,7 +2065,6 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
     vgaHWPtr hwp;
-    CARD32 memBase;
 
     ENTER_PROC("SMI_MapMem");
 
@@ -2227,7 +2211,7 @@ SMI_UnmapMem(ScrnInfoPtr pScrn)
     if (pSmi->FBBase) {
 	xf86UnMapVidMem(pScrn->scrnIndex, (pointer) pSmi->FBBase,
 			pSmi->videoRAMBytes);
-	pSmi->FBBase != NULL;
+	pSmi->FBBase = NULL;
     }
 
     LEAVE_PROC("SMI_UnmapMem");
@@ -2688,7 +2672,7 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	    pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
 	}
 
-	SMI_MSOCSetMode(pScrn, mode);
+	SMI501_SetMode(pScrn, mode);
 
 	SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
@@ -2993,6 +2977,12 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     /* dualhead */
     if (pSmi->Dualhead) {
+	/* TFT panel uses FIFO1, DSTN panel uses FIFO1 for upper panel and 
+	 * FIFO2 for lower panel.  I don't have a DSTN panel, so it's untested.
+	 * -- AGD
+	 */
+	CARD32 fifo1_readoffset, fifo2_readoffset, fifo_writeoffset;
+
 	/* PLL controls */
 	/* set LCD to vclk2 */
 	new->SR69 = 0x04;
@@ -3022,12 +3012,6 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 	    new->SR6E = 0x52;
 	    new->SR6F = 0x89;
 	}
-
-	/* TFT panel uses FIFO1, DSTN panel uses FIFO1 for upper panel and 
-	 * FIFO2 for lower panel.  I don't have a DSTN panel, so it's untested.
-	 * -- AGD
-	 */
-	CARD32 fifo1_readoffset, fifo2_readoffset, fifo_writeoffset;
 
 	/* setting SR21 bit 2 disables ZV circuitry, 
 	 * if ZV is needed, SR21 = 0x20
@@ -3759,8 +3743,10 @@ static void SMI_SetShadowDimensions(ScrnInfoPtr pScrn,int width,int height){
 }
 
 static Bool
-SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr){
-    SMIPtr pSmi = SMIPTR(pScrn);
+SMI_DriverFunc(ScrnInfoPtr pScrn, xorgDriverFuncOp op, pointer ptr)
+{
+    xorgRRConfig	rconf = ((xorgRRRotation*)ptr)->RRConfig;
+    SMIPtr		pSmi = SMIPTR(pScrn);
 
     ENTER_PROC("SMI_DriverFunc");
     if(op==RR_GET_INFO){
@@ -3775,7 +3761,6 @@ SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr){
 	  return FALSE;
        }
 
-       xorgRRConfig rconf= ((xorgRRRotation*)ptr)->RRConfig;
        if(rconf.rotation==RR_Rotate_0){
 	  if(pSmi->rotate!=0){
 	     if(pSmi->PointerMoved != NULL){
@@ -3810,25 +3795,4 @@ SMI_DriverFunc(ScrnInfoPtr pScrn , xorgDriverFuncOp op,pointer ptr){
 
     LEAVE_PROC("SMI_DriverFunc");
     return TRUE;
-}
-
-static Bool
-SMI_MSOCSetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
-{
-    SMIPtr pSmi = SMIPTR(pScrn);
-
-    ENTER_PROC("SMI_MSOCSetMode");
-
-    mode->VRefresh = 60;
-
-    if (pSmi->IsSecondary)
-        crtSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
-    else
-        panelSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
-
-    panelUseCRT(pSmi, TRUE);	/* Enable both outputs simultaneously */
-    LEAVE_PROC("SMI_MSOCSetMode");
-
-    return TRUE;
-
 }
