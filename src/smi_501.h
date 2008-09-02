@@ -44,7 +44,7 @@ authorization from the XFree86 Project and Silicon Motion.
 /* In Kb - documentation says it is 64Kb... */
 #define FB_RESERVE4USB			512
 
-/* Power constants to use with setDPMS function. */
+/* Power constants to use with SMI501_SetDPMS function. */
 typedef enum _DPMS_t {
     DPMS_ON,
     DPMS_STANDBY,
@@ -215,11 +215,14 @@ typedef enum _panel_state_t {
 /******************************************************************************
  *			F U N C T I O N   P R O T O T Y P E S
  ******************************************************************************/
-/* Set DPMS state. */
-void setDPMS(SMIPtr pSmi, DPMS_t state);
-/* Calculate memory clock settings of input clock. */
+void SMI501_SetDPMS(SMIPtr pSmi, DPMS_t state);
+Bool SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
+unsigned int SMI501_Read32(SMIPtr pSmi, unsigned int nOffset);
+void SMI501_Write32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData);
 
-/* Init flags and values used in init_crt structure */
+/* FIXME does something use it? */
+void DisableOverlay(SMIPtr pSmi);
+void EnableOverlay(SMIPtr pSmi);
 
 /* TV clock phase select */
 #define DISP_CRT_TVP			0x00000100
@@ -304,18 +307,6 @@ void setDPMS(SMIPtr pSmi, DPMS_t state);
 		     (((g) & RGB565_G_MASK) << RGB565_G_SHIFT) |	\
 		     (((b) & RGB565_B_MASK) >> RGB565_B_SHIFT))		\
 )
-
-/* Sets the same mode both on panel and crt */
-Bool SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode);
-
-unsigned int regRead32(SMIPtr pSmi, unsigned int nOffset);
-void regWrite32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData);
-
-
-/* FIXME does something use it? */
-void DisableOverlay(SMIPtr pSmi);
-void EnableOverlay(SMIPtr pSmi);
-
 
 /* REGISTER DEFINITIONS */
 

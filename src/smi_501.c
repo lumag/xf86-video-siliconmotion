@@ -112,6 +112,34 @@ mode_table_t mode_table[] = {
 };
 
 
+/* Set DPMS state. */
+void
+SMI501_SetDPMS(SMIPtr pSmi, DPMS_t state)
+{
+    unsigned int	value;
+
+    value = SMI501_Read32(pSmi, SYSTEM_CTRL);
+    switch (state) {
+	case DPMS_ON:
+	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHP);
+	    break;
+
+	case DPMS_STANDBY:
+	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHN);
+	    break;
+
+	case DPMS_SUSPEND:
+	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHP);
+	    break;
+
+	case DPMS_OFF:
+	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHN);
+	    break;
+    }
+
+    SMI501_Write32(pSmi, SYSTEM_CTRL, value);
+}
+
 Bool
 SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 {
@@ -135,11 +163,11 @@ SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
 }
 
 /**********************************************************************
- * regRead32
+ * SMI501_Read32
  *    Read the value of the 32-bit register specified by nOffset
  **********************************************************************/
 unsigned int
-regRead32(SMIPtr pSmi, unsigned int nOffset)
+SMI501_Read32(SMIPtr pSmi, unsigned int nOffset)
 {
     unsigned int result;
 
@@ -149,12 +177,12 @@ regRead32(SMIPtr pSmi, unsigned int nOffset)
 }
 
 /**********************************************************************
- * regWrite32
+ * SMI501_Write32
  *    Write the 32-bit value, nData, to the 32-bit register specified by
  *    nOffset
  **********************************************************************/
 void
-regWrite32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData)
+SMI501_Write32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData)
 {
     WRITE_SCR(pSmi, nOffset, nData);
 }
@@ -410,13 +438,13 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
     unsigned int	fb_size, offset;
 
     /* Get current power configuration. */
-    gate = regRead32(pSmi, CURRENT_POWER_GATE);
+    gate = SMI501_Read32(pSmi, CURRENT_POWER_GATE);
     gate |= 0x08;	/* Enable power to 2D engine */
     gate = FIELD_SET(gate, CURRENT_POWER_GATE, CSC,          ENABLE);
     gate = FIELD_SET(gate, CURRENT_POWER_GATE, ZVPORT,       ENABLE);
     gate = FIELD_SET(gate, CURRENT_POWER_GATE, GPIO_PWM_I2C, ENABLE);
 
-    clock = regRead32(pSmi, CURRENT_POWER_CLOCK);
+    clock = SMI501_Read32(pSmi, CURRENT_POWER_CLOCK);
 
     clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, MCLK_SELECT, 336);
     clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, MCLK_DIVIDER, 3);
@@ -437,70 +465,71 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	/* Calculate frame buffer address. */
 	value = 0;
 	fb_size = register_table->fb_width * register_table->height;
-	if (FIELD_GET(regRead32(pSmi, CRT_DISPLAY_CTRL),
+	if (FIELD_GET(SMI501_Read32(pSmi, CRT_DISPLAY_CTRL),
 		      CRT_DISPLAY_CTRL,
 		      PLANE) == CRT_DISPLAY_CTRL_PLANE_ENABLE) {
-	    value = FIELD_GET(regRead32(pSmi, CRT_FB_ADDRESS),
+	    value = FIELD_GET(SMI501_Read32(pSmi, CRT_FB_ADDRESS),
 			      CRT_FB_ADDRESS, ADDRESS);
 	    if (fb_size < value)
 		value = 0;
 	    else
-		value += FIELD_GET(regRead32(pSmi, CRT_FB_WIDTH),
+		value += FIELD_GET(SMI501_Read32(pSmi, CRT_FB_WIDTH),
 				   CRT_FB_WIDTH, OFFSET) *
-		    (FIELD_GET(regRead32(pSmi, CRT_VERTICAL_TOTAL),
+		    (FIELD_GET(SMI501_Read32(pSmi, CRT_VERTICAL_TOTAL),
 			       CRT_VERTICAL_TOTAL, DISPLAY_END) + 1);
 	}
 
 	/* Program panel registers. */
-	regWrite32(pSmi, PANEL_FB_ADDRESS,
-		   FIELD_SET(0, PANEL_FB_ADDRESS, STATUS, PENDING) |
-		   FIELD_SET(0, PANEL_FB_ADDRESS, EXT, LOCAL) |
-		   FIELD_VALUE(0, PANEL_FB_ADDRESS, ADDRESS, value));
+	SMI501_Write32(pSmi, PANEL_FB_ADDRESS,
+		       FIELD_SET(0, PANEL_FB_ADDRESS, STATUS, PENDING) |
+		       FIELD_SET(0, PANEL_FB_ADDRESS, EXT, LOCAL) |
+		       FIELD_VALUE(0, PANEL_FB_ADDRESS, ADDRESS, value));
 
-	regWrite32(pSmi, PANEL_FB_WIDTH,
-		   FIELD_VALUE(0, PANEL_FB_WIDTH, WIDTH,
-			       register_table->fb_width) |
-		   FIELD_VALUE(0, PANEL_FB_WIDTH, OFFSET,
-			       register_table->fb_width));
+	SMI501_Write32(pSmi, PANEL_FB_WIDTH,
+		       FIELD_VALUE(0, PANEL_FB_WIDTH, WIDTH,
+				   register_table->fb_width) |
+		       FIELD_VALUE(0, PANEL_FB_WIDTH, OFFSET,
+				   register_table->fb_width));
 
-	regWrite32(pSmi, PANEL_WINDOW_WIDTH,
-		   FIELD_VALUE(0, PANEL_WINDOW_WIDTH, WIDTH,
-			       register_table->width) |
-		   FIELD_VALUE(0, PANEL_WINDOW_WIDTH, X, 0));
+	SMI501_Write32(pSmi, PANEL_WINDOW_WIDTH,
+		       FIELD_VALUE(0, PANEL_WINDOW_WIDTH, WIDTH,
+				   register_table->width) |
+		       FIELD_VALUE(0, PANEL_WINDOW_WIDTH, X, 0));
 
-	regWrite32(pSmi, PANEL_WINDOW_HEIGHT,
-		   FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, HEIGHT,
-			       register_table->height) |
-		   FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, Y, 0));
+	SMI501_Write32(pSmi, PANEL_WINDOW_HEIGHT,
+		       FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, HEIGHT,
+				   register_table->height) |
+		       FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, Y, 0));
 
-	regWrite32(pSmi, PANEL_PLANE_TL,
-		   FIELD_VALUE(0, PANEL_PLANE_TL, TOP, 0) |
-		   FIELD_VALUE(0, PANEL_PLANE_TL, LEFT, 0));
+	SMI501_Write32(pSmi, PANEL_PLANE_TL,
+		       FIELD_VALUE(0, PANEL_PLANE_TL, TOP, 0) |
+		       FIELD_VALUE(0, PANEL_PLANE_TL, LEFT, 0));
 
-	regWrite32(pSmi, PANEL_PLANE_BR,
-		   FIELD_VALUE(0, PANEL_PLANE_BR, BOTTOM,
-			       register_table->height - 1) |
-		   FIELD_VALUE(0, PANEL_PLANE_BR, RIGHT,
-			       register_table->width - 1));
+	SMI501_Write32(pSmi, PANEL_PLANE_BR,
+		       FIELD_VALUE(0, PANEL_PLANE_BR, BOTTOM,
+				   register_table->height - 1) |
+		       FIELD_VALUE(0, PANEL_PLANE_BR, RIGHT,
+				   register_table->width - 1));
 
-	regWrite32(pSmi, PANEL_HORIZONTAL_TOTAL,
-		   register_table->horizontal_total);
-	regWrite32(pSmi, PANEL_HORIZONTAL_SYNC,
-		   register_table->horizontal_sync);
-	regWrite32(pSmi, PANEL_VERTICAL_TOTAL,
-		   register_table->vertical_total);
-	regWrite32(pSmi, PANEL_VERTICAL_SYNC,
-		   register_table->vertical_sync);
+	SMI501_Write32(pSmi, PANEL_HORIZONTAL_TOTAL,
+		       register_table->horizontal_total);
+	SMI501_Write32(pSmi, PANEL_HORIZONTAL_SYNC,
+		       register_table->horizontal_sync);
+	SMI501_Write32(pSmi, PANEL_VERTICAL_TOTAL,
+		       register_table->vertical_total);
+	SMI501_Write32(pSmi, PANEL_VERTICAL_SYNC,
+		       register_table->vertical_sync);
 
 	/* Program panel display control register. */
-	value = regRead32(pSmi, PANEL_DISPLAY_CTRL) &
+	value = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL) &
 	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, VSYNC_PHASE) &
 	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, HSYNC_PHASE) &
 	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, TIMING) &
 	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, PLANE) &
 	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, FORMAT);
 
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, value | register_table->control);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, value |
+		       register_table->control);
 
 	/* Palette RAM. */
 	palette_ram = PANEL_PALETTE_RAM;
@@ -508,12 +537,12 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	/* Turn on panel. */
 	panelPowerSequence(pSmi, PANEL_ON, 4);
 
-	regWrite32(pSmi, MISC_CTRL,
-		    FIELD_SET (regRead32 (pSmi, MISC_CTRL), MISC_CTRL,
-			       DAC_POWER, ENABLE));
-	regWrite32(pSmi, CRT_DISPLAY_CTRL,
-		    FIELD_SET (regRead32 (pSmi, CRT_DISPLAY_CTRL),
-			       CRT_DISPLAY_CTRL, SELECT, PANEL));
+	SMI501_Write32(pSmi, MISC_CTRL,
+		       FIELD_SET(SMI501_Read32(pSmi, MISC_CTRL), MISC_CTRL,
+				 DAC_POWER, ENABLE));
+	SMI501_Write32(pSmi, CRT_DISPLAY_CTRL,
+		       FIELD_SET(SMI501_Read32(pSmi, CRT_DISPLAY_CTRL),
+				 CRT_DISPLAY_CTRL, SELECT, PANEL));
     }
 
     /* Program CRT. */
@@ -527,49 +556,49 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	setPower(pSmi, gate, clock | register_table->clock);
 
 	/* Turn on DAC. */
-	regWrite32(pSmi, MISC_CTRL, FIELD_SET(regRead32(pSmi, MISC_CTRL),
-					      MISC_CTRL, DAC_POWER, ENABLE));
+	SMI501_Write32(pSmi, MISC_CTRL, FIELD_SET(SMI501_Read32(pSmi, MISC_CTRL),
+						  MISC_CTRL, DAC_POWER, ENABLE));
 
 	/* Calculate frame buffer address. */
 	value = 0;
 	fb_size = register_table->fb_width * register_table->height;
-	if (FIELD_GET(regRead32(pSmi, PANEL_DISPLAY_CTRL),
+	if (FIELD_GET(SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL),
 		      PANEL_DISPLAY_CTRL,
 		      PLANE) == PANEL_DISPLAY_CTRL_PLANE_ENABLE) {
-	    value = FIELD_GET(regRead32(pSmi, PANEL_FB_ADDRESS),
+	    value = FIELD_GET(SMI501_Read32(pSmi, PANEL_FB_ADDRESS),
 			      PANEL_FB_ADDRESS, ADDRESS);
 	    if (fb_size < value)
 		value = 0;
 	    else
-		value += FIELD_GET(regRead32(pSmi, PANEL_FB_WIDTH),
+		value += FIELD_GET(SMI501_Read32(pSmi, PANEL_FB_WIDTH),
 				   PANEL_FB_WIDTH, OFFSET) *
-		    FIELD_GET(regRead32(pSmi, PANEL_WINDOW_HEIGHT),
+		    FIELD_GET(SMI501_Read32(pSmi, PANEL_WINDOW_HEIGHT),
 			      PANEL_WINDOW_HEIGHT, HEIGHT);
 	}
 
 	/* Program CRT registers. */
-	regWrite32(pSmi, CRT_FB_ADDRESS,
-		   FIELD_SET(0, CRT_FB_ADDRESS, STATUS, PENDING) |
-		   FIELD_SET(0, CRT_FB_ADDRESS, EXT, LOCAL) |
-		   FIELD_VALUE(0, CRT_FB_ADDRESS, ADDRESS, value));
+	SMI501_Write32(pSmi, CRT_FB_ADDRESS,
+		       FIELD_SET(0, CRT_FB_ADDRESS, STATUS, PENDING) |
+		       FIELD_SET(0, CRT_FB_ADDRESS, EXT, LOCAL) |
+		       FIELD_VALUE(0, CRT_FB_ADDRESS, ADDRESS, value));
 
-	regWrite32(pSmi, CRT_FB_WIDTH,
-		   FIELD_VALUE(0, CRT_FB_WIDTH, WIDTH,
-			       register_table->fb_width) |
-		   FIELD_VALUE(0, CRT_FB_WIDTH, OFFSET,
-			       register_table->fb_width));
+	SMI501_Write32(pSmi, CRT_FB_WIDTH,
+		       FIELD_VALUE(0, CRT_FB_WIDTH, WIDTH,
+				   register_table->fb_width) |
+		       FIELD_VALUE(0, CRT_FB_WIDTH, OFFSET,
+				   register_table->fb_width));
 
-	regWrite32(pSmi, CRT_HORIZONTAL_TOTAL,
-		   register_table->horizontal_total);
-	regWrite32(pSmi, CRT_HORIZONTAL_SYNC,
-		   register_table->horizontal_sync);
-	regWrite32(pSmi, CRT_VERTICAL_TOTAL,
-		   register_table->vertical_total);
-	regWrite32(pSmi, CRT_VERTICAL_SYNC,
-		   register_table->vertical_sync);
+	SMI501_Write32(pSmi, CRT_HORIZONTAL_TOTAL,
+		       register_table->horizontal_total);
+	SMI501_Write32(pSmi, CRT_HORIZONTAL_SYNC,
+		       register_table->horizontal_sync);
+	SMI501_Write32(pSmi, CRT_VERTICAL_TOTAL,
+		       register_table->vertical_total);
+	SMI501_Write32(pSmi, CRT_VERTICAL_SYNC,
+		       register_table->vertical_sync);
 
 	/* Program CRT display control register. */
-	value = regRead32(pSmi, CRT_DISPLAY_CTRL) &
+	value = SMI501_Read32(pSmi, CRT_DISPLAY_CTRL) &
 	    FIELD_CLEAR(CRT_DISPLAY_CTRL, VSYNC_PHASE) &
 	    FIELD_CLEAR(CRT_DISPLAY_CTRL, HSYNC_PHASE) &
 	    FIELD_CLEAR(CRT_DISPLAY_CTRL, SELECT) &
@@ -577,13 +606,13 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	    FIELD_CLEAR(CRT_DISPLAY_CTRL, PLANE) &
 	    FIELD_CLEAR(CRT_DISPLAY_CTRL, FORMAT);
 
-	regWrite32(pSmi, CRT_DISPLAY_CTRL, value | register_table->control);
+	SMI501_Write32(pSmi, CRT_DISPLAY_CTRL, value | register_table->control);
 
 	/* Palette RAM. */
 	palette_ram = CRT_PALETTE_RAM;
 
 	/* Turn on CRT. */
-	setDPMS(pSmi, DPMS_ON);
+	SMI501_SetDPMS(pSmi, DPMS_ON);
     }
 
     /* In case of 8-bpp, fill palette. */
@@ -597,7 +626,7 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	for (offset = 0; offset < 256 * 4; offset += 4) {
 	    /* Store current RGB value. */
 	    /* ERROR!!!!! IGX RGB should be a function, maybe RGB16?
-	    regWrite32(pSmi,  (palette_ram + offset),
+	    SMI501_Write32(pSmi,  (palette_ram + offset),
 		       (gray ? (RGB((gray + 50) / 100,
 				    (gray + 50) / 100,
 				    (gray + 50) / 100))
@@ -628,7 +657,7 @@ programMode(SMIPtr pSmi, reg_table_t *register_table)
 	/* Start with RGB = 0,0,0. */
 	value = 0x000000;
 	for (offset = 0; offset < 256 * 4; offset += 4) {
-	    regWrite32(pSmi, palette_ram + offset, value);
+	    SMI501_Write32(pSmi, palette_ram + offset, value);
 	    /* Advance RGB by 1,1,1. */
 	    value += 0x010101;
 	}
@@ -690,7 +719,7 @@ setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock)
     unsigned int	control_value;
 
     /* Get current power mode. */
-    control_value = FIELD_GET(regRead32(pSmi, POWER_MODE_CTRL),
+    control_value = FIELD_GET(SMI501_Read32(pSmi, POWER_MODE_CTRL),
 			      POWER_MODE_CTRL, MODE);
 
     switch (control_value) {
@@ -719,44 +748,16 @@ setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock)
     }
 
     /* Program new power mode. */
-    regWrite32(pSmi, gate_reg, nGates);
-    regWrite32(pSmi, clock_reg, Clock);
-    regWrite32(pSmi, POWER_MODE_CTRL, control_value);
+    SMI501_Write32(pSmi, gate_reg, nGates);
+    SMI501_Write32(pSmi, clock_reg, Clock);
+    SMI501_Write32(pSmi, POWER_MODE_CTRL, control_value);
 
     /* When returning from sleep, wait until finished. */
     /*	IGX -- comment out for now, gets us in an infinite loop!
-	while (FIELD_GET(regRead32(pSmi, POWER_MODE_CTRL),
+	while (FIELD_GET(SMI501_Read32(pSmi, POWER_MODE_CTRL),
 					 POWER_MODE_CTRL,
 					 SLEEP_STATUS) == POWER_MODE_CTRL_SLEEP_STATUS_ACTIVE) ;
     */
-}
-
-/* Set DPMS state. */
-void
-setDPMS(SMIPtr pSmi, DPMS_t state)
-{
-    unsigned int	value;
-
-    value = regRead32(pSmi, SYSTEM_CTRL);
-    switch (state) {
-	case DPMS_ON:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHP);
-	    break;
-
-	case DPMS_STANDBY:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHN);
-	    break;
-
-	case DPMS_SUSPEND:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHP);
-	    break;
-
-	case DPMS_OFF:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHN);
-	    break;
-    }
-
-    regWrite32(pSmi, SYSTEM_CTRL, value);
 }
 
 /* Panel Code */
@@ -788,7 +789,7 @@ panelWaitVSync(SMIPtr pSmi, int vsync_count)
 	/* Wait for end of vsync */
 	timeout = 0;
 	do {
-	    status = FIELD_GET(regRead32(pSmi, CMD_INTPR_STATUS),
+	    status = FIELD_GET(SMI501_Read32(pSmi, CMD_INTPR_STATUS),
 			       CMD_INTPR_STATUS, PANEL_SYNC);
 	    if (++timeout == VSYNCTIMEOUT)
 		break;
@@ -797,7 +798,7 @@ panelWaitVSync(SMIPtr pSmi, int vsync_count)
 	/* Wait for start of vsync */
 	timeout = 0;
 	do {
-	    status = FIELD_GET(regRead32(pSmi, CMD_INTPR_STATUS),
+	    status = FIELD_GET(SMI501_Read32(pSmi, CMD_INTPR_STATUS),
 			       CMD_INTPR_STATUS, PANEL_SYNC);
 	    if (++timeout == VSYNCTIMEOUT)
 		break;
@@ -830,55 +831,55 @@ panelWaitVSync(SMIPtr pSmi, int vsync_count)
 static void
 panelPowerSequence(SMIPtr pSmi, panel_state_t on_off, int vsync_delay)
 {
-    unsigned int	panelControl = regRead32(pSmi, PANEL_DISPLAY_CTRL);
+    unsigned int	panelControl = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL);
 
     if (on_off == PANEL_ON) {
 	/* Turn on FPVDDEN. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, FPVDDEN, HIGH);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/* Turn on FPDATA. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, DATA, ENABLE);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/*  Turn on FPVBIAS. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, VBIASEN, HIGH);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/* Turn on FPEN. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, FPEN, HIGH);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
     }
     else {
 	/* Turn off FPEN. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, FPEN, LOW);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/*  Turn off FPVBIASEN. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, VBIASEN, LOW);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/* Turn off FPDATA. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, DATA, DISABLE);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
 	panelWaitVSync(pSmi, vsync_delay);
 
 	/* Turn off FPVDDEN. */
 	panelControl = FIELD_SET(panelControl,
 				 PANEL_DISPLAY_CTRL, FPVDDEN, LOW);
-	regWrite32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
+	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
     }
 }
 
@@ -907,8 +908,8 @@ panelUseCRT(SMIPtr pSmi, BOOL bEnable)
     unsigned int	panel_ctrl = 0;
     unsigned int	crt_ctrl   = 0;
 
-    panel_ctrl = regRead32(pSmi, PANEL_DISPLAY_CTRL);
-    crt_ctrl   = regRead32(pSmi, CRT_DISPLAY_CTRL);
+    panel_ctrl = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL);
+    crt_ctrl   = SMI501_Read32(pSmi, CRT_DISPLAY_CTRL);
 
     if (bEnable) {
 	/* Enable panel graphics plane */
@@ -931,8 +932,8 @@ panelUseCRT(SMIPtr pSmi, BOOL bEnable)
 	crt_ctrl = FIELD_SET(crt_ctrl, CRT_DISPLAY_CTRL, SELECT, CRT);
     }
 
-    regWrite32(pSmi, PANEL_DISPLAY_CTRL, panel_ctrl);
-    regWrite32(pSmi, CRT_DISPLAY_CTRL,   crt_ctrl);
+    SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panel_ctrl);
+    SMI501_Write32(pSmi, CRT_DISPLAY_CTRL,   crt_ctrl);
 }
 
 void

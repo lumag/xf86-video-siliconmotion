@@ -83,7 +83,7 @@ SMI_AccelSync(ScrnInfoPtr pScrn)
 	int	i, dwVal;
 
 	for (i = 0x1000000; i > 0; i--) {
-	    dwVal = regRead32(pSmi, CMD_INTPR_STATUS);
+	    dwVal = SMI501_Read32(pSmi, CMD_INTPR_STATUS);
 	    if (FIELD_GET(dwVal, CMD_INTPR_STATUS,
 			  2D_ENGINE) == CMD_INTPR_STATUS_2D_ENGINE_IDLE &&
 		FIELD_GET(dwVal, CMD_INTPR_STATUS,

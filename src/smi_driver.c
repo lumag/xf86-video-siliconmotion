@@ -1822,10 +1822,10 @@ SMI_DetectPanelSize(ScrnInfoPtr pScrn)
 	    pSmi->lcd = 1;
 	}
 	else if (IS_MSOC(pSmi)) {
-	    pSmi->lcdWidth = FIELD_GET(regRead32(pSmi, PANEL_WINDOW_WIDTH),
-						 PANEL_WINDOW_WIDTH, WIDTH);
-	    pSmi->lcdHeight = FIELD_GET(regRead32(pSmi, PANEL_WINDOW_HEIGHT),
-						  PANEL_WINDOW_HEIGHT, HEIGHT);
+	    pSmi->lcdWidth = FIELD_GET(SMI501_Read32(pSmi, PANEL_WINDOW_WIDTH),
+				       PANEL_WINDOW_WIDTH, WIDTH);
+	    pSmi->lcdHeight = FIELD_GET(SMI501_Read32(pSmi, PANEL_WINDOW_HEIGHT),
+					PANEL_WINDOW_HEIGHT, HEIGHT);
 	}
 	else {
 	    /* panel size detection for hardware other than 730 */
@@ -2014,12 +2014,13 @@ SMI_DetectMem(ScrnInfoPtr pScrn)
 	unsigned int	value;
 	unsigned int	total_memory;
 
-	value = regRead32(pSmi, DRAM_CTRL);
+	value = SMI501_Read32(pSmi, DRAM_CTRL);
 	if (FIELD_GET(value, DRAM_CTRL, SIZE) == DRAM_CTRL_SIZE_4) {
 	    /*
 	     * SM107 : Need to re-assign number of local memory banks
 	     */
-	    regWrite32(pSmi, DRAM_CTRL, FIELD_SET(value, DRAM_CTRL, BANKS, 2));
+	    SMI501_Write32(pSmi, DRAM_CTRL, FIELD_SET(value, DRAM_CTRL,
+						      BANKS, 2));
 	    total_memory = 4 * 1024;
 	}
 	else
@@ -3659,9 +3660,8 @@ SMI_DisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode,
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24, SR24);
 #endif
     }
-    else {
-	setDPMS(pSmi, PowerManagementMode);
-    }
+    else
+	SMI501_SetDPMS(pSmi, PowerManagementMode);
 
     /* Save the current power state */
     pSmi->CurrentDPMS = PowerManagementMode;
