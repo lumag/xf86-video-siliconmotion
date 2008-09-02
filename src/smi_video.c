@@ -659,6 +659,12 @@ SMI_InitVideo(ScreenPtr pScreen)
     XF86VideoAdaptorPtr newAdaptor = NULL;
     int numAdaptors;
 
+    /* FIXME silently return?
+     * If secondary or dualhead setup */
+    if (IS_MSOC(psmi) &&
+	(psmi->IsSecondary || xf86IsEntityShared(psmi->pEnt->index)))
+	return;
+
     ENTER_PROC("SMI_InitVideo");
 
     numAdaptors = xf86XVListGenericAdaptors(pScrn, &ptrAdaptors);
@@ -885,11 +891,13 @@ SMI_SetupVideo(ScreenPtr pScreen)
 		     | XvWindowMask
 		     ;
 
-    ptrAdaptor->flags = VIDEO_OVERLAID_IMAGES
-/* 		      | VIDEO_CLIP_TO_VIEWPORT */
-		      ;
-
-    ptrAdaptor->name = "Silicon Motion Lynx Series Video Engine";
+    ptrAdaptor->flags = VIDEO_OVERLAID_IMAGES;
+    if (IS_MSOC(pSmi)) {
+	ptrAdaptor->flags |= VIDEO_CLIP_TO_VIEWPORT;
+	ptrAdaptor->name = "Silicon Motion MSOC Series Video Engine";
+    }
+    else
+	ptrAdaptor->name = "Silicon Motion Lynx Series Video Engine";
 
     ptrAdaptor->nPorts = 1;
     ptrAdaptor->pPortPrivates = (DevUnion*) &ptrAdaptor[1];
@@ -1386,7 +1394,7 @@ SMI_StopVideo(
 		WRITE_VPR(pSmi, 0x00, READ_VPR(pSmi, 0x00) & ~0x01000008);
 	    }
 #if SMI_USE_CAPTURE
-	    if (pSmi->Chipset != SMI_COUGAR3DR) {
+	    if (!IS_MSOC(pSmi) && pSmi->Chipset != SMI_COUGAR3DR) {
 		WRITE_CPR(pSmi, 0x00, READ_CPR(pSmi, 0x00) & ~0x00000001);
 		WRITE_VPR(pSmi, 0x54, READ_VPR(pSmi, 0x54) & ~0x00F00000);
 	    }
@@ -2264,8 +2272,9 @@ SMI_InitOffscreenImages(
     }
 
     offscreenImages->image = SMI_VideoImages;
-    offscreenImages->flags = VIDEO_OVERLAID_IMAGES
-                         /*| VIDEO_CLIP_TO_VIEWPORT*/;
+    offscreenImages->flags = VIDEO_OVERLAID_IMAGES;
+    if (IS_MSOC(pSmi))
+	offscreenImages->flags |= VIDEO_CLIP_TO_VIEWPORT;
     offscreenImages->alloc_surface = SMI_AllocSurface;
     offscreenImages->free_surface = SMI_FreeSurface;
     offscreenImages->display = SMI_DisplaySurface;

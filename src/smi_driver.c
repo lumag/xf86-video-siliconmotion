@@ -1006,6 +1006,10 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     SMI_MapMem(pScrn);
     SMI_DisableVideo(pScrn);
 
+    /* FIXME shouldn't have been already set? */
+    if (IS_MSOC(pSmi))
+	pSmi->lcd = pSmi->IsSecondary == FALSE;
+
     /* detect the panel size */
     SMI_DetectPanelSize(pScrn);
 
@@ -1758,114 +1762,128 @@ SMI_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 static void
 SMI_DetectPanelSize(ScrnInfoPtr pScrn)
 {
-    SMIPtr pSmi = SMIPTR(pScrn);
+    char	*s;
+    int		 width, height;
+    SMIPtr	 pSmi = SMIPTR(pScrn);
 
-    /* panel size detection ... requires BIOS call on 730 hardware */
-    if (pSmi->Chipset == SMI_COUGAR3DR) {
-	if (pSmi->pInt10 != NULL) {
-	    pSmi->pInt10->num = 0x10;
-	    pSmi->pInt10->ax  = 0x5F00;
-	    pSmi->pInt10->bx  = 0;
-	    pSmi->pInt10->cx  = 0;
-	    pSmi->pInt10->dx  = 0;
-	    xf86ExecX86int10(pSmi->pInt10);
-	    if (pSmi->pInt10->ax == 0x005F) {
-		switch (pSmi->pInt10->cx & 0x0F) {
-		case PANEL_640x480:
+    pSmi->lcdWidth  = 0;
+    pSmi->lcdHeight = 0;
+    if ((s = xf86GetOptValString(pSmi->Options, OPTION_PANEL_SIZE)) != NULL) {
+	if (sscanf(s, "%dx%d", &width, &height) != 2)
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "Invalid PanelSize option: %s\n", s);
+	else {
+	    pSmi->lcdWidth  = width;
+	    pSmi->lcdHeight = height;
+	}
+    }
+
+    if (pSmi->lcdWidth == 0 || pSmi->lcdHeight == 0) {
+	/* panel size detection ... requires BIOS call on 730 hardware */
+	if (pSmi->Chipset == SMI_COUGAR3DR) {
+	    if (pSmi->pInt10 != NULL) {
+		pSmi->pInt10->num = 0x10;
+		pSmi->pInt10->ax  = 0x5F00;
+		pSmi->pInt10->bx  = 0;
+		pSmi->pInt10->cx  = 0;
+		pSmi->pInt10->dx  = 0;
+		xf86ExecX86int10(pSmi->pInt10);
+		if (pSmi->pInt10->ax == 0x005F) {
+		    switch (pSmi->pInt10->cx & 0x0F) {
+			case PANEL_640x480:
+			    pSmi->lcdWidth  = 640;
+			    pSmi->lcdHeight = 480;
+			    break;
+			case PANEL_800x600:
+			    pSmi->lcdWidth  = 800;
+			    pSmi->lcdHeight = 600;
+			    break;
+			case PANEL_1024x768:
+			    pSmi->lcdWidth  = 1024;
+			    pSmi->lcdHeight = 768;
+			    break;
+			case PANEL_1280x1024:
+			    pSmi->lcdWidth  = 1280;
+			    pSmi->lcdHeight = 1024;
+			    break;
+			case PANEL_1600x1200:
+			    pSmi->lcdWidth  = 1600;
+			    pSmi->lcdHeight = 1200;
+			    break;
+			case PANEL_1400x1050:
+			    pSmi->lcdWidth  = 1400;
+			    pSmi->lcdHeight = 1050;
+			    break;
+		    }
+
+		    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+			       "Detected panel size via BIOS: %d x %d\n",
+			       pSmi->lcdWidth, pSmi->lcdHeight);
+		}
+		else
+		    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+			       "BIOS error during 730 panel detection!\n");
+	    }
+	    else  {
+		/* int10 support isn't setup on the second call to this function,
+		  o if this is the second call, don't do detection again */
+		if (pSmi->lcd == 0)
+		    /* If we get here, int10 support is not loaded or not working */ 
+		    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+			       "No BIOS support for 730 panel detection!\n");
+	    }
+
+	    /* Set this to indicate that we've done the detection */
+	    pSmi->lcd = 1;
+	}
+	else if (IS_MSOC(pSmi)) {
+	    pSmi->lcdWidth = FIELD_GET(regRead32(pSmi, PANEL_WINDOW_WIDTH),
+						 PANEL_WINDOW_WIDTH, WIDTH);
+	    pSmi->lcdHeight = FIELD_GET(regRead32(pSmi, PANEL_WINDOW_HEIGHT),
+						  PANEL_WINDOW_HEIGHT, HEIGHT);
+	}
+	else {
+	    /* panel size detection for hardware other than 730 */
+	    pSmi->lcd = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				     0x31) & 0x01;
+
+	    if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+			     0x30) & 0x01) {
+		pSmi->lcd <<= 1;
+	    }
+	    switch (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				 0x30) & 0x0C) {
+		case 0x00:
 		    pSmi->lcdWidth  = 640;
 		    pSmi->lcdHeight = 480;
 		    break;
-		case PANEL_800x600:
+		case 0x04:
 		    pSmi->lcdWidth  = 800;
 		    pSmi->lcdHeight = 600;
 		    break;
-		case PANEL_1024x768:
-		    pSmi->lcdWidth  = 1024;
-		    pSmi->lcdHeight = 768;
+		case 0x08:
+		    if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				     0x74) & 0x02) {
+			pSmi->lcdWidth  = 1024;
+			pSmi->lcdHeight = 600;
+		    }
+		    else {
+			pSmi->lcdWidth  = 1024;
+			pSmi->lcdHeight = 768;
+		    }
 		    break;
-		case PANEL_1280x1024:
+		case 0x0C:
 		    pSmi->lcdWidth  = 1280;
 		    pSmi->lcdHeight = 1024;
 		    break;
-		case PANEL_1600x1200:
-		    pSmi->lcdWidth  = 1600;
-		    pSmi->lcdHeight = 1200;
-		    break;
-		case PANEL_1400x1050:
-		    pSmi->lcdWidth  = 1400;
-		    pSmi->lcdHeight = 1050;
-		    break;
-		}
-	
-		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Detected panel size via BIOS: %d x %d\n",
-			   pSmi->lcdWidth, pSmi->lcdHeight);
 	    }
-	    else {
-		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "BIOS error during 730 panel detection!\n");
-			   pSmi->lcdWidth  = pScrn->virtualX;
-		pSmi->lcdHeight = pScrn->virtualY;
-	    }
-	}
-	else  {
-	    /* int10 support isn't setup on the second call to this function,
-	       so if this is the second call, don't do detection again */
-	    if (pSmi->lcd == 0) {
-		/* If we get here, int10 support is not loaded or not working */ 
-		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "No BIOS support for 730 panel detection!\n");
-		pSmi->lcdWidth  = pScrn->virtualX;
-		pSmi->lcdHeight = pScrn->virtualY;
-	    }
-	}
-
-	/* Set this to indicate that we've done the detection */
-	pSmi->lcd = 1;
-    }
-    else if (IS_MSOC(pSmi)) {
-	char* s;
-
-	pSmi->lcd = pSmi->IsSecondary == FALSE;
-	/* Default to ZoomOnLCD enabled. */
-	pSmi->lcdWidth  = 0;
-	pSmi->lcdHeight = 0;
-
-	if ((s = xf86GetOptValString(pSmi->Options, OPTION_PANEL_SIZE))) {
-	    if (sscanf(s, "%dx%d", &pSmi->lcdWidth, &pSmi->lcdHeight) != 2) {
-		xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "Invalid PanelSize option: %s\n", s);
-		pSmi->lcdWidth  = 1024;
-		pSmi->lcdHeight = 768;
-	    }
-	}
-    } else {
-	/* panel size detection for hardware other than 730 */
-	pSmi->lcd = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31) & 0x01;
-	
-	if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x30) & 0x01) {
-	    pSmi->lcd <<= 1;
-	}
-	switch (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x30) & 0x0C) {
-	case 0x00:
-	    pSmi->lcdWidth  = 640;
-	    pSmi->lcdHeight = 480;
-	    break;
-	case 0x04:
-	    pSmi->lcdWidth  = 800;
-	    pSmi->lcdHeight = 600;
-	    break;
-	case 0x08:
-	    if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x74) & 0x02) {
-		pSmi->lcdWidth  = 1024;
-		pSmi->lcdHeight = 600;
-	    } else {
-		pSmi->lcdWidth  = 1024;
-		pSmi->lcdHeight = 768;
-	    }
-	    break;
-	case 0x0C:
-	    pSmi->lcdWidth  = 1280;
-	    pSmi->lcdHeight = 1024;
-	    break;
 	}
     }
+
+    if (!pSmi->lcdWidth && (pSmi->lcdWidth = pScrn->virtualX) == 0)
+	pSmi->lcdWidth = 1024;
+    if (!pSmi->lcdHeight && (pSmi->lcdHeight = pScrn->virtualY) == 0)
+	pSmi->lcdHeight = 768;
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "%s Panel Size = %dx%d\n",
 	       (pSmi->lcd == 0) ? "OFF" : (pSmi->lcd == 1) ? "TFT" : "DSTN",
