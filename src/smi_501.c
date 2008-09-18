@@ -1,8 +1,7 @@
-/* Header:   //Mercury/Projects/archives/XFree86/4.0/smi_driver.c-arc   1.42   03 Jan 2001 13:52:16   Frido  $ */
-
 /*
 Copyright (C) 1994-1999 The XFree86 Project, Inc.  All Rights Reserved.
 Copyright (C) 2000 Silicon Motion, Inc.  All Rights Reserved.
+Copyright (C) 2008 Mandriva Linux.  All Rights Reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -26,7 +25,6 @@ Silicon Motion shall not be used in advertising or otherwise to promote the
 sale, use or other dealings in this Software without prior written
 authorization from The XFree86 Project or Silicon Motion.
 */
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/siliconmotion/smi_driver.c,v 1.30 2003/04/23 21:51:44 tsi Exp $ */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -47,906 +45,543 @@ authorization from The XFree86 Project or Silicon Motion.
 #define DPMS_SERVER
 #include <X11/extensions/dpms.h>
 
+/* Want to see register dumps for now */
+#undef VERBLEV
+#define VERBLEV		1
 
-/*
- * Forward definitions for the functions that make up the driver.
- */
-static int roundDiv(int num, int denom);
-static int findClock(int requested_clock, clock_select_t *clock,
-		     display_t display);
-static mode_table_t *findMode(mode_table_t *mode_table, int width, int height,
-			      int refresh_rate);
-static void adjustMode(mode_table_t *vesaMode, mode_table_t *mode,
-		       display_t display);
-static void setModeRegisters(reg_table_t *register_table, mode_table_t *mode,
-			     display_t display, int bpp, int fbPitch);
-static void programMode(SMIPtr pSmi, reg_table_t *register_table);
-static void SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-		    unsigned int fMode, unsigned int nHertz, display_t display,
-		    int fbPitch, int bpp);
-static void panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-			 unsigned int fMode, unsigned int nHertz, int fbPitch,
-			 int bpp);
-static void crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-		       unsigned int fMode, unsigned int nHertz, int fbPitch,
-		       int bpp);
-static void setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock);
-static void panelWaitVSync(SMIPtr pSmi, int vsync_count);
-static void panelPowerSequence(SMIPtr pSmi, panel_state_t on_off,
-			       int vsync_delay);
-static void panelUseCRT(SMIPtr pSmi, BOOL bEnable);
-
-/*
- * Add comment here about this module.
- */
-
-/* Mode table. */
-mode_table_t mode_table[] = {
-    /*----------------------------------------------------------------------------------------
-     * H.	H.    H.     H.   H.        V.   V.    V.    V.   V.        Pixel     H.     V.
-     * tot.	disp. sync   sync sync      tot. disp. sync  sync sinc      clock     freq.  freq.
-     *      end   start  wdth polarity       end   start hght polarity
-     *---------------------------------------------------------------------------------------*/
-
-    /* 640 x 480 */
-    {  800, 640,  656,   96,  NEGATIVE, 525, 480,  490,  2,   NEGATIVE, 25175000, 31469, 60 },
-    {  832, 640,  664,   40,  NEGATIVE, 520, 480,  489,  3,   NEGATIVE, 31500000, 37861, 72 },
-    {  840, 640,  656,   64,  NEGATIVE, 500, 480,  481,  3,   NEGATIVE, 31500000, 37500, 75 },
-    {  832, 640,  696,   56,  NEGATIVE, 509, 480,  481,  3,   NEGATIVE, 36000000, 43269, 85 },
-
-    /* 800 x 600 */
-    { 1024, 800,  824,   72,  POSITIVE, 625, 600,  601,  2,   POSITIVE, 36000000, 35156, 56 },
-    { 1056, 800,  840,  128,  POSITIVE, 628, 600,  601,  4,   POSITIVE, 40000000, 37879, 60 },
-    { 1040, 800,  856,  120,  POSITIVE, 666, 600,  637,  6,   POSITIVE, 50000000, 48077, 72 },
-    { 1056, 800,  816,   80,  POSITIVE, 625, 600,  601,  3,   POSITIVE, 49500000, 46875, 75 },
-    { 1048, 800,  832,   64,  POSITIVE, 631, 600,  601,  3,   POSITIVE, 56250000, 53674, 85 },
-
-    /* 1024 x 768*/
-    { 1344, 1024, 1048, 136,  NEGATIVE, 806, 768,  771,  6,   NEGATIVE, 65000000, 48363, 60 },
-    { 1328, 1024, 1048, 136,  NEGATIVE, 806, 768,  771,  6,   NEGATIVE, 75000000, 56476, 70 },
-    { 1312, 1024, 1040,  96,  POSITIVE, 800, 768,  769,  3,   POSITIVE, 78750000, 60023, 75 },
-    { 1376, 1024, 1072,  96,  POSITIVE, 808, 768,  769,  3,   POSITIVE, 94500000, 68677, 85 },
-
-    /* End of table. */
-    { 0, 0, 0, 0, NEGATIVE, 0, 0, 0, 0, NEGATIVE, 0, 0, 0 },
-};
-
-
-/* Set DPMS state. */
-void
-SMI501_SetDPMS(SMIPtr pSmi, DPMS_t state)
-{
-    unsigned int	value;
-
-    value = SMI501_Read32(pSmi, SYSTEM_CTRL);
-    switch (state) {
-	case DPMS_ON:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHP);
-	    break;
-
-	case DPMS_STANDBY:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VPHN);
-	    break;
-
-	case DPMS_SUSPEND:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHP);
-	    break;
-
-	case DPMS_OFF:
-	    value = FIELD_SET(value, SYSTEM_CTRL, DPMS, VNHN);
-	    break;
-    }
-
-    SMI501_Write32(pSmi, SYSTEM_CTRL, value);
-}
+static char *format_integer_base2(int32_t word);
+static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
+static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
+			    int32_t clock, int32_t value);
+static void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);
 
 Bool
-SMI501_SetMode(ScrnInfoPtr pScrn, DisplayModePtr mode)
+SMI501_EnterVT(int scrnIndex, int flags)
 {
-    SMIPtr pSmi = SMIPTR(pScrn);
+    ScrnInfoPtr	pScrn = xf86Screens[scrnIndex];
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    Bool	result;
 
-    ENTER_PROC("SMI501_SetMode");
+    /* Enable MMIO and map memory */
+    SMI_MapMem(pScrn);
 
-    /* FIXME */
-    mode->VRefresh = 60;
+    pSmi->Save(pScrn);
 
-    if (pSmi->IsSecondary)
-	crtSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
-    else
-	panelSetMode(pSmi, mode->HDisplay, mode->VDisplay, 0, mode->VRefresh, pSmi->Stride, pScrn->depth);
+    /* FBBase may have changed after remapping the memory */
+    pScrn->pixmapPrivate.ptr = pSmi->FBBase;
+    if(pSmi->useEXA)
+	pSmi->EXADriverPtr->memoryBase = pSmi->FBBase;
 
-    panelUseCRT(pSmi, TRUE);	/* Enable both outputs simultaneously */
-    LEAVE_PROC("SMI501_SetMode");
+    /* #670 */
+    if (pSmi->shadowFB) {
+	pSmi->FBOffset = pSmi->savedFBOffset;
+	pSmi->FBReserved = pSmi->savedFBReserved;
+    }
 
-    return TRUE;
+    result = pSmi->ModeInit(pScrn, pScrn->currentMode);
 
-}
+    if (result && pSmi->shadowFB) {
+	BoxRec box;
 
-/**********************************************************************
- * SMI501_Read32
- *    Read the value of the 32-bit register specified by nOffset
- **********************************************************************/
-unsigned int
-SMI501_Read32(SMIPtr pSmi, unsigned int nOffset)
-{
-    unsigned int result;
+	if (pSmi->pSaveBuffer) {
+	    memcpy(pSmi->FBBase, pSmi->pSaveBuffer, pSmi->saveBufferSize);
+	    xfree(pSmi->pSaveBuffer);
+	    pSmi->pSaveBuffer = NULL;
+	}
 
-    result = READ_SCR(pSmi, nOffset);
+	box.x1 = 0;
+	box.y1 = 0;
+	box.x2 = pSmi->width;
+	box.y2 = pSmi->height;
+	SMI_RefreshArea(pScrn, 1, &box);
+    }
+
+    /* Reset the grapics engine */
+    if (!pSmi->NoAccel)
+	SMI_EngineReset(pScrn);
 
     return (result);
 }
 
-/**********************************************************************
- * SMI501_Write32
- *    Write the 32-bit value, nData, to the 32-bit register specified by
- *    nOffset
- **********************************************************************/
 void
-SMI501_Write32(SMIPtr pSmi, unsigned int nOffset, unsigned int nData)
+SMI501_LeaveVT(int scrnIndex, int flags)
 {
-    WRITE_SCR(pSmi, nOffset, nData);
+    ScrnInfoPtr	pScrn = xf86Screens[scrnIndex];
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
+    if (pSmi->shadowFB) {
+	pSmi->pSaveBuffer = xnfalloc(pSmi->saveBufferSize);
+	if (pSmi->pSaveBuffer)
+	    memcpy(pSmi->pSaveBuffer, pSmi->FBBase, pSmi->saveBufferSize);
+
+	pSmi->savedFBOffset = pSmi->FBOffset;
+	pSmi->savedFBReserved = pSmi->FBReserved;
+    }
+
+    memset(pSmi->FBBase, 0, 256 * 1024);
+    SMI_UnmapMem(pScrn);
 }
 
-
-/* Perform a rounded division. */
-static int
-roundDiv(int num, int denom)
+void
+SMI501_Save(ScrnInfoPtr pScrn)
 {
-    /* n / d + 1 / 2 = (2n + d) / 2d */
-    return (2 * num + denom) / (2 * denom);
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    MSOCRegPtr	save = pSmi->save;
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Register dump (Before Save)\n");
+    SMI501_PrintRegs(pScrn);
+
+    /* Used mainly for DPMS info */
+    save->system_ctl.value = READ_SCR(pSmi, SYSTEM_CTL);
+
+    /* Used basically to enable dac */
+    save->misc_ctl.value = READ_SCR(pSmi, MISC_CTL);
+
+    /* Read it first to know if current power mode */
+    save->power_ctl.value = READ_SCR(pSmi, POWER_CTL);
+
+    switch (field(save->power_ctl, mode)) {
+	case 0:
+	    save->current_gate  = POWER0_GATE;
+	    save->current_clock = POWER0_CLOCK;
+	    break;
+	case 1:
+	    save->current_gate  = POWER1_GATE;
+	    save->current_clock = POWER1_CLOCK;
+	    break;
+	default:
+	    /* FIXME
+	     * Should be in sleep mode
+	     * TODO
+	     * select mode0 by default
+	     */
+	    save->current_gate = POWER0_GATE;
+	    save->current_clock = POWER0_CLOCK;
+	    break;
+    }
+
+    save->gate.value  = READ_SCR(pSmi, save->current_gate);
+    save->clock.value = READ_SCR(pSmi, save->current_clock);
+
+    /* FIXME Never changed */
+    save->power_ctl.value = READ_SCR(pSmi, TIMING_CONTROL);
+
+    save->sleep_gate.value = READ_SCR(pSmi, SLEEP_GATE);
+
+    save->panel_display_ctl.value = READ_SCR(pSmi, PANEL_DISPLAY_CTL);
+    save->panel_fb_address.value = READ_SCR(pSmi, PANEL_FB_ADDRESS);
+    save->panel_fb_width.value = READ_SCR(pSmi, PANEL_FB_WIDTH);
+    save->panel_wwidth.value = READ_SCR(pSmi, PANEL_WWIDTH);
+    save->panel_wheight.value = READ_SCR(pSmi, PANEL_WHEIGHT);
+    save->panel_plane_tl.value = READ_SCR(pSmi, PANEL_PLANE_TL);
+    save->panel_plane_br.value = READ_SCR(pSmi, PANEL_PLANE_BR);
+    save->panel_htotal.value = READ_SCR(pSmi, PANEL_HTOTAL);
+    save->panel_hsync.value = READ_SCR(pSmi, PANEL_HSYNC);
+    save->panel_vtotal.value = READ_SCR(pSmi, PANEL_VTOTAL);
+    save->panel_vsync.value = READ_SCR(pSmi, PANEL_VSYNC);
+
+    save->crt_display_ctl.value = READ_SCR(pSmi, CRT_DISPLAY_CTL);
+    save->crt_fb_address.value = READ_SCR(pSmi, CRT_FB_ADDRESS);
+    save->crt_fb_width.value = READ_SCR(pSmi, CRT_FB_WIDTH);
+    save->crt_htotal.value = READ_SCR(pSmi, CRT_HTOTAL);
+    save->crt_hsync.value = READ_SCR(pSmi, CRT_HSYNC);
+    save->crt_vtotal.value = READ_SCR(pSmi, CRT_VTOTAL);
+    save->crt_vsync.value = READ_SCR(pSmi, CRT_VSYNC);
 }
 
-/* Finds clock closest to the requested. */
-static int
-findClock(int requested_clock, clock_select_t *clock, display_t display)
+void
+SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
+				 int PowerManagementMode, int flags)
 {
-    int	mclk;
-    int	divider, shift;
-    int	best_diff = 999999999;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    MSOCRegPtr		mode = pSmi->mode;
 
-    /* Try 288MHz and 336MHz clocks. */
-    for (mclk = 288000000; mclk <= 336000000; mclk += 48000000) {
-	/* For CRT, try dividers 1 and 3, for panel, try divider 5 as well. */
-	for (divider = 1; divider <= (display == PANEL ? 5 : 3); divider += 2) {
-	    /* Try all 8 shift values. */
-	    for (shift = 0; shift < 8; shift++) {
-		/* Calculate difference with requested clock. */
-		int diff = roundDiv(mclk, (divider << shift)) - requested_clock;
+    if (pSmi->CurrentDPMS != PowerManagementMode) {
+	mode->system_ctl.value = READ_SCR(pSmi, SYSTEM_CTL);
+	switch (PowerManagementMode) {
+	    case DPMSModeOn:
+		field(mode->system_ctl, dpmsh) = 1;
+		field(mode->system_ctl, dpmsv) = 1;
+		break;
+	    case DPMSModeStandby:
+		field(mode->system_ctl, dpmsh) = 0;
+		field(mode->system_ctl, dpmsv) = 1;
+		break;
+	    case DPMSModeSuspend:
+		field(mode->system_ctl, dpmsh) = 1;
+		field(mode->system_ctl, dpmsv) = 0;
+		break;
+	    case DPMSModeOff:
+		field(mode->system_ctl, dpmsh) = 0;
+		field(mode->system_ctl, dpmsv) = 0;
+		break;
+	}
+	WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
+	pSmi->CurrentDPMS = PowerManagementMode;
+    }
+}
+
+Bool
+SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
+{
+    MSOCRegPtr	save;
+    MSOCRegPtr	mode;
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    double	mclk;
+    int32_t	clock;
+    int		diff, best, divider, shift, x2_divider, x2_shift;
+
+    save = pSmi->save;
+    mode = pSmi->mode;
+
+    pSmi->Bpp = pScrn->bitsPerPixel / 8;
+    if (pSmi->rotate) {
+	pSmi->width  = pScrn->virtualY;
+	pSmi->height = pScrn->virtualX;
+	pSmi->Stride = (pSmi->height * pSmi->Bpp + 15) & ~15;
+    } 
+    else {
+	pSmi->width  = pScrn->virtualX;
+	pSmi->height = pScrn->virtualY;
+	pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
+    }
+
+    /* Start with a fresh copy of registers before any mode change */
+    memcpy(mode, save, sizeof(MSOCRegRec));
+
+    /* Enable DAC -- 0: enable - 1: disable */
+    field(mode->misc_ctl, dac) = 0;
+
+    /* Enable 2D engine */
+    field(mode->gate, engine) = 1;
+    /* Color space conversion */
+    field(mode->gate, csc) = 1;
+    /* ZV port */
+    field(mode->gate, zv) = 1;
+    /* Gpio, Pwm, and I2c */
+    field(mode->gate, gpio) = 1;
+
+    /* Update gate first */
+    WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
+
+    /* FIXME fixed at power mode 0 as in the smi sources */
+    field(mode->power_ctl, status) = 0;
+    field(mode->power_ctl, mode) = 0;
+
+    /* FIXME fixed at 336/3/0 as in the smi sources */
+    field(mode->clock, m_select) = 1;
+    clock = mode->clock.value;
+    field(mode->clock, m_divider) = 1;
+    field(mode->clock, m_shift) = 0;
+    SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
+
+    switch (pSmi->MCLK) {
+	case 168000:	    /* 336/1/1 */
+	    field(mode->clock, m2_select) = 1;
+	    clock = mode->clock.value;
+	    field(mode->clock, m2_divider) = 0;
+	    field(mode->clock, m2_shift) = 1;
+	    break;
+	case 96000:	    /* 288/3/0 */
+	    field(mode->clock, m2_select) = 0;
+	    clock = mode->clock.value;
+	    field(mode->clock, m2_divider) = 1;
+	    field(mode->clock, m2_shift) = 0;
+	    break;
+	case 144000:	    /* 288/1/1 */
+	    field(mode->clock, m2_select) = 0;
+	    clock = mode->clock.value;
+	    field(mode->clock, m2_divider) = 0;
+	    field(mode->clock, m2_shift) = 1;
+	    break;
+	case 112000:	    /* 336/3/0 */
+	default:
+	    field(mode->clock, m2_select) = 1;
+	    clock = mode->clock.value;
+	    field(mode->clock, m2_divider) = 1;
+	    field(mode->clock, m2_shift) = 0;
+	    break;
+    }
+    SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
+
+    /* Find clock best matching mode */
+    best = 0x7fffffff;
+    for (mclk = 288000.0; mclk <= 336000.0; mclk += 48000.0) {
+	for (divider = 1; divider <= (pSmi->lcd ? 5 : 3); divider += 2) {
+	    /* Start at 1 to match division by 2 */
+	    for (shift = 1; shift <= 8; shift++) {
+		/* Shift starts at 1 to add a division by two, matching
+		 * description of P2XCLK and V2XCLK. */
+		diff = (mclk / (divider << shift)) - xf86mode->Clock;
 		if (diff < 0)
 		    diff = -diff;
+		if (diff < best) {
+		    x2_shift = shift - 1;
+		    x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
 
-		/* If the difference is less than the current, use it. */
-		if (diff < best_diff) {
-		    /* Store best difference. */
-		    best_diff = diff;
-
-		    /* Store clock values. */
-		    clock->mclk = mclk;
-		    clock->divider = divider;
-		    clock->shift = shift;
+		    /* Remember best diff */
+		    best = diff;
 		}
 	    }
 	}
     }
 
-    /* Return best clock. */
-    return clock->mclk / (clock->divider << clock->shift);
-}
+    if (pSmi->lcd) {
+	field(mode->clock, p2_select) = mclk == 288000.0 ? 0 : 1;
+	clock = mode->clock.value;
+	field(mode->clock, p2_divider) = x2_divider;
+	field(mode->clock, p2_shift) = x2_shift;
+	SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
+	field(mode->panel_display_ctl, format) =
+	    pScrn->bitsPerPixel == 8 ? 0 :
+	    pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-/* Finds the requested mode in the mode table. */
-static mode_table_t *
-findMode(mode_table_t *mode_table, int width, int height, int refresh_rate)
-{
-    /* Walk the entire mode table. */
-    while (mode_table->pixel_clock != 0) {
-	/* If this mode matches the requested mode, return it! */
-	if (mode_table->horizontal_display_end == width &&
-	    mode_table->vertical_display_end == height &&
-	    mode_table->vertical_frequency == refresh_rate)
-	    return (mode_table);
+	field(mode->panel_display_ctl, enable) = 1;
+	field(mode->panel_display_ctl, timing) = 1;
 
-	/* Next entry in the mode table. */
-	mode_table++;
-    }
+	/* FIXME if non clone dual head, and secondary, need to
+	 * properly set panel fb address properly ... */
+	field(mode->panel_fb_address, address) = 0;
+	field(mode->panel_fb_address, mextern) = 0;	/* local memory */
+	field(mode->panel_fb_address, pending) = 0;	/* FIXME required? */
 
-    /* No mode found. */
-    return (NULL);
-}
+	/* >> 4 because of the "unused bits" that should be set to 0 */
+	/* FIXME this should be used for virtual size? */
+	field(mode->panel_fb_width, offset) = pSmi->Stride >> 4;
+	field(mode->panel_fb_width, width) = pSmi->Stride >> 4;
 
-/* Converts the VESA timing into Voyager timing. */
-static void
-adjustMode(mode_table_t *vesaMode, mode_table_t *mode, display_t display)
-{
-    int			blank_width, sync_start, sync_width;
-    clock_select_t	clock;
+	field(mode->panel_wwidth, x) = 0;
+	field(mode->panel_wwidth, width) = xf86mode->HDisplay;
 
-    /* Calculate the VESA line and screen frequencies. */
-    vesaMode->horizontal_frequency = roundDiv(vesaMode->pixel_clock,
-					      vesaMode->horizontal_total);
-    vesaMode->vertical_frequency = roundDiv(vesaMode->horizontal_frequency,
-					    vesaMode->vertical_total);
+	field(mode->panel_wheight, y) = 0;
+	field(mode->panel_wheight, height) = xf86mode->VDisplay;
 
-    /* Calculate the sync percentages of the VESA mode. */
-    blank_width = vesaMode->horizontal_total - vesaMode->horizontal_display_end;
-    sync_start = roundDiv((vesaMode->horizontal_sync_start -
-			   vesaMode->horizontal_display_end) * 100, blank_width);
-    sync_width = roundDiv(vesaMode->horizontal_sync_width * 100, blank_width);
+	field(mode->panel_plane_tl, top) = 0;
+	field(mode->panel_plane_tl, left) = 0;
 
-    /* Copy VESA mode into Voyager mode. */
-    *mode = *vesaMode;
+	field(mode->panel_plane_br, right) = xf86mode->HDisplay - 1;
+	field(mode->panel_plane_br, bottom) = xf86mode->VDisplay - 1;
 
-    /* Find the best pixel clock. */
-    mode->pixel_clock = findClock(vesaMode->pixel_clock * 2,
-				  &clock, display) / 2;
+	/* 0 means pulse high */
+	field(mode->panel_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
+	field(mode->panel_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
 
-    /* Calculate the horizontal total based on the pixel clock and VESA line
-     * frequency. */
-    mode->horizontal_total = roundDiv(mode->pixel_clock,
-				      vesaMode->horizontal_frequency);
+	field(mode->panel_htotal, total) = xf86mode->HTotal - 1;
+	field(mode->panel_htotal, end) = xf86mode->HDisplay - 1;
 
-    /* Calculate the sync start and width based on the VESA percentages. */
-    blank_width = mode->horizontal_total - mode->horizontal_display_end;
-    mode->horizontal_sync_start = mode->horizontal_display_end +
-				  roundDiv(blank_width * sync_start, 100);
-    mode->horizontal_sync_width = roundDiv(blank_width * sync_width, 100);
+	field(mode->panel_hsync, start) = xf86mode->HSyncStart;
+	field(mode->panel_hsync, width) = xf86mode->HSyncEnd -
+	    xf86mode->HSyncStart;
 
-    /* Calculate the line and screen frequencies. */
-    mode->horizontal_frequency = roundDiv(mode->pixel_clock,
-					  mode->horizontal_total);
-    mode->vertical_frequency = roundDiv(mode->horizontal_frequency,
-					mode->vertical_total);
-}
+	field(mode->panel_vtotal, total) = xf86mode->VTotal - 1;
+	field(mode->panel_vtotal, end) = xf86mode->VDisplay - 1;
 
-/* Fill the register structure. */
-static void
-setModeRegisters(reg_table_t *register_table, mode_table_t *mode,
-		 display_t display, int bpp, int fbPitch)
-{
-    clock_select_t	clock;
-
-    memset(&clock, 0, sizeof(clock));
-
-    /* Calculate the clock register values. */
-    findClock(mode->pixel_clock * 2, &clock, display);
-
-    if (display == PANEL) {
-	/* Set clock value for panel. */
-	register_table->clock =
-	    (clock.mclk == 288000000 ?
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, P2XCLK_SELECT, 288) :
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, P2XCLK_SELECT, 336)) |
-	    (clock.divider == 1 ?
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, P2XCLK_DIVIDER, 1) :
-	     (clock.divider == 3 ?
-	      FIELD_SET(0, CURRENT_POWER_CLOCK, P2XCLK_DIVIDER, 3) :
-	      FIELD_SET(0, CURRENT_POWER_CLOCK, P2XCLK_DIVIDER, 5))) |
-	    FIELD_VALUE(0, CURRENT_POWER_CLOCK, P2XCLK_SHIFT, clock.shift);
-
-	/* Set control register value. */
-	register_table->control =
-	(mode->vertical_sync_polarity == POSITIVE ?
-	 FIELD_SET(0, PANEL_DISPLAY_CTRL, VSYNC_PHASE, ACTIVE_HIGH) :
-	 FIELD_SET(0, PANEL_DISPLAY_CTRL, VSYNC_PHASE, ACTIVE_LOW)) |
-	(mode->horizontal_sync_polarity == POSITIVE ?
-	 FIELD_SET(0, PANEL_DISPLAY_CTRL, HSYNC_PHASE, ACTIVE_HIGH) :
-	 FIELD_SET(0, PANEL_DISPLAY_CTRL, HSYNC_PHASE, ACTIVE_LOW)) |
-	    FIELD_SET(0, PANEL_DISPLAY_CTRL, TIMING, ENABLE) |
-	    FIELD_SET(0, PANEL_DISPLAY_CTRL, PLANE, ENABLE) |
-	(bpp == 8 ?
-	 FIELD_SET(0, PANEL_DISPLAY_CTRL, FORMAT, 8) :
-	 (bpp == 16 ?
-	  FIELD_SET(0, PANEL_DISPLAY_CTRL, FORMAT, 16) :
-	  FIELD_SET(0, PANEL_DISPLAY_CTRL, FORMAT, 32)));
-
-	/* Set timing registers. */
-	register_table->horizontal_total =
-	    FIELD_VALUE(0, PANEL_HORIZONTAL_TOTAL, TOTAL,
-			mode->horizontal_total - 1) |
-	    FIELD_VALUE(0, PANEL_HORIZONTAL_TOTAL, DISPLAY_END,
-			mode->horizontal_display_end - 1);
-
-	register_table->horizontal_sync =
-	    FIELD_VALUE(0, PANEL_HORIZONTAL_SYNC, WIDTH,
-			mode->horizontal_sync_width) |
-	    FIELD_VALUE(0, PANEL_HORIZONTAL_SYNC, START,
-			mode->horizontal_sync_start - 1);
-
-	register_table->vertical_total =
-	    FIELD_VALUE(0, PANEL_VERTICAL_TOTAL, TOTAL,
-			mode->vertical_total - 1) |
-	    FIELD_VALUE(0, PANEL_VERTICAL_TOTAL, DISPLAY_END,
-			mode->vertical_display_end - 1);
-
-	register_table->vertical_sync =
-	    FIELD_VALUE(0, PANEL_VERTICAL_SYNC, HEIGHT,
-			mode->vertical_sync_height) |
-	    FIELD_VALUE(0, PANEL_VERTICAL_SYNC, START,
-			mode->vertical_sync_start - 1);
+	field(mode->panel_vsync, start) = xf86mode->VSyncStart;
+	field(mode->panel_vsync, height) = xf86mode->VSyncEnd -
+	    xf86mode->VSyncStart;
     }
     else {
-	/* Set clock value for CRT. */
-	register_table->clock =
-	    (clock.mclk == 288000000 ?
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, V2XCLK_SELECT, 288) :
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, V2XCLK_SELECT, 336)) |
-	    (clock.divider == 1 ?
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, V2XCLK_DIVIDER, 1) :
-	     FIELD_SET(0, CURRENT_POWER_CLOCK, V2XCLK_DIVIDER, 3)) |
-	    FIELD_VALUE(0, CURRENT_POWER_CLOCK, V2XCLK_SHIFT, clock.shift);
+	field(mode->clock, v2_select) = mclk == 288000.0 ? 0 : 1;
+	clock = mode->clock.value;
+	field(mode->clock, v2_divider) = x2_divider;
+	field(mode->clock, v2_shift) = x2_shift;
+	SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
-	/* Set control register value.*/
-	register_table->control =
-	    (mode->vertical_sync_polarity == POSITIVE ?
-	     FIELD_SET(0, CRT_DISPLAY_CTRL, VSYNC_PHASE, ACTIVE_HIGH) :
-	     FIELD_SET(0, CRT_DISPLAY_CTRL, VSYNC_PHASE, ACTIVE_LOW)) |
-	    (mode->horizontal_sync_polarity == POSITIVE ?
-	     FIELD_SET(0, CRT_DISPLAY_CTRL, HSYNC_PHASE, ACTIVE_HIGH) :
-	     FIELD_SET(0, CRT_DISPLAY_CTRL, HSYNC_PHASE, ACTIVE_LOW)) |
-	    FIELD_SET(0, CRT_DISPLAY_CTRL, SELECT, CRT) |
-	    FIELD_SET(0, CRT_DISPLAY_CTRL, TIMING, ENABLE) |
-	    FIELD_SET(0, CRT_DISPLAY_CTRL, PLANE, ENABLE) |
-	    (bpp == 8 ?
-	     FIELD_SET(0, CRT_DISPLAY_CTRL, FORMAT, 8) :
-	     (bpp == 16 ?
-	      FIELD_SET(0, CRT_DISPLAY_CTRL, FORMAT, 16) :
-	      FIELD_SET(0, CRT_DISPLAY_CTRL, FORMAT, 32)));
+	field(mode->crt_display_ctl, format) =
+	    pScrn->bitsPerPixel == 8 ? 0 :
+	    pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-	/* Set timing registers. */
-	register_table->horizontal_total =
-	    FIELD_VALUE(0, CRT_HORIZONTAL_TOTAL, TOTAL,
-			mode->horizontal_total - 1) |
-	    FIELD_VALUE(0, CRT_HORIZONTAL_TOTAL, DISPLAY_END,
-			mode->horizontal_display_end - 1);
+	/* 0: select panel - 1: select crt */
+	field(mode->crt_display_ctl, select) = 1;
+	field(mode->crt_display_ctl, enable) = 1;
 
-	register_table->horizontal_sync =
-	    FIELD_VALUE(0, CRT_HORIZONTAL_SYNC, WIDTH,
-			mode->horizontal_sync_width) |
-	    FIELD_VALUE(0, CRT_HORIZONTAL_SYNC, START,
-			mode->horizontal_sync_start - 1);
+	/* FIXME if non clone dual head, and secondary, need to
+	 * properly set crt fb address properly ... */
+	field(mode->crt_fb_address, address) = 0;
+	field(mode->crt_fb_address, mextern) = 0;	/* local memory */
+	field(mode->crt_fb_address, pending) = 0;	/* FIXME required? */
 
-	register_table->vertical_total =
-	    FIELD_VALUE(0, CRT_VERTICAL_TOTAL, TOTAL,
-			mode->vertical_total - 1) |
-	    FIELD_VALUE(0, CRT_VERTICAL_TOTAL, DISPLAY_END,
-			mode->vertical_display_end - 1);
-	register_table->vertical_sync =
-	    FIELD_VALUE(0, CRT_VERTICAL_SYNC, HEIGHT,
-			mode->vertical_sync_height) |
-	    FIELD_VALUE(0, CRT_VERTICAL_SYNC, START,
-			mode->vertical_sync_start - 1);
+	/* >> 4 because of the "unused fields" that should be set to 0 */
+	/* FIXME this should be used for virtual size? */
+	field(mode->crt_fb_width, offset) = pSmi->Stride >> 4;
+	field(mode->crt_fb_width, width) = pSmi->Stride >> 4;
+
+	/* 0 means pulse high */
+	field(mode->crt_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
+	field(mode->crt_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
+
+	field(mode->crt_htotal, total) = xf86mode->HTotal - 1;
+	field(mode->crt_htotal, end) = xf86mode->HDisplay - 1;
+
+	field(mode->crt_hsync, start) = xf86mode->HSyncStart;
+	field(mode->crt_hsync, width) = xf86mode->HSyncEnd -
+	    xf86mode->HSyncStart;
+
+	field(mode->crt_vtotal, total) = xf86mode->VTotal - 1;
+	field(mode->crt_vtotal, end) = xf86mode->VDisplay - 1;
+
+	field(mode->crt_vsync, start) = xf86mode->HSyncStart;
+	field(mode->crt_vsync, height) = xf86mode->HSyncEnd -
+	    xf86mode->HSyncStart;
     }
 
-    /* Set up framebuffer pitch, from passed in value */
-    register_table->fb_width = mode->horizontal_display_end * (bpp / 8);
-    register_table->fb_width = fbPitch;
+    WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
 
-    /* Calculate frame buffer width and height. */
-    register_table->width    = mode->horizontal_display_end;
-    register_table->height   = mode->vertical_display_end;
+    if (pSmi->lcd) {
+	WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
+	WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
 
-    /* Save display type. */
-    register_table->display = display;
-}
+	WRITE_SCR(pSmi, PANEL_WWIDTH, mode->panel_wwidth.value);
+	WRITE_SCR(pSmi, PANEL_WHEIGHT, mode->panel_wheight.value);
 
-/* Program the mode with the registers specified. */
-static void
-programMode(SMIPtr pSmi, reg_table_t *register_table)
-{
-    unsigned int	value, gate, clock;
-    unsigned int	palette_ram;
-    unsigned int	fb_size, offset;
+	WRITE_SCR(pSmi, PANEL_PLANE_TL, mode->panel_plane_tl.value);
+	WRITE_SCR(pSmi, PANEL_PLANE_BR, mode->panel_plane_br.value);
 
-    /* Get current power configuration. */
-    gate = SMI501_Read32(pSmi, CURRENT_POWER_GATE);
-    gate |= 0x08;	/* Enable power to 2D engine */
-    gate = FIELD_SET(gate, CURRENT_POWER_GATE, CSC,          ENABLE);
-    gate = FIELD_SET(gate, CURRENT_POWER_GATE, ZVPORT,       ENABLE);
-    gate = FIELD_SET(gate, CURRENT_POWER_GATE, GPIO_PWM_I2C, ENABLE);
+	WRITE_SCR(pSmi, PANEL_HTOTAL, mode->panel_htotal.value);
+	WRITE_SCR(pSmi, PANEL_HSYNC, mode->panel_hsync.value);
+	WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
+	WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 
-    clock = SMI501_Read32(pSmi, CURRENT_POWER_CLOCK);
+	/* Power up sequence for panel */
+	field(mode->panel_display_ctl, vdd) = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
 
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, MCLK_SELECT, 336);
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, MCLK_DIVIDER, 3);
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, MCLK_SHIFT, 0);
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, M2XCLK_SELECT, 336);
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, M2XCLK_DIVIDER, 1);
-    clock = FIELD_SET(clock, CURRENT_POWER_CLOCK, M2XCLK_SHIFT, 1);
+	field(mode->panel_display_ctl, signal) = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
 
-    /* Program panel. */
-    if (register_table->display == PANEL) {
-	/* Program clock, enable display controller. */
-	gate = FIELD_SET(gate, CURRENT_POWER_GATE, DISPLAY, ENABLE);
-	clock &= FIELD_CLEAR(CURRENT_POWER_CLOCK, P2XCLK_SELECT) &
-	    FIELD_CLEAR(CURRENT_POWER_CLOCK, P2XCLK_DIVIDER) &
-	    FIELD_CLEAR(CURRENT_POWER_CLOCK, P2XCLK_SHIFT);
-	setPower(pSmi, gate, clock | register_table->clock);
+	field(mode->panel_display_ctl, bias) = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
 
-	/* Calculate frame buffer address. */
-	value = 0;
-	fb_size = register_table->fb_width * register_table->height;
-	if (FIELD_GET(SMI501_Read32(pSmi, CRT_DISPLAY_CTRL),
-		      CRT_DISPLAY_CTRL,
-		      PLANE) == CRT_DISPLAY_CTRL_PLANE_ENABLE) {
-	    value = FIELD_GET(SMI501_Read32(pSmi, CRT_FB_ADDRESS),
-			      CRT_FB_ADDRESS, ADDRESS);
-	    if (fb_size < value)
-		value = 0;
-	    else
-		value += FIELD_GET(SMI501_Read32(pSmi, CRT_FB_WIDTH),
-				   CRT_FB_WIDTH, OFFSET) *
-		    (FIELD_GET(SMI501_Read32(pSmi, CRT_VERTICAL_TOTAL),
-			       CRT_VERTICAL_TOTAL, DISPLAY_END) + 1);
-	}
+	field(mode->panel_display_ctl, fp) = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
 
-	/* Program panel registers. */
-	SMI501_Write32(pSmi, PANEL_FB_ADDRESS,
-		       FIELD_SET(0, PANEL_FB_ADDRESS, STATUS, PENDING) |
-		       FIELD_SET(0, PANEL_FB_ADDRESS, EXT, LOCAL) |
-		       FIELD_VALUE(0, PANEL_FB_ADDRESS, ADDRESS, value));
-
-	SMI501_Write32(pSmi, PANEL_FB_WIDTH,
-		       FIELD_VALUE(0, PANEL_FB_WIDTH, WIDTH,
-				   register_table->fb_width) |
-		       FIELD_VALUE(0, PANEL_FB_WIDTH, OFFSET,
-				   register_table->fb_width));
-
-	SMI501_Write32(pSmi, PANEL_WINDOW_WIDTH,
-		       FIELD_VALUE(0, PANEL_WINDOW_WIDTH, WIDTH,
-				   register_table->width) |
-		       FIELD_VALUE(0, PANEL_WINDOW_WIDTH, X, 0));
-
-	SMI501_Write32(pSmi, PANEL_WINDOW_HEIGHT,
-		       FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, HEIGHT,
-				   register_table->height) |
-		       FIELD_VALUE(0, PANEL_WINDOW_HEIGHT, Y, 0));
-
-	SMI501_Write32(pSmi, PANEL_PLANE_TL,
-		       FIELD_VALUE(0, PANEL_PLANE_TL, TOP, 0) |
-		       FIELD_VALUE(0, PANEL_PLANE_TL, LEFT, 0));
-
-	SMI501_Write32(pSmi, PANEL_PLANE_BR,
-		       FIELD_VALUE(0, PANEL_PLANE_BR, BOTTOM,
-				   register_table->height - 1) |
-		       FIELD_VALUE(0, PANEL_PLANE_BR, RIGHT,
-				   register_table->width - 1));
-
-	SMI501_Write32(pSmi, PANEL_HORIZONTAL_TOTAL,
-		       register_table->horizontal_total);
-	SMI501_Write32(pSmi, PANEL_HORIZONTAL_SYNC,
-		       register_table->horizontal_sync);
-	SMI501_Write32(pSmi, PANEL_VERTICAL_TOTAL,
-		       register_table->vertical_total);
-	SMI501_Write32(pSmi, PANEL_VERTICAL_SYNC,
-		       register_table->vertical_sync);
-
-	/* Program panel display control register. */
-	value = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL) &
-	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, VSYNC_PHASE) &
-	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, HSYNC_PHASE) &
-	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, TIMING) &
-	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, PLANE) &
-	    FIELD_CLEAR(PANEL_DISPLAY_CTRL, FORMAT);
-
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, value |
-		       register_table->control);
-
-	/* Palette RAM. */
-	palette_ram = PANEL_PALETTE_RAM;
-
-	/* Turn on panel. */
-	panelPowerSequence(pSmi, PANEL_ON, 4);
-
-	SMI501_Write32(pSmi, MISC_CTRL,
-		       FIELD_SET(SMI501_Read32(pSmi, MISC_CTRL), MISC_CTRL,
-				 DAC_POWER, ENABLE));
-	SMI501_Write32(pSmi, CRT_DISPLAY_CTRL,
-		       FIELD_SET(SMI501_Read32(pSmi, CRT_DISPLAY_CTRL),
-				 CRT_DISPLAY_CTRL, SELECT, PANEL));
+	/* FIXME: No dual head setup, and in this case, crt may
+	 * just be another panel */
+	/* crt clones panel */
+	field(mode->crt_display_ctl, enable) = 1;
+	/* 0: select panel - 1: select crt */
+	field(mode->crt_display_ctl, select) = 0;
+	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
     }
-
-    /* Program CRT. */
     else {
-	/* Program clock, enable display controller. */
-	gate = FIELD_SET(gate, CURRENT_POWER_GATE, DISPLAY, ENABLE);
-	clock &= FIELD_CLEAR(CURRENT_POWER_CLOCK, V2XCLK_SELECT) &
-	    FIELD_CLEAR(CURRENT_POWER_CLOCK, V2XCLK_DIVIDER) &
-	    FIELD_CLEAR(CURRENT_POWER_CLOCK, V2XCLK_SHIFT);
+	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
+	WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
+	WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
+	WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
+	WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
+	WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
+	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 
-	setPower(pSmi, gate, clock | register_table->clock);
-
-	/* Turn on DAC. */
-	SMI501_Write32(pSmi, MISC_CTRL, FIELD_SET(SMI501_Read32(pSmi, MISC_CTRL),
-						  MISC_CTRL, DAC_POWER, ENABLE));
-
-	/* Calculate frame buffer address. */
-	value = 0;
-	fb_size = register_table->fb_width * register_table->height;
-	if (FIELD_GET(SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL),
-		      PANEL_DISPLAY_CTRL,
-		      PLANE) == PANEL_DISPLAY_CTRL_PLANE_ENABLE) {
-	    value = FIELD_GET(SMI501_Read32(pSmi, PANEL_FB_ADDRESS),
-			      PANEL_FB_ADDRESS, ADDRESS);
-	    if (fb_size < value)
-		value = 0;
-	    else
-		value += FIELD_GET(SMI501_Read32(pSmi, PANEL_FB_WIDTH),
-				   PANEL_FB_WIDTH, OFFSET) *
-		    FIELD_GET(SMI501_Read32(pSmi, PANEL_WINDOW_HEIGHT),
-			      PANEL_WINDOW_HEIGHT, HEIGHT);
-	}
-
-	/* Program CRT registers. */
-	SMI501_Write32(pSmi, CRT_FB_ADDRESS,
-		       FIELD_SET(0, CRT_FB_ADDRESS, STATUS, PENDING) |
-		       FIELD_SET(0, CRT_FB_ADDRESS, EXT, LOCAL) |
-		       FIELD_VALUE(0, CRT_FB_ADDRESS, ADDRESS, value));
-
-	SMI501_Write32(pSmi, CRT_FB_WIDTH,
-		       FIELD_VALUE(0, CRT_FB_WIDTH, WIDTH,
-				   register_table->fb_width) |
-		       FIELD_VALUE(0, CRT_FB_WIDTH, OFFSET,
-				   register_table->fb_width));
-
-	SMI501_Write32(pSmi, CRT_HORIZONTAL_TOTAL,
-		       register_table->horizontal_total);
-	SMI501_Write32(pSmi, CRT_HORIZONTAL_SYNC,
-		       register_table->horizontal_sync);
-	SMI501_Write32(pSmi, CRT_VERTICAL_TOTAL,
-		       register_table->vertical_total);
-	SMI501_Write32(pSmi, CRT_VERTICAL_SYNC,
-		       register_table->vertical_sync);
-
-	/* Program CRT display control register. */
-	value = SMI501_Read32(pSmi, CRT_DISPLAY_CTRL) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, VSYNC_PHASE) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, HSYNC_PHASE) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, SELECT) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, TIMING) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, PLANE) &
-	    FIELD_CLEAR(CRT_DISPLAY_CTRL, FORMAT);
-
-	SMI501_Write32(pSmi, CRT_DISPLAY_CTRL, value | register_table->control);
-
-	/* Palette RAM. */
-	palette_ram = CRT_PALETTE_RAM;
-
-	/* Turn on CRT. */
-	SMI501_SetDPMS(pSmi, DPMS_ON);
+	/* Turn CRT on */
+	SMI501_DisplayPowerManagementSet(pScrn, DPMSModeOn, 0);
     }
 
-    /* In case of 8-bpp, fill palette. */
-    if (FIELD_GET(register_table->control,
-		  PANEL_DISPLAY_CTRL,
-		  FORMAT) == PANEL_DISPLAY_CTRL_FORMAT_8) {
-	/* Start with RGB = 0,0,0. */
-	BYTE red = 0, green = 0, blue = 0;
-	unsigned int gray = 0;
+    WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
 
-	for (offset = 0; offset < 256 * 4; offset += 4) {
-	    /* Store current RGB value. */
-	    /* ERROR!!!!! IGX RGB should be a function, maybe RGB16?
-	    SMI501_Write32(pSmi,  (palette_ram + offset),
-		       (gray ? (RGB((gray + 50) / 100,
-				    (gray + 50) / 100,
-				    (gray + 50) / 100))
-			: (RGB(red, green, blue))));
-            */
+    /* FIXME update pallete here if running at 8 bpp */
 
-	    if (gray)	/* Walk through grays (40 in total). */
-		gray += 654;
-	    else {	/* Walk through colors (6 per base color). */
-		if (blue != 255)
-		    blue += 51;
-		else if (green != 255) {
-		    blue = 0;
-		    green += 51;
-		}
-		else if (red != 255) {
-		    green = blue = 0;
-		    red += 51;
-		}
-		else
-		    gray = 1;
-	    }
-	}
+    SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Register dump (After Mode Init)\n");
+    SMI501_PrintRegs(pScrn);
+
+    return (TRUE);
+}
+
+static char *
+format_integer_base2(int32_t word)
+{
+    int		i;
+    static char	buffer[33];
+
+    for (i = 0; i < 32; i++) {
+	if (word & (1 << i))
+	    buffer[31 - i] = '1';
+	else
+	    buffer[31 - i] = '0';
     }
 
-    /* For 16- and 32-bpp,  fill palette with gamma values. */
-    else {
-	/* Start with RGB = 0,0,0. */
-	value = 0x000000;
-	for (offset = 0; offset < 256 * 4; offset += 4) {
-	    SMI501_Write32(pSmi, palette_ram + offset, value);
-	    /* Advance RGB by 1,1,1. */
-	    value += 0x010101;
-	}
-    }
+    return (buffer);
 }
 
 static void
-SetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-	unsigned int fMode, unsigned int nHertz, display_t display,
-	int fbPitch, int bpp)
+SMI501_PrintRegs(ScrnInfoPtr pScrn)
 {
-    mode_table_t mode;
-    pmode_table_t vesaMode;
-    reg_table_t register_table;
+    int		i;
+    SMIPtr	pSmi = SMIPTR(pScrn);
 
-    /* Locate the mode */
-    vesaMode = findMode(mode_table, nWidth, nHeight, nHertz);
-
-    if (vesaMode != NULL) {
-	/* Convert VESA timing into Voyager timing */
-	adjustMode(vesaMode, &mode, display);
-
-	/* Fill the register structure */
-	setModeRegisters(&register_table, &mode, display, bpp, fbPitch);
-
-	/* Program the registers */
-	programMode(pSmi, &register_table);
-    }
+    xf86ErrorFVerb(VERBLEV, "    SMI501 System Setup:\n");
+    for (i = 0x00; i < 0x6c; i += 4)
+	xf86ErrorFVerb(VERBLEV, "\t%08x: %s\n", i,
+		       format_integer_base2(READ_SCR(pSmi, i)));
+    xf86ErrorFVerb(VERBLEV, "    SMI501 Display Setup:\n");
+    for (i = 0x80000; i < 0x80400; i += 4)
+	xf86ErrorFVerb(VERBLEV, "\t%08x: %s\n", i,
+		       format_integer_base2(READ_SCR(pSmi, i)));
 }
 
 static void
-panelSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-	     unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp)
+SMI501_WaitVSync(SMIPtr pSmi, int vsync_count)
 {
-    SetMode(pSmi, nWidth, nHeight, fMode, 60 /* was nHertz */, PANEL,
-	    fbPitch, bpp);
-}
-
-static void
-crtSetMode(SMIPtr pSmi, unsigned int nWidth, unsigned int nHeight,
-	   unsigned int fMode, unsigned int nHertz, int fbPitch, int bpp)
-{
-    SetMode(pSmi, nWidth, nHeight, fMode, nHertz, CRT,
-	    fbPitch, bpp);
-}
-
-/*
- *
- *
- *  From POWER.C
- *
- *
- */
-/* Program new power mode. */
-static void
-setPower(SMIPtr pSmi, unsigned int nGates, unsigned int Clock)
-{
-    unsigned int	gate_reg, clock_reg;
-    unsigned int	control_value;
-
-    /* Get current power mode. */
-    control_value = FIELD_GET(SMI501_Read32(pSmi, POWER_MODE_CTRL),
-			      POWER_MODE_CTRL, MODE);
-
-    switch (control_value) {
-	case POWER_MODE_CTRL_MODE_MODE0:
-
-	    /* Switch from mode 0 to mode 1. */
-	    gate_reg = POWER_MODE1_GATE;
-	    clock_reg = POWER_MODE1_CLOCK;
-	    control_value = FIELD_SET(control_value,
-				      POWER_MODE_CTRL, MODE, MODE1);
-	    break;
-
-	case POWER_MODE_CTRL_MODE_MODE1:
-	case POWER_MODE_CTRL_MODE_SLEEP:
-
-	    /* Switch from mode 1 or sleep to mode 0. */
-	    gate_reg = POWER_MODE0_GATE;
-	    clock_reg = POWER_MODE0_CLOCK;
-	    control_value = FIELD_SET(control_value,
-				      POWER_MODE_CTRL, MODE, MODE0);
-	    break;
-
-	default:
-	    /* Invalid mode */
-	    return;
-    }
-
-    /* Program new power mode. */
-    SMI501_Write32(pSmi, gate_reg, nGates);
-    SMI501_Write32(pSmi, clock_reg, Clock);
-    SMI501_Write32(pSmi, POWER_MODE_CTRL, control_value);
-
-    /* When returning from sleep, wait until finished. */
-    /*	IGX -- comment out for now, gets us in an infinite loop!
-	while (FIELD_GET(SMI501_Read32(pSmi, POWER_MODE_CTRL),
-					 POWER_MODE_CTRL,
-					 SLEEP_STATUS) == POWER_MODE_CTRL_SLEEP_STATUS_ACTIVE) ;
-    */
-}
-
-/* Panel Code */
-/**********************************************************************
- *
- * panelWaitVSync
- *
- * Purpose
- *    Wait for the specified number of panel Vsyncs
- *
- * Parameters
- *    [in]
- *        vsync_count - Number of Vsyncs to wait
- *
- *    [out]
- *        None
- *
- * Returns
- *    Nothing
- *
- **********************************************************************/
-static void
-panelWaitVSync(SMIPtr pSmi, int vsync_count)
-{
-    unsigned int	status;
-    unsigned int	timeout;
+    int32_t	status, timeout;
 
     while (vsync_count-- > 0) {
 	/* Wait for end of vsync */
 	timeout = 0;
 	do {
-	    status = FIELD_GET(SMI501_Read32(pSmi, CMD_INTPR_STATUS),
-			       CMD_INTPR_STATUS, PANEL_SYNC);
-	    if (++timeout == VSYNCTIMEOUT)
+	    /* bit 11: vsync active *if set* */
+	    status = READ_SCR(pSmi, CMD_STATUS);
+	    if (++timeout == 10000)
 		break;
-	} while (status == CMD_INTPR_STATUS_PANEL_SYNC_ACTIVE);
+	} while (status & (1 << 11));
 
 	/* Wait for start of vsync */
 	timeout = 0;
 	do {
-	    status = FIELD_GET(SMI501_Read32(pSmi, CMD_INTPR_STATUS),
-			       CMD_INTPR_STATUS, PANEL_SYNC);
-	    if (++timeout == VSYNCTIMEOUT)
+	    status = READ_SCR(pSmi, CMD_STATUS);
+	    if (++timeout == 10000)
 		break;
-	} while (status == CMD_INTPR_STATUS_PANEL_SYNC_INACTIVE);
+	} while (!(status & (1 << 11)));
     }
 }
 
-/**********************************************************************
- *
- * panelPowerSequence
- *
- * Purpose
- *    Turn the panel On/Off
- *
- * Parameters
- *    [in]
- *        on_off      - Turn panel On/Off. Can be:
- *                      PANEL_ON
- *                      PANEL_OFF
- *        vsync_delay - Number of Vsyncs to wait after each signal is
- *                      turned on/off
- *
- *    [out]
- *        None
- *
- * Returns
- *    Nothing
- *
- **********************************************************************/
 static void
-panelPowerSequence(SMIPtr pSmi, panel_state_t on_off, int vsync_delay)
+SMI501_SetClock(SMIPtr pSmi, int32_t port, int32_t clock, int32_t value)
 {
-    unsigned int	panelControl = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL);
+    /*
+     *	Rules to Program the Power Mode Clock Registers for Clock Selection
+     *
+     *	1. There should be only one clock source changed at a time.
+     *	   To change clock source for P2XCLK, V2XCLK, MCLK, M2XCLK
+     *	   simultaneously may cause the internal logic normal operation
+     *	   to be disrupted. There should be a minimum of 16mS wait from
+     *	   change one clock source to another.
+     *	2. When adjusting the clock rate, the PLL selection bit should
+     *	   be programmed first before changing the divider value for each
+     *	   clock source. For example, to change the P2XCLK clock rate:
+     *		. bit 29 should be set first
+     *		. wait for a minimum of 16ms (about one Vsync time)
+     *		. adjust bits [28:24].
+     *	   The minimum 16 ms wait is necessary for logic to settle down
+     *	   before the clock rate is changed.
+     *	3. There should be a minimum 16 ms wait after a clock source is
+     *	   changed before any operation that could result in a bus
+     *	   transaction.
+     */
 
-    if (on_off == PANEL_ON) {
-	/* Turn on FPVDDEN. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, FPVDDEN, HIGH);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
+    /* register contents selecting clock */
+    WRITE_SCR(pSmi, port, clock);
+    SMI501_WaitVSync(pSmi, 1);
 
-	/* Turn on FPDATA. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, DATA, ENABLE);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
-
-	/*  Turn on FPVBIAS. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, VBIASEN, HIGH);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
-
-	/* Turn on FPEN. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, FPEN, HIGH);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-    }
-    else {
-	/* Turn off FPEN. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, FPEN, LOW);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
-
-	/*  Turn off FPVBIASEN. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, VBIASEN, LOW);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
-
-	/* Turn off FPDATA. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, DATA, DISABLE);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-	panelWaitVSync(pSmi, vsync_delay);
-
-	/* Turn off FPVDDEN. */
-	panelControl = FIELD_SET(panelControl,
-				 PANEL_DISPLAY_CTRL, FPVDDEN, LOW);
-	SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panelControl);
-    }
-}
-
-/**********************************************************************
- *
- * panelUseCRT
- *
- * Purpose
- *    Enable/disable routing of panel output to CRT monitor
- *
- * Parameters
- *    [in]
- *        bEnable - TRUE enables routing of panel output to CRT monitor
- *                  FALSE disables routing of panel output to CRT monitor
- *
- *    [out]
- *        None
- *
- * Returns
- *    Nothing
- *
- **********************************************************************/
-static void
-panelUseCRT(SMIPtr pSmi, BOOL bEnable)
-{
-    unsigned int	panel_ctrl = 0;
-    unsigned int	crt_ctrl   = 0;
-
-    panel_ctrl = SMI501_Read32(pSmi, PANEL_DISPLAY_CTRL);
-    crt_ctrl   = SMI501_Read32(pSmi, CRT_DISPLAY_CTRL);
-
-    if (bEnable) {
-	/* Enable panel graphics plane */
-	panel_ctrl = FIELD_SET(panel_ctrl, PANEL_DISPLAY_CTRL, PLANE, ENABLE);
-
-	/* Disable CRT graphics plane */
-	crt_ctrl = FIELD_SET(crt_ctrl, CRT_DISPLAY_CTRL, PLANE, DISABLE);
-
-	/* Route panel data to CRT monitor */
-	crt_ctrl = FIELD_SET(crt_ctrl, CRT_DISPLAY_CTRL, SELECT, PANEL);
-    }
-    else {
-	/* Disable panel graphics plane */
-	panel_ctrl = FIELD_SET(panel_ctrl, PANEL_DISPLAY_CTRL, PLANE, DISABLE);
-
-	/* Enable CRT graphics plane */
-	crt_ctrl = FIELD_SET(crt_ctrl, CRT_DISPLAY_CTRL, PLANE, ENABLE);
-
-	/* Do not route panel data to CRT monitor */
-	crt_ctrl = FIELD_SET(crt_ctrl, CRT_DISPLAY_CTRL, SELECT, CRT);
-    }
-
-    SMI501_Write32(pSmi, PANEL_DISPLAY_CTRL, panel_ctrl);
-    SMI501_Write32(pSmi, CRT_DISPLAY_CTRL,   crt_ctrl);
-}
-
-void
-DisableOverlay(SMIPtr pSmi)
-{
-    int	dwVal = READ_VPR(pSmi, 0x00);
-
-    WRITE_VPR(pSmi, 0x00, dwVal & 0xfffffffb);
-}
-void
-EnableOverlay(SMIPtr pSmi)
-{
-    int	dwVal = READ_VPR(pSmi, 0x00);
-
-    WRITE_VPR(pSmi, 0x00, dwVal | 0x00000004);
+    /* full register contents */
+    WRITE_SCR(pSmi, port, clock);
+    SMI501_WaitVSync(pSmi, 1);
 }
