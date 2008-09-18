@@ -101,8 +101,6 @@ typedef struct
 	    SR4A, SR4B, SR4C;
     /* PLL controls */
     CARD8   SR68, SR69, SR6C, SR6D, SR6E, SR6F;
-
-    Bool	DualHead;
 } SMIRegRec, *SMIRegPtr;
 
 /* Global PDEV structure. */
@@ -121,9 +119,9 @@ typedef struct
 					   value */
     CARD8		SR21Value;	/* PDR#521: original SR21
 					   value */
-    SMIRegRec		SavedReg;	/* console saved mode
+    void		*save;		/* console saved mode
 					   registers */
-    SMIRegRec		ModeReg;	/* XServer video state mode
+    void		*mode;		/* XServer video state mode
 					   registers */
     xf86CursorInfoPtr	CursorInfoRec;	/* HW Cursor info */
 
@@ -247,6 +245,8 @@ typedef struct
     Bool		polyLines;	/* Our polylines patch is
 					   active */
 
+    void		(*Save)(ScrnInfoPtr pScrn);
+    Bool		(*ModeInit)(ScrnInfoPtr pScrn, DisplayModePtr mode);
     void (*PointerMoved)(int index, int x, int y);
 
     int			videoKey;	/* Video chroma key */
@@ -367,6 +367,8 @@ Bool SMI_EXAInit(ScreenPtr pScrn);
 Bool SMI_HWCursorInit(ScreenPtr pScrn);
 
 /* smi_driver.c */
+Bool SMI_MapMem(ScrnInfoPtr pScrn);
+void SMI_UnmapMem(ScrnInfoPtr pScrn);
 void SMI_AdjustFrame(int scrnIndex, int x, int y, int flags);
 Bool SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
 
