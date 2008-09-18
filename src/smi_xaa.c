@@ -549,6 +549,7 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 	pSmi->ClipTurnedOn = FALSE;
     }
 
+    CHECK_SECONDARY(pSmi);
     if (bg == -1) {
 	WaitQueue(5);
 	WRITE_DPR(pSmi, 0x14, fg);
