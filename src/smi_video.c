@@ -659,10 +659,7 @@ SMI_InitVideo(ScreenPtr pScreen)
     XF86VideoAdaptorPtr newAdaptor = NULL;
     int numAdaptors;
 
-    /* FIXME silently return?
-     * If secondary or dualhead setup */
-    if (IS_MSOC(psmi) &&
-	(psmi->IsSecondary || xf86IsEntityShared(psmi->pEnt->index)))
+    if (IS_MSOC(psmi) && psmi->IsSecondary)
 	return;
 
     ENTER_PROC("SMI_InitVideo");
@@ -1821,17 +1818,17 @@ SMI_ClipVideo(
     SMIPtr pSmi = SMIPTR(pScrn);
     INT32 vscale, hscale;
     int diff;
-    RegionRec	VPReg;
-    BoxRec	VPBox = { pScrn->frameX0 , pScrn->frameY0,
-			  pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
-    BoxPtr	extents = REGION_EXTENTS(pScrn->pScreen, reg);
+    RegionRec  VPReg;
+    BoxRec     VPBox = { pScrn->frameX0 , pScrn->frameY0,
+			 pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
+    BoxPtr extents = REGION_EXTENTS(pScreen, reg);
 
     ENTER_PROC("SMI_ClipVideo");
     DEBUG((VERBLEV, "ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16));
 
     /* Rotate the viewport before clipping  */
-    if(pSmi->rotate)
-       ROTATE_BOX(VPBox);
+    if (pSmi->rotate)
+	ROTATE_BOX(VPBox);
     REGION_INIT(pScrn->pScreen, &VPReg, &VPBox, 1);
     REGION_INTERSECT(pScrn->pScreen, reg, reg, &VPReg);
     REGION_UNINIT(pScrn->pScreen, &VPReg);
@@ -2037,24 +2034,26 @@ SMI_DisplayVideo0501(ScrnInfoPtr pScrn,
 	    break;
     }
 
-
     if (drw_w > vid_w) {	/*  Horizontal Stretch */
-	hstretch = (40960 * vid_w / drw_w + 5) / 10;
+	hstretch = 4096 * vid_w / drw_w;
 	dcr40 |= 1 << 8;
     }
     else {			/*  Horizontal Shrink */
-
-	hstretch = ((40960 * drw_w / vid_w + 5) / 10) | 0x8000;
+	if (drw_w < (vid_w >> 1))
+	    drw_w = vid_w >> 1;
+	hstretch = (4096 * drw_w / vid_w) | 0x8000;
     }
 
     if (drw_h > vid_h) {	/* Vertical Stretch */
-	vstretch = (40960 * vid_h / drw_h + 5) / 10;
+	vstretch = 4096 * vid_h / drw_h;
 	dcr40 |= 1 << 9;
     }
     else {			/* Vertical Shrink */
-
-	vstretch = ((40960 * drw_h / vid_h + 5) / 10) | 0x8000;
+	if (drw_h < (vid_h >> 1))
+	    drw_h = vid_h >> 1;
+	vstretch = (4096 * drw_h / vid_h) | 0x8000;
     }
+    
 #if 0
     SMI_WaitForSync(pScrn);
 #endif
@@ -2309,15 +2308,11 @@ SMI_VideoSave(ScreenPtr pScreen, ExaOffscreenArea *area)
 }
 
 static CARD32
-SMI_AllocateMemory(
-	ScrnInfoPtr	pScrn,
-	void		**mem_struct,
-	int 		size
-)
+SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 {
-    ScreenPtr pScreen = screenInfo.screens[pScrn->scrnIndex];
-    SMIPtr pSmi = SMIPTR(pScrn);
-    int offset = 0;
+    ScreenPtr	pScreen = screenInfo.screens[pScrn->scrnIndex];
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    int		offset = 0;
 
     ENTER_PROC("SMI_AllocateMemory");
 
@@ -2331,14 +2326,15 @@ SMI_AllocateMemory(
 	    exaOffscreenFree(pScrn->pScreen, area);
 	}
 
-	area = exaOffscreenAlloc(pScrn->pScreen, size, 64, TRUE, SMI_VideoSave, NULL);
+	area = exaOffscreenAlloc(pScrn->pScreen, size, 64, TRUE,
+				 SMI_VideoSave, NULL);
 
 	*mem_struct = area;
-	if (area == NULL)
-	    return 0;
-	offset = area->offset;
-    } else {
-	FBLinearPtr linear = *mem_struct;
+	if (area != NULL)
+	    offset = area->offset;
+    }
+    else {
+	FBLinearPtr	linear = *mem_struct;
 
 	/*  XAA allocates in units of pixels at the screen bpp,
 	 *  so adjust size appropriately.
@@ -2352,32 +2348,27 @@ SMI_AllocateMemory(
 	    if (xf86ResizeOffscreenLinear(linear, size))
 		return linear->offset * pSmi->Bpp;
 
-		xf86FreeOffscreenLinear(linear);
-	    }
-			
-	    linear = xf86AllocateOffscreenLinear(pScreen, size, 16, NULL, NULL, NULL);
-	    *mem_struct = linear;
-
-	    if (!linear) {
-		int max_size;
-
-		xf86QueryLargestOffscreenLinear(pScreen, &max_size, 16, PRIORITY_EXTREME);
-		if (max_size < size) 
-		    return 0;
-			
-		xf86PurgeUnlockedOffscreenAreas(pScreen);
-
-		linear = xf86AllocateOffscreenLinear(pScreen, size, 16, NULL, NULL, NULL);
-		*mem_struct = linear;
-
-		if (!linear)
-		    return 0;
+	    xf86FreeOffscreenLinear(linear);
 	}
+	else {
+	    int max_size;
+
+	    xf86QueryLargestOffscreenLinear(pScreen, &max_size, 16,
+					    PRIORITY_EXTREME);
+	    if (max_size < size)
+		return 0;
+
+	    xf86PurgeUnlockedOffscreenAreas(pScreen);
+	}
+
+	linear = xf86AllocateOffscreenLinear(pScreen, size, 16,
+					     NULL, NULL, NULL);
+	if ((*mem_struct = linear) != NULL)
+	    offset = linear->offset * pSmi->Bpp;
 
 	DEBUG((VERBLEV, "offset = %p\n", offset));
     }
 
-    DEBUG((VERBLEV, "area = %p\n", area));
     LEAVE_PROC("SMI_AllocateMemory");
     return offset;
 }
@@ -2563,26 +2554,21 @@ SMI_DisplaySurface(
 
     xf86XVFillKeyHelper(surface->pScrn->pScreen,
 			pPort->Attribute[XV_COLORKEY], clipBoxes);
+    SMI_ResetVideo(surface->pScrn);
 
-    if (pSmi->Chipset == SMI_COUGAR3DR) {
-	SMI_ResetVideo(surface->pScrn);
+    if (pSmi->Chipset == SMI_COUGAR3DR)
 	SMI_DisplayVideo0730(surface->pScrn, surface->id, surface->offsets[0],
 			     surface->width, surface->height, surface->pitches[0], x1, y1, x2,
 			     y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
-    }
-    else if (IS_MSOC(pSmi)) {
-	SMI_ResetVideo (surface->pScrn);
+    else if (IS_MSOC(pSmi))
 	SMI_DisplayVideo0501(surface->pScrn, surface->id,
 			     surface->offsets[0], surface->width,
 			     surface->height, surface->pitches[0], x1, y1,
 			     x2, y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
-    }
-    else {
-	SMI_ResetVideo(surface->pScrn);
+    else
 	SMI_DisplayVideo(surface->pScrn, surface->id, surface->offsets[0],
 			 surface->width, surface->height, surface->pitches[0], x1, y1, x2,
 			 y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
-    }
 
     ptrOffscreen->isOn = TRUE;
     if (pPort->videoStatus & CLIENT_VIDEO_ON) {
