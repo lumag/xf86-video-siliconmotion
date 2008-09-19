@@ -666,7 +666,6 @@ SMI_HWCursorInit(ScreenPtr pScreen)
 	infoPtr->MaxWidth  = MAX_CURSOR_501;
 	infoPtr->MaxHeight = MAX_CURSOR_501;
 	infoPtr->Flags	   = HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_1 |
-			     HARDWARE_CURSOR_TRUECOLOR_AT_8BPP |
 			     HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK;
 	infoPtr->RealizeCursor = SMI501_RealizeCursor;
     }
