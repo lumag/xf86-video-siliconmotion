@@ -76,8 +76,6 @@ static void SMI_EnableVideo(ScrnInfoPtr pScrn);
 static Bool SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
 static Bool SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen);
 static Bool SMI_SaveScreen(ScreenPtr pScreen, int mode);
-static void SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
-                            LOCO *colors, VisualPtr pVisual);
 static void SMI_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
                                           int PowerManagementMode, int flags);
 static Bool SMI_ddc1(int scrnIndex);
@@ -2414,8 +2412,10 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      * colormap.  And SetGamma call, else it will load palette with solid white.
      */
     /* CZ 2.11.2001: CMAP_PALETTED_TRUECOLOR for gamma correction */
-    if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits, SMI_LoadPalette, NULL,
-            CMAP_RELOAD_ON_MODE_SWITCH | CMAP_PALETTED_TRUECOLOR)) {
+    if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits, IS_MSOC(pSmi) ?
+			     SMI501_LoadPalette : SMI_LoadPalette, NULL,
+			     CMAP_RELOAD_ON_MODE_SWITCH |
+			     CMAP_PALETTED_TRUECOLOR)) {
 	LEAVE_PROC("SMI_ScreenInit");
 	return FALSE;
     }
@@ -3298,32 +3298,30 @@ SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
 }
 
 void
-SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies, LOCO *colors,
-				VisualPtr pVisual)
+SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
+		LOCO *colors, VisualPtr pVisual)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
     int i;
 
     ENTER_PROC("SMI_LoadPalette");
 
-    if (!IS_MSOC(pSmi)) {
-	/* Enable both the CRT and LCD DAC RAM paths, so both palettes are updated */
-	if (pSmi->Chipset == SMI_LYNX3DM || pSmi->Chipset == SMI_COUGAR3DR) {
-	    CARD8 ccr66;
+    /* Enable both the CRT and LCD DAC RAM paths, so both palettes are updated */
+    if (pSmi->Chipset == SMI_LYNX3DM || pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD8 ccr66;
 
-	    ccr66  = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66);
-	    ccr66 &= 0x0f;
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, ccr66);
-	}
+	ccr66  = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66);
+	ccr66 &= 0x0f;
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, ccr66);
+    }
 
-	for(i = 0; i < numColors; i++) {
-	    DEBUG((VERBLEV, "pal[%d] = %d %d %d\n", indicies[i],
-		   colors[indicies[i]].red, colors[indicies[i]].green, colors[indicies[i]].blue));
-	    VGAOUT8(pSmi, VGA_DAC_WRITE_ADDR, indicies[i]);
-	    VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].red);
-	    VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].green);
-	    VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].blue);
-	}
+    for(i = 0; i < numColors; i++) {
+	DEBUG((VERBLEV, "pal[%d] = %d %d %d\n", indicies[i],
+	       colors[indicies[i]].red, colors[indicies[i]].green, colors[indicies[i]].blue));
+	VGAOUT8(pSmi, VGA_DAC_WRITE_ADDR, indicies[i]);
+	VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].red);
+	VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].green);
+	VGAOUT8(pSmi, VGA_DAC_DATA, colors[indicies[i]].blue);
     }
 
     LEAVE_PROC("SMI_LoadPalette");

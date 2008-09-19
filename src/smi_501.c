@@ -491,8 +491,6 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
     }
 
-    /* FIXME update pallete here if running at 8 bpp */
-
     SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
@@ -500,6 +498,21 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     SMI501_PrintRegs(pScrn);
 
     return (TRUE);
+}
+
+void
+SMI501_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices,
+		   LOCO *colors, VisualPtr pVisual)
+{
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    int		i, port;
+
+    port = pSmi->IsSecondary ? CRT_PALETTE : PANEL_PALETTE;
+    for (i = 0; i < numColors; i++)
+	WRITE_SCR(pSmi, port + (indices[i]  <<  2),
+		  (colors[indices[i]].red   << 16) |
+		  (colors[indices[i]].green <<  8) |
+		   colors[indices[i]].blue);
 }
 
 static char *

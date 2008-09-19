@@ -371,6 +371,8 @@ Bool SMI_MapMem(ScrnInfoPtr pScrn);
 void SMI_UnmapMem(ScrnInfoPtr pScrn);
 void SMI_AdjustFrame(int scrnIndex, int x, int y, int flags);
 Bool SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
+void SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
+		     LOCO *colors, VisualPtr pVisual);
 
 /* smi_dga.c */
 Bool SMI_DGAInit(ScreenPtr pScrn);

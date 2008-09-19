@@ -699,6 +699,8 @@ typedef struct _MSOCRegRec {
     } crt_vsync;
 } MSOCRegRec, *MSOCRegPtr;
 
+#define PANEL_PALETTE			0x080400
+#define CRT_PALETTE			0x080c00
 
 /* In Kb - documentation says it is 64Kb... */
 #define FB_RESERVE4USB			512
@@ -710,5 +712,7 @@ void SMI501_Save(ScrnInfoPtr pScrn);
 void SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
 				      int PowerManagementMode, int flags);
 Bool SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
+void SMI501_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices,
+			LOCO *colors, VisualPtr pVisual);
 
 #endif  /*_SMI_501_H*/
