@@ -165,9 +165,9 @@ typedef struct
     int			GEResetCnt;	/* Limit the number of errors
 					   printed using a counter */
 
-    Bool		pci_burst;	/* Enable PCI burst mode for
+    Bool		PCIBurst;	/* Enable PCI burst mode for
 					   reads? */
-    Bool		NoPCIRetry;	/* Disable PCI retries */
+    Bool		PCIRetry;	/* Enable PCI retries */
     Bool		fifo_conservative;	/* Adjust fifo for
 						   acceleration? */
     Bool		fifo_moderate;	/* Adjust fifo for

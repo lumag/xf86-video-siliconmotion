@@ -485,6 +485,12 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 
     WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
 
+    if (pSmi->PCIBurst) {
+	field(mode->system_ctl, burst) = field(mode->system_ctl, burst_read) = 1;
+	field(mode->system_ctl, retry) = pSmi->PCIRetry != FALSE;
+	WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
+    }
+
     /* FIXME update pallete here if running at 8 bpp */
 
     SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);

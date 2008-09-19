@@ -189,12 +189,12 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 /* Wait until "v" queue entries are free */
 /**** FIXME
  **** This is completely ilogical. Argument "v" is ignored, and
- **** pSmi->NoPCIRetry defaults to true (but on smi sources this
+ **** pSmi->PCIRetry defaults to false (but on smi sources this
  **** macro is a noop and will get stuck on engine reset timeouts if enabled...)
  ***/
 #define	WaitQueue(v)	  \
     do {		   \
-	if (!IS_MSOC(pSmi) && pSmi->NoPCIRetry) {	\
+	if (!IS_MSOC(pSmi) && !pSmi->PCIRetry) {	\
 	    int loop = MAXLOOP; mem_barrier();	  \
 	    while (!FIFO_EMPTY())	   \
 		if (loop-- == 0) break;	  \

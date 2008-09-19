@@ -52,15 +52,31 @@ typedef struct _MSOCRegRec {
      *	Read/Write MMIO_base + 0x000000
      *	Power-on Default 0b0000.0000.XX0X.X0XX.0000.0000.0000.0000
      *
+     *	7:7	PCI Retry
+     *		0: Enable
+     *		1: Disable
+     *	15:15	PCI Burst Read Enable.
+     *		The BE bit must be enabled as well for this bit to take effect.
+     *		(BE bit is bit 29, bit 15 is BrE)
+     *		0: Disable.
+     *		1: Enable.
+     *	29:29	PCI Burst Enable.
+     *		0: Disable.
+     *		1: Enable.
      *	30:31	Vertical Sync	Horizontal Sync
-     *	 00	Pulsing		Pulsing
-     *	 01	Pulsing		Not pulsing
-     *	 10	Not pulsing	Pulsing
-     *	 11	Not pulsing	Not pulsing
+     *	   00	Pulsing		Pulsing
+     *	   01	Pulsing		Not pulsing
+     *	   10	Not pulsing	Pulsing
+     *	   11	Not pulsing	Not pulsing
      */
     union {
 	struct {
-	    int32_t	u0		: bitfield( 0, 29);
+	    int32_t	u0		: bitfield( 0,  6);
+	    int32_t	retry		: bitfield( 7,  7);
+	    int32_t	u1		: bitfield( 8, 14);
+	    int32_t	burst_read	: bitfield(15, 15);
+	    int32_t	u2		: bitfield(16, 28);
+	    int32_t	burst		: bitfield(29, 29);
 	    int32_t	dpmsh		: bitfield(30, 30);
 	    int32_t	dpmsv		: bitfield(31, 31);
 	} detail;

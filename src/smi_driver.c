@@ -182,11 +182,11 @@ typedef enum
 
 static const OptionInfoRec SMIOptions[] =
 {
-    { OPTION_PCI_BURST,	     "pci_burst",	  OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_PCI_BURST,	     "pci_burst",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_FIFO_CONSERV,    "fifo_conservative", OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_FIFO_MODERATE,   "fifo_moderate",	  OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_FIFO_AGGRESSIVE, "fifo_aggressive",	  OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_PCI_RETRY,	     "pci_retry",	  OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_FIFO_AGGRESSIVE, "fifo_aggressive",  OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_PCI_RETRY,	     "pci_retry",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_NOACCEL,	     "NoAccel",		  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_MCLK,	     "set_mclk",	  OPTV_FREQ,	{0}, FALSE },
     { OPTION_SHOWCACHE,	     "show_cache",	  OPTV_BOOLEAN, {0}, FALSE },
@@ -541,7 +541,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     int i;
     ClockRangePtr clockRanges;
     char *s;
-    int mclk;
     vgaHWPtr hwp;
     int vgaCRIndex, vgaIOBase;
     vbeInfoPtr pVbe = NULL;
@@ -687,24 +686,27 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     memcpy(pSmi->Options, SMIOptions, sizeof(SMIOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, pSmi->Options);
 
-    if (xf86ReturnOptValBool(pSmi->Options, OPTION_PCI_BURST, FALSE)) {
-	pSmi->pci_burst = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: pci_burst - PCI burst "
-		   "read enabled\n");
-    } else {
-	pSmi->pci_burst = FALSE;
-    }
+    /* Enable pci burst by default */
+    from = X_PROBED;
+    pSmi->PCIBurst = TRUE;
+    if (xf86GetOptValBool(pSmi->Options, OPTION_PCI_BURST, &pSmi->PCIBurst))
+	from = X_CONFIG;
+    xf86DrvMsg(pScrn->scrnIndex, from, "PCI Burst %sabled\n",
+	       pSmi->PCIBurst ? "en" : "dis");
 
-    pSmi->NoPCIRetry = TRUE;
-    if (xf86ReturnOptValBool(pSmi->Options, OPTION_PCI_RETRY, FALSE)) {
-	if (xf86ReturnOptValBool(pSmi->Options, OPTION_PCI_BURST, FALSE)) {
-	    pSmi->NoPCIRetry = FALSE;
-	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: pci_retry\n");
-	} else {
-	    xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "\"pci_retry\" option "
-		       "requires \"pci_burst\".\n");
+    /* Pci retry enabled by default if pci burst also enabled */
+    from = X_PROBED;
+    pSmi->PCIRetry = pSmi->PCIBurst ? TRUE : FALSE;
+    if (xf86GetOptValBool(pSmi->Options, OPTION_PCI_RETRY, &pSmi->PCIRetry)) {
+	from = X_CONFIG;
+	if (pSmi->PCIRetry && !pSmi->PCIBurst) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		       "\"pci_retry\" option requires \"pci_burst\".\n");
+	    pSmi->PCIRetry = FALSE;
 	}
     }
+    xf86DrvMsg(pScrn->scrnIndex, from, "PCI Retry %sabled\n",
+	       pSmi->PCIRetry ? "en" : "dis");
 
     if (xf86IsOptionSet(pSmi->Options, OPTION_FIFO_CONSERV)) {
 	pSmi->fifo_conservative = TRUE;
@@ -2679,7 +2681,7 @@ SMI_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode)
 
     outb(pSmi->PIOBase + VGA_SEQ_INDEX, 0x17);
     tmp = inb(pSmi->PIOBase + VGA_SEQ_DATA);
-    if (pSmi->pci_burst) {
+    if (pSmi->PCIBurst) {
 	new->SR17 = tmp | 0x20;
     } else {
 	new->SR17 = tmp & ~0x20;
