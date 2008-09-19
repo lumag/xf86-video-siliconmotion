@@ -90,9 +90,11 @@ SMI_EXAInit(ScreenPtr pScreen)
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
     if (pSmi->EXADriverPtr->memorySize > pSmi->EXADriverPtr->offScreenBase) {
 	/* Offscreen Pixmaps */
-	pSmi->EXADriverPtr->flags |= EXA_OFFSCREEN_PIXMAPS;
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-			"EXA offscreen memory manager enabled.\n");
+	if (!IS_MSOC(pSmi)) {
+	    pSmi->EXADriverPtr->flags |= EXA_OFFSCREEN_PIXMAPS;
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		       "EXA offscreen memory manager enabled.\n");
+	}
     } else {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Not enough video RAM for EXA offscreen memory manager.\n");
@@ -151,7 +153,7 @@ SMI_EXASync(ScreenPtr pScreen, int marker)
 
     ENTER_PROC("SMI_EXASync");
 
-    WaitIdleEmpty();
+    SMI_AccelSync(pScrn);
 
     LEAVE_PROC("SMI_EXASync");
 }
