@@ -508,15 +508,16 @@ SMI_Probe(DriverPtr drv, int flags)
 		pScrn->SwitchMode    = SMI_SwitchMode;
 		pScrn->AdjustFrame   = SMI_AdjustFrame;
 
-		if ((pEnt = xf86GetEntityInfo(usedChips[i])) &&
-		    pEnt->chipset == PCI_CHIP_SMI501) {
-		    pScrn->EnterVT   = SMI501_EnterVT;
-		    pScrn->LeaveVT   = SMI501_LeaveVT;
+		if ((pEnt = xf86GetEntityInfo(usedChips[i]))) {
+		    if (pEnt->chipset == PCI_CHIP_SMI501) {
+			pScrn->EnterVT   = SMI501_EnterVT;
+			pScrn->LeaveVT   = SMI501_LeaveVT;
+		    }
+		    else {
+			pScrn->EnterVT   = SMI_EnterVT;
+			pScrn->LeaveVT   = SMI_LeaveVT;
+		    }
 		    xfree(pEnt);
-		}
-		else {
-		    pScrn->EnterVT   = SMI_EnterVT;
-		    pScrn->LeaveVT   = SMI_LeaveVT;
 		}
 		pScrn->FreeScreen    = SMI_FreeScreen;
 		pScrn->ValidMode     = SMI_ValidMode;
@@ -685,7 +686,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, pSmi->Options);
 
     /* Enable pci burst by default */
-    from = X_PROBED;
+    from = X_DEFAULT;
     pSmi->PCIBurst = TRUE;
     if (xf86GetOptValBool(pSmi->Options, OPTION_PCI_BURST, &pSmi->PCIBurst))
 	from = X_CONFIG;
@@ -693,7 +694,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	       pSmi->PCIBurst ? "en" : "dis");
 
     /* Pci retry enabled by default if pci burst also enabled */
-    from = X_PROBED;
+    from = X_DEFAULT;
     pSmi->PCIRetry = pSmi->PCIBurst ? TRUE : FALSE;
     if (xf86GetOptValBool(pSmi->Options, OPTION_PCI_RETRY, &pSmi->PCIRetry)) {
 	from = X_CONFIG;
