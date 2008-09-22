@@ -76,7 +76,7 @@ SMI_DGAInit(ScreenPtr pScreen)
     int num = 0;
     Bool ret;
 
-    ENTER_PROC("SMI_DGAInit");
+    ENTER();
 
     pMode = firstMode = pScrn->modes;
 
@@ -84,8 +84,7 @@ SMI_DGAInit(ScreenPtr pScreen)
 	newmodes = xrealloc(modes, (num + 1) * sizeof(DGAModeRec));
 	if (newmodes == NULL) {
 	    xfree(modes);
-	    LEAVE_PROC("SMI_DGAInit");
-	    return FALSE;
+	    RETURN(FALSE);
 	}
 
 	modes = newmodes;
@@ -144,8 +143,8 @@ SMI_DGAInit(ScreenPtr pScreen)
     pSmi->DGAModes    = modes;
 
     ret = DGAInit(pScreen, &SMI_DGAFuncs, modes, num);
-    LEAVE_PROC("SMI_DGAInit");
-    return ret;
+
+    RETURN(ret);
 }
 
 static Bool
@@ -155,7 +154,7 @@ SMI_SetMode(ScrnInfoPtr pScrn, DGAModePtr pMode)
     int index = pScrn->pScreen->myNum;
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_SetMode");
+    ENTER();
 
     if (pMode == NULL) {
 	/* restore the original mode */
@@ -178,8 +177,7 @@ SMI_SetMode(ScrnInfoPtr pScrn, DGAModePtr pMode)
 	SMI_SwitchMode(index, pMode->mode, 0);
     }
 
-    LEAVE_PROC("SMI_SetMode");
-    return TRUE;
+    RETURN(TRUE);
 }
 
 
@@ -188,11 +186,9 @@ SMI_GetViewport(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_GetViewport");
+    ENTER();
 
-    LEAVE_PROC("SMI_GetViewport");
-
-    return pSmi->DGAViewportStatus;
+    RETURN(pSmi->DGAViewportStatus);
 }
 
 static void
@@ -200,12 +196,12 @@ SMI_SetViewport(ScrnInfoPtr pScrn, int x, int y, int flags)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_SetViewport");
+    ENTER();
 
     SMI_AdjustFrame(pScrn->pScreen->myNum, x, y, flags);
     pSmi->DGAViewportStatus = 0;
 
-    LEAVE_PROC("SMI_SetViewport");
+    LEAVE();
 }
 
 static void
@@ -213,7 +209,7 @@ SMI_FillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h, unsigned long color)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_FillRect");
+    ENTER();
 
     if (pSmi->XAAInfoRec) {
 	(*pSmi->XAAInfoRec->SetupForSolidFill)(pScrn, color, GXcopy, ~0);
@@ -221,7 +217,7 @@ SMI_FillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h, unsigned long color)
 	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
-    LEAVE_PROC("SMI_FillRect");
+    LEAVE();
 }
 
 static void
@@ -230,7 +226,7 @@ SMI_BlitRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_BlitRect");
+    ENTER();
 
     if (pSmi->XAAInfoRec) {
 	int xdir = ((srcx < dstx) && (srcy == dsty)) ? -1 : 1;
@@ -241,7 +237,7 @@ SMI_BlitRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
-    LEAVE_PROC("SMI_BlitRect");
+    LEAVE();
 }
 
 static void
@@ -250,7 +246,7 @@ SMI_BlitTransRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_BlitTraneRect");
+    ENTER();
 
     if (pSmi->XAAInfoRec) {
 	int xdir = ((srcx < dstx) && (srcy == dsty)) ? -1 : 1;
@@ -261,7 +257,7 @@ SMI_BlitTransRect(ScrnInfoPtr pScrn, int srcx, int srcy, int w, int h, int dstx,
 	SET_SYNC_FLAG(pSmi->XAAInfoRec);
     }
 
-    LEAVE_PROC("SMI_BlitTraneRect");
+    LEAVE();
 }
 
 static Bool
@@ -270,7 +266,7 @@ SMI_OpenFramebuffer(ScrnInfoPtr pScrn, char **name, unsigned char **mem,
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_OpenFrameBuffer");
+    ENTER();
 
     *name   = NULL;	/* no special device */
     *mem    = (unsigned char*)pSmi->FBBase;
@@ -278,7 +274,6 @@ SMI_OpenFramebuffer(ScrnInfoPtr pScrn, char **name, unsigned char **mem,
     *offset = 0;
     *flags  = DGA_NEED_ROOT;
 
-    LEAVE_PROC("SMI_OpenFrameBuffer");
-    return TRUE;
+    RETURN(TRUE);
 }
 

@@ -41,7 +41,7 @@ SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
     unsigned int	iTempVal;
     CARD8 tmp;
 
-    ENTER_PROC("SMI_GEReset");
+    ENTER();
 
     if (from_timeout) {
 	if (pSmi->GEResetCnt++ < 10 || xf86GetVerbosity() > 1) {
@@ -67,7 +67,7 @@ SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp);
     SMI_EngineReset(pScrn);
 
-    LEAVE_PROC("SMI_GEReset");
+    LEAVE();
 }
 
 /* The sync function for the GE */
@@ -76,7 +76,7 @@ SMI_AccelSync(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_AccelSync");
+    ENTER();
 
     WaitIdleEmpty(); /* #161 */
     if (IS_MSOC(pSmi)) {
@@ -96,7 +96,7 @@ SMI_AccelSync(ScrnInfoPtr pScrn)
 	}
     }
 
-    LEAVE_PROC("SMI_AccelSync");
+    LEAVE();
 }
 
 void
@@ -107,7 +107,7 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
     int i;
     int xyAddress[] = { 320, 400, 512, 640, 800, 1024, 1280, 1600, 2048 };
 
-    ENTER_PROC("SMI_EngineReset");
+    ENTER();
 
     pSmi->Stride = ((pSmi->width * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
     if(pScrn->bitsPerPixel==24)
@@ -145,7 +145,7 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 
     SMI_DisableClipping(pScrn);
 
-    LEAVE_PROC("SMI_EngineReset");
+    LEAVE();
 }
 
 /******************************************************************************/
@@ -158,9 +158,8 @@ SMI_SetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right,
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_SetClippingRectangle");
-    DEBUG((VERBLEV, "left=%d top=%d right=%d bottom=%d\n", left, top, right,
-	   bottom));
+    ENTER();
+    DEBUG("left=%d top=%d right=%d bottom=%d\n", left, top, right, bottom);
 
     /* CZ 26.10.2001: this code prevents offscreen pixmaps being drawn ???
 	left   = max(left, 0);
@@ -193,7 +192,7 @@ SMI_SetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right,
     WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
     WRITE_DPR(pSmi, 0x30, pSmi->ScissorsRight);
 
-    LEAVE_PROC("SMI_SetClippingRectangle");
+    LEAVE();
 }
 
 void
@@ -201,7 +200,7 @@ SMI_DisableClipping(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_DisableClipping");
+    ENTER();
 
     pSmi->ScissorsLeft = 0;
     if (pScrn->bitsPerPixel == 24) {
@@ -220,7 +219,7 @@ SMI_DisableClipping(ScrnInfoPtr pScrn)
     WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
     WRITE_DPR(pSmi, 0x30, pSmi->ScissorsRight);
 
-    LEAVE_PROC("SMI_DisableClipping");
+    LEAVE();
 }
 
 CARD32

@@ -65,7 +65,7 @@ authorization from the XFree86 Project and Silicon Motion.
 /******************************************************************************/
 
 #ifndef SMI_DEBUG
-#    define SMI_DEBUG	0
+#define SMI_DEBUG		0
 #endif
 
 #define SMI_USE_IMAGE_WRITES	0
@@ -276,20 +276,25 @@ typedef struct
 /******************************************************************************/
 
 #if SMI_DEBUG
-#    define VERBLEV 1
-#    define ENTER_PROC(PROCNAME)	xf86ErrorFVerb(VERBLEV, "ENTER\t" PROCNAME \
-								"(%d)\n", __LINE__); xf86Break1()
-#    define DEBUG_PROC(PROCNAME)	xf86ErrorFVerb(VERBLEV, "DEBUG\t" PROCNAME \
-								"(%d)\n", __LINE__); xf86Break2()
-#    define LEAVE_PROC(PROCNAME)	xf86ErrorFVerb(VERBLEV, "LEAVE\t" PROCNAME \
-								"(%d)\n", __LINE__); xf86Break1()
-#    define DEBUG(arg)			xf86ErrorFVerb arg
+extern int smi_indent;
+# define VERBLEV	1
+# define ENTER()	xf86ErrorFVerb(VERBLEV, "%*c %s\n",\
+				       smi_indent++, '>', __FUNCTION__)
+# define LEAVE()	xf86ErrorFVerb(VERBLEV, "%*c %s\n",\
+				       --smi_indent, '<', __FUNCTION__)
+# define RETURN(value)							\
+    do {								\
+	xf86ErrorFVerb(VERBLEV, "%*c %s\n",				\
+		       --smi_indent, '<', __FUNCTION__);		\
+	return (value);							\
+    } while (0)
+# define DEBUG(...)	xf86ErrorFVerb(VERBLEV, __VA_ARGS__)
 #else
-#    define VERBLEV	4
-#    define ENTER_PROC(PROCNAME)
-#    define DEBUG_PROC(PROCNAME)
-#    define LEAVE_PROC(PROCNAME)
-#    define DEBUG(arg)
+# define VERBLEV	4
+# define ENTER()	/**/
+# define LEAVE()	/**/
+# define RETURN(value)	return (value)
+# define DEBUG(...)	/**/
 #endif
 
 /* Some Silicon Motion structs & registers */

@@ -106,17 +106,17 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define IN_SEQ(pSmi, index)			\
 	VGAIN8_INDEX((pSmi), VGA_SEQ_INDEX, VGA_SEQ_DATA, (index))
 
-#define WRITE_DPR(pSmi, dpr, data)	MMIO_OUT32(pSmi->DPRBase, dpr, data); DEBUG((VERBLEV, "DPR%02X = %08X\n", dpr, data))
+#define WRITE_DPR(pSmi, dpr, data)	MMIO_OUT32(pSmi->DPRBase, dpr, data); DEBUG("DPR%02X = %08X\n", dpr, data)
 #define READ_DPR(pSmi, dpr)			MMIO_IN32(pSmi->DPRBase, dpr)
-#define WRITE_VPR(pSmi, vpr, data)	MMIO_OUT32(pSmi->VPRBase, vpr, data); DEBUG((VERBLEV, "VPR%02X = %08X\n", vpr, data))
+#define WRITE_VPR(pSmi, vpr, data)	MMIO_OUT32(pSmi->VPRBase, vpr, data); DEBUG("VPR%02X = %08X\n", vpr, data)
 #define READ_VPR(pSmi, vpr)			MMIO_IN32(pSmi->VPRBase, vpr)
-#define WRITE_CPR(pSmi, cpr, data)	MMIO_OUT32(pSmi->CPRBase, cpr, data); DEBUG((VERBLEV, "CPR%02X = %08X\n", cpr, data))
+#define WRITE_CPR(pSmi, cpr, data)	MMIO_OUT32(pSmi->CPRBase, cpr, data); DEBUG("CPR%02X = %08X\n", cpr, data)
 #define READ_CPR(pSmi, cpr)			MMIO_IN32(pSmi->CPRBase, cpr)
-#define WRITE_FPR(pSmi, fpr, data)      MMIO_OUT32(pSmi->FPRBase, fpr, data); DEBUG((VERBLEV, "FPR%02X = %08X\n", fpr, data))
+#define WRITE_FPR(pSmi, fpr, data)      MMIO_OUT32(pSmi->FPRBase, fpr, data); DEBUG("FPR%02X = %08X\n", fpr, data)
 #define READ_FPR(pSmi, fpr)                     MMIO_IN32(pSmi->FPRBase, fpr)
-#define WRITE_DCR(pSmi, dcr, data)	MMIO_OUT32(pSmi->DCRBase, dcr, data); DEBUG((VERBLEV, "DCR%02X = %08X\n", dcr, data))
+#define WRITE_DCR(pSmi, dcr, data)	MMIO_OUT32(pSmi->DCRBase, dcr, data); DEBUG("DCR%02X = %08X\n", dcr, data)
 #define READ_DCR(pSmi, dcr)		MMIO_IN32(pSmi->DCRBase, dcr)
-#define WRITE_SCR(pSmi, scr, data)	MMIO_OUT32(pSmi->SCRBase, scr, data); DEBUG((VERBLEV, "SCR%02X = %08X\n", scr, data))
+#define WRITE_SCR(pSmi, scr, data)	MMIO_OUT32(pSmi->SCRBase, scr, data); DEBUG("SCR%02X = %08X\n", scr, data)
 #define READ_SCR(pSmi, scr)		MMIO_IN32(pSmi->SCRBase, scr)
 
 #define CHECK_SECONDARY(pSmi)						\

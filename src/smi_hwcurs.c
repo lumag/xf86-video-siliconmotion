@@ -74,14 +74,12 @@ SMI_RealizeCursor(xf86CursorInfoPtr infoPtr, CursorPtr pCurs)
     unsigned char * pmask = bits->mask;
     int x, y, srcwidth, i;
 
-    ENTER_PROC("SMI_RealizeCursor");
+    ENTER();
 
     /* Allocate memory */
     ram = (unsigned char *) xcalloc(1, 1024);
-    if (ram == NULL) {
-	LEAVE_PROC("SMI_RealizeCursor");
-	return NULL;
-    }
+    if (ram == NULL)
+	RETURN(NULL);
 
     /* Calculate cursor information */
     srcwidth = ((bits->width + 31) / 8) & ~3;
@@ -200,8 +198,7 @@ SMI_RealizeCursor(xf86CursorInfoPtr infoPtr, CursorPtr pCurs)
 	break;
     }
 
-    LEAVE_PROC("SMI_RealizeCursor");
-    return ram;
+    RETURN(ram);
 }
 
 /* From the SMI Windows CE driver */
@@ -289,7 +286,7 @@ SMI501_RealizeCursor(xf86CursorInfoPtr infoPtr, CursorPtr pCurs)
     int			 x, y, srcwidth, i;
     unsigned int	 MaxCursor;
 
-    ENTER_PROC("SMI501_RealizeCursor");
+    ENTER();
 
     /* Allocate memory */
     ram = (unsigned char *) xcalloc (1, SMI501_CURSOR_SIZE);
@@ -297,10 +294,8 @@ SMI501_RealizeCursor(xf86CursorInfoPtr infoPtr, CursorPtr pCurs)
     usram = (unsigned short *) ram;
     MaxCursor = MAX_CURSOR_501;
 
-    if (ram == NULL) {
-	LEAVE_PROC("SMI501_RealizeCursor");
-	return (NULL);
-    }
+    if (ram == NULL)
+	RETURN(NULL);
 
     /* Calculate cursor information */
     srcwidth = ((bits->width + 31) / 8) & ~3;
@@ -332,9 +327,7 @@ SMI501_RealizeCursor(xf86CursorInfoPtr infoPtr, CursorPtr pCurs)
 
     SMI501_RotateCursorShape(infoPtr, pSmi->rotate, ram);
 
-    LEAVE_PROC("SMI501_RealizeCursor");
-
-    return (ram);
+    RETURN(ram);
 }
 
 static void
@@ -342,7 +335,7 @@ SMI_LoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_LoadCursorImage");
+    ENTER();
 
     if (IS_MSOC(pSmi)) {
 	/* Write address, disabling the HW cursor */
@@ -385,7 +378,7 @@ SMI_LoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
     /* Copy cursor image to framebuffer storage */
     memcpy(pSmi->FBBase + pSmi->FBCursorOffset, src, 1024);
 
-    LEAVE_PROC("SMI_LoadCursorImage");
+    LEAVE();
 }
 
 static void
@@ -393,7 +386,7 @@ SMI_ShowCursor(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_ShowCursor");
+    ENTER();
 
     if (IS_MSOC(pSmi)) {
 	CARD32	uiPanelTmp;
@@ -428,7 +421,7 @@ SMI_ShowCursor(ScrnInfoPtr pScrn)
 	}
     }
 
-    LEAVE_PROC("SMI_ShowCursor");
+    LEAVE();
 }
 
 static void
@@ -436,7 +429,7 @@ SMI_HideCursor(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
 
-    ENTER_PROC("SMI_HideCursor");
+    ENTER();
 
     if (IS_MSOC(pSmi)) {
 	CARD32	uiPanelTmp;
@@ -471,7 +464,7 @@ SMI_HideCursor(ScrnInfoPtr pScrn)
 	}
     }
 
-    LEAVE_PROC("SMI_HideCursor");
+    LEAVE();
 }
 
 static void
@@ -480,7 +473,7 @@ SMI_SetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
     SMIPtr pSmi = SMIPTR(pScrn);
     int xoff, yoff;
 
-    ENTER_PROC("SMI_SetCursorPosition");
+    ENTER();
 
     /* Calculate coordinates for rotation */
     switch (pSmi->rotate) {
@@ -568,7 +561,7 @@ SMI_SetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 	}
     }
 
-    LEAVE_PROC("SMI_SetCursorPosition");
+    LEAVE();
 }
 
 static void
@@ -577,7 +570,7 @@ SMI_SetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
     SMIPtr pSmi = SMIPTR(pScrn);
     unsigned char packedFG, packedBG;
 
-    ENTER_PROC("SMI_SetCursorColors");
+    ENTER();
 
     if (IS_MSOC(pSmi)) {
 	/* for the SMI501 HWCursor, there are 4 possible colors, one of which
@@ -639,7 +632,7 @@ SMI_SetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
 	}
     }
 
-	LEAVE_PROC("SMI_SetCursorColors");
+    LEAVE();
 }
 
 Bool
@@ -650,14 +643,12 @@ SMI_HWCursorInit(ScreenPtr pScreen)
     xf86CursorInfoPtr infoPtr;
     Bool ret;
 
-    ENTER_PROC("SMI_HWCursorInit");
+    ENTER();
 
     /* Create cursor infor record */
     infoPtr = xf86CreateCursorInfoRec();
-    if (infoPtr == NULL) {
-	LEAVE_PROC("SMI_HWCursorInit");
-	return FALSE;
-    }
+    if (infoPtr == NULL)
+	RETURN(FALSE);
 
     pSmi->CursorInfoRec = infoPtr;
 
@@ -691,7 +682,6 @@ SMI_HWCursorInit(ScreenPtr pScreen)
     /* Proceed with cursor initialization */
     ret = xf86InitCursor(pScreen, infoPtr);
 
-    LEAVE_PROC("SMI_HWCursorInit");
-    return ret;
+    RETURN(ret);
 }
 

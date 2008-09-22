@@ -60,11 +60,12 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
     SMIPtr pSmi = SMIPTR(pScrn);
     int width, height, srcX, srcY, destX, destY;
 
-    ENTER_PROC("SMI_RefreshArea");
+    ENTER();
 
     /* #671 */
     if (pSmi->polyLines) {
 	pSmi->polyLines = FALSE;
+	LEAVE();
 	return;
     }
 
@@ -93,7 +94,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	width  = pbox->x2 - srcX;
 	height = pbox->y2 - srcY;
 
-	DEBUG((VERBLEV, "x=%d y=%d w=%d h=%d\n", srcX, srcY, width, height));
+	DEBUG("x=%d y=%d w=%d h=%d\n", srcX, srcY, width, height);
 
 	if ((width > 0) && (height > 0)) {
 	    switch (pSmi->rotate) {
@@ -167,7 +168,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x44, 0);
 
-    LEAVE_PROC("SMI_RefreshArea");
+    LEAVE();
 }
 
 /* Custom version for the 730 series (Cougar3DR).
@@ -179,11 +180,12 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
     int width, height, srcX, srcY, destX, destY;
     int maxPixels, tempWidth;
 
-    ENTER_PROC("SMI_RefreshArea730");
+    ENTER();
 
     /* #671 */
     if (pSmi->polyLines) {
 	pSmi->polyLines = FALSE;
+	LEAVE();
 	return;
     }
 
@@ -216,7 +218,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	width  = pbox->x2 - srcX;
 	height = pbox->y2 - srcY;
 
-	DEBUG((VERBLEV, "x=%d y=%d w=%d h=%d\n", srcX, srcY, width, height));
+	DEBUG("x=%d y=%d w=%d h=%d\n", srcX, srcY, width, height);
 
 	if ((width > 0) && (height > 0)) {
 	    switch (pSmi->rotate) {
@@ -308,7 +310,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x44, 0);
 
-    LEAVE_PROC("SMI_RefreshArea730");
+    LEAVE();
 }
 
 /******************************************************************************\
