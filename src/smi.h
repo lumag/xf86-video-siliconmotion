@@ -175,7 +175,7 @@ typedef struct
     Bool		fifo_aggressive;	/* Adjust fifo for
 						   acceleration? */
     Bool		NoAccel;	/* Disable Acceleration */
-    Bool		hwcursor;	/* hardware cursor enabled */
+    Bool		HwCursor;	/* hardware cursor enabled */
     Bool		ShowCache;	/* Debugging option */
     Bool		useBIOS;	/* Use BIOS for mode sets */
     Bool		zoomOnLCD;	/* Zoom on LCD */

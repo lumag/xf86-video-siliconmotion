@@ -729,21 +729,19 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     from = X_DEFAULT;
-    pSmi->hwcursor = TRUE;
-    if (xf86GetOptValBool(pSmi->Options, OPTION_HWCURSOR, &pSmi->hwcursor)) {
+    pSmi->HwCursor = TRUE;
+    /* SWCursor overrides HWCusor if both specified */
+    if (xf86GetOptValBool(pSmi->Options, OPTION_SWCURSOR, &pSmi->HwCursor) ||
+	xf86GetOptValBool(pSmi->Options, OPTION_HWCURSOR, &pSmi->HwCursor))
 	from = X_CONFIG;
+
+    if (pSmi->HwCursor && pSmi->randrRotation) {
+	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+		   "RandRRotation enabled: Disabling hardware cursor.\n");
+	pSmi->HwCursor = FALSE;
     }
-    if (xf86ReturnOptValBool(pSmi->Options, OPTION_SWCURSOR, FALSE)) {
-	pSmi->hwcursor = FALSE;
-	from = X_CONFIG;
-    }
-    if(pSmi->hwcursor && pSmi->randrRotation){
-       xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "RandRRotation enabled: Disabling hardware cursor.\n");
-       pSmi->hwcursor = FALSE;
-    }else{
-       xf86DrvMsg(pScrn->scrnIndex, from, "Using %s Cursor\n",
-                  pSmi->hwcursor ? "Hardware" : "Software");
-    }
+    xf86DrvMsg(pScrn->scrnIndex, from, "Using %sware Cursor\n",
+	       pSmi->HwCursor ? "Hard" : "Soft");
 
     if (xf86GetOptValBool(pSmi->Options, OPTION_SHADOW_FB, &pSmi->shadowFB)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "ShadowFB %s.\n",
@@ -928,7 +926,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	if (pSmi->Dualhead) {
 	    pSmi->useBIOS = FALSE;
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "UseBIOS disabled in dualhead mode\n");
-	    pSmi->hwcursor = FALSE;
+	    pSmi->HwCursor = FALSE;
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "No hardware cursor in dualhead mode\n");
 	    if (pScrn->bitsPerPixel != 16) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Dualhead only supported at "
@@ -1141,7 +1139,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     }
 
     /* Load ramdac if needed */
-    if (pSmi->hwcursor) {
+    if (pSmi->HwCursor) {
 	if (!xf86LoadSubModule(pScrn, "ramdac")) {
 	    SMI_FreeRec(pScrn);
 	    RETURN(FALSE);
@@ -2325,7 +2323,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Initialize HW cursor layer.  Must follow software cursor
      * initialization.
      */
-    if (pSmi->hwcursor) {
+    if (pSmi->HwCursor) {
 	if (!SMI_HWCursorInit(pScreen)) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
 		       "initialization failed\n");
