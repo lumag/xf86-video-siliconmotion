@@ -49,10 +49,11 @@ authorization from The XFree86 Project or Silicon Motion.
 #undef VERBLEV
 #define VERBLEV		1
 
+static void SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 static char *format_integer_base2(int32_t word);
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
-			    int32_t clock, int32_t value);
+			    int32_t pll, int32_t value);
 static void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);
 
 Bool
@@ -229,7 +230,6 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     MSOCRegPtr	mode;
     SMIPtr	pSmi = SMIPTR(pScrn);
     double	mclk;
-    int32_t	clock;
     int		diff, best, divider, shift, x2_divider, x2_shift;
 
     save = pSmi->save;
@@ -262,48 +262,38 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     /* Gpio, Pwm, and I2c */
     field(mode->gate, gpio) = 1;
 
-    /* Update gate first */
-    WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
-
     /* FIXME fixed at power mode 0 as in the smi sources */
     field(mode->power_ctl, status) = 0;
     field(mode->power_ctl, mode) = 0;
 
     /* FIXME fixed at 336/3/0 as in the smi sources */
     field(mode->clock, m_select) = 1;
-    clock = mode->clock.value;
     field(mode->clock, m_divider) = 1;
     field(mode->clock, m_shift) = 0;
-    SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
     switch (pSmi->MCLK) {
 	case 168000:	    /* 336/1/1 */
 	    field(mode->clock, m2_select) = 1;
-	    clock = mode->clock.value;
 	    field(mode->clock, m2_divider) = 0;
 	    field(mode->clock, m2_shift) = 1;
 	    break;
 	case 96000:	    /* 288/3/0 */
 	    field(mode->clock, m2_select) = 0;
-	    clock = mode->clock.value;
 	    field(mode->clock, m2_divider) = 1;
 	    field(mode->clock, m2_shift) = 0;
 	    break;
 	case 144000:	    /* 288/1/1 */
 	    field(mode->clock, m2_select) = 0;
-	    clock = mode->clock.value;
 	    field(mode->clock, m2_divider) = 0;
 	    field(mode->clock, m2_shift) = 1;
 	    break;
 	case 112000:	    /* 336/3/0 */
 	default:
 	    field(mode->clock, m2_select) = 1;
-	    clock = mode->clock.value;
 	    field(mode->clock, m2_divider) = 1;
 	    field(mode->clock, m2_shift) = 0;
 	    break;
     }
-    SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
     /* Find clock best matching mode */
     best = 0x7fffffff;
@@ -329,10 +319,8 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 
     if (pSmi->lcd) {
 	field(mode->clock, p2_select) = mclk == 288000.0 ? 0 : 1;
-	clock = mode->clock.value;
 	field(mode->clock, p2_divider) = x2_divider;
 	field(mode->clock, p2_shift) = x2_shift;
-	SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
 	field(mode->panel_display_ctl, format) =
 	    pScrn->bitsPerPixel == 8 ? 0 :
@@ -384,10 +372,8 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     }
     else {
 	field(mode->clock, v2_select) = mclk == 288000.0 ? 0 : 1;
-	clock = mode->clock.value;
 	field(mode->clock, v2_divider) = x2_divider;
 	field(mode->clock, v2_shift) = x2_shift;
-	SMI501_SetClock(pSmi, mode->current_clock, clock, mode->clock.value);
 
 	field(mode->crt_display_ctl, format) =
 	    pScrn->bitsPerPixel == 8 ? 0 :
@@ -426,6 +412,41 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	field(mode->crt_vsync, height) = xf86mode->HSyncEnd -
 	    xf86mode->HSyncStart;
     }
+
+    SMI501_ModeSet(pScrn, mode);
+
+    SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Register dump (After Mode Init)\n");
+    SMI501_PrintRegs(pScrn);
+
+    return (TRUE);
+}
+
+static void
+SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
+{
+    MSOCClockRec	clock;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+
+    /* Update gate first */
+    WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
+
+    clock.value = READ_SCR(pSmi, mode->current_clock);
+    field(clock, m_select) = field(mode->clock, m_select);
+    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
+
+    clock.value = READ_SCR(pSmi, mode->current_clock);
+    field(clock, m2_select) = field(mode->clock, m2_select);
+    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
+
+    clock.value = READ_SCR(pSmi, mode->current_clock);
+    if (pSmi->lcd)
+	field(clock, p2_select) = field(mode->clock, p2_select);
+    else
+	field(clock, v2_select) = field(mode->clock, v2_select);
+    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
 
     WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
 
@@ -485,19 +506,14 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 
     WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
 
-    if (pSmi->PCIBurst) {
-	field(mode->system_ctl, burst) = field(mode->system_ctl, burst_read) = 1;
-	field(mode->system_ctl, retry) = pSmi->PCIRetry != FALSE;
-	WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
-    }
-
-    SMI_AdjustFrame(pScrn->scrnIndex, pScrn->frameX0, pScrn->frameY0, 0);
-
-    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
-		   "Register dump (After Mode Init)\n");
-    SMI501_PrintRegs(pScrn);
-
-    return (TRUE);
+    /* Match configuration */
+    /* FIXME some other fields should also be set, otherwise, since
+     * neither kernel nor driver change it, a reboot is required to
+     * modify or reset to default */
+    field(mode->system_ctl, burst) = field(mode->system_ctl, burst_read) =
+	pSmi->PCIBurst != FALSE;
+    field(mode->system_ctl, retry) = pSmi->PCIRetry != FALSE;
+    WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
 }
 
 void
@@ -573,7 +589,7 @@ SMI501_WaitVSync(SMIPtr pSmi, int vsync_count)
 }
 
 static void
-SMI501_SetClock(SMIPtr pSmi, int32_t port, int32_t clock, int32_t value)
+SMI501_SetClock(SMIPtr pSmi, int32_t port, int32_t pll, int32_t value)
 {
     /*
      *	Rules to Program the Power Mode Clock Registers for Clock Selection
@@ -597,10 +613,10 @@ SMI501_SetClock(SMIPtr pSmi, int32_t port, int32_t clock, int32_t value)
      */
 
     /* register contents selecting clock */
-    WRITE_SCR(pSmi, port, clock);
+    WRITE_SCR(pSmi, port, pll);
     SMI501_WaitVSync(pSmi, 1);
 
     /* full register contents */
-    WRITE_SCR(pSmi, port, clock);
+    WRITE_SCR(pSmi, port, pll);
     SMI501_WaitVSync(pSmi, 1);
 }
