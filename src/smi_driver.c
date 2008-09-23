@@ -192,7 +192,7 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_NOACCEL,	     "NoAccel",		  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_MCLK,	     "set_mclk",	  OPTV_FREQ,	{0}, FALSE },
     { OPTION_SHOWCACHE,	     "show_cache",	  OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_HWCURSOR,	     "HWCursor",	  OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_HWCURSOR,	     "HWCursor",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_SWCURSOR,	     "SWCursor",	  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_SHADOW_FB,	     "ShadowFB",	  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_ROTATE,	     "Rotate",		  OPTV_ANYSTR,  {0}, FALSE },
@@ -728,12 +728,13 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
        pSmi->randrRotation ? "enabled" : "disabled");
     }
 
-    from = X_DEFAULT;
+    from = X_CONFIG;
     pSmi->HwCursor = TRUE;
     /* SWCursor overrides HWCusor if both specified */
-    if (xf86GetOptValBool(pSmi->Options, OPTION_SWCURSOR, &pSmi->HwCursor) ||
-	xf86GetOptValBool(pSmi->Options, OPTION_HWCURSOR, &pSmi->HwCursor))
-	from = X_CONFIG;
+    if (xf86ReturnOptValBool(pSmi->Options, OPTION_SWCURSOR, FALSE))
+	pSmi->HwCursor = FALSE;
+    else if (!xf86GetOptValBool(pSmi->Options, OPTION_HWCURSOR, &pSmi->HwCursor))
+	from = X_DEFAULT;
 
     if (pSmi->HwCursor && pSmi->randrRotation) {
 	xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
