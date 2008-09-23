@@ -427,26 +427,35 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 static void
 SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 {
+    int32_t		pll;
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
     /* Update gate first */
     WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
 
+    /* Start with current value */
     clock.value = READ_SCR(pSmi, mode->current_clock);
+
     field(clock, m_select) = field(mode->clock, m_select);
-    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
+    pll = clock.value;
+    field(clock, m_divider) = field(mode->clock, m_divider);
+    field(clock, m_shift) = field(mode->clock, m_shift);
+    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    clock.value = READ_SCR(pSmi, mode->current_clock);
     field(clock, m2_select) = field(mode->clock, m2_select);
-    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
+    pll = clock.value;
+    field(clock, m2_divider) = field(mode->clock, m2_divider);
+    field(clock, m2_shift) = field(mode->clock, m2_shift);
+    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    clock.value = READ_SCR(pSmi, mode->current_clock);
     if (pSmi->lcd)
 	field(clock, p2_select) = field(mode->clock, p2_select);
     else
 	field(clock, v2_select) = field(mode->clock, v2_select);
-    SMI501_SetClock(pSmi, mode->current_clock, clock.value, mode->clock.value);
+    pll = clock.value;
+    clock.value = mode->clock.value;
+    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
     WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
 
