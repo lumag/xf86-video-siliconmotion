@@ -179,6 +179,7 @@ typedef enum
     OPTION_ACCELMETHOD,
     OPTION_RANDRROTATION,
     OPTION_PANEL_SIZE,
+    OPTION_USE_FBDEV,
     NUMBER_OF_OPTIONS
 } SMIOpts;
 
@@ -206,7 +207,8 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
     { OPTION_RANDRROTATION,  "RandRRotation",     OPTV_BOOLEAN, {0}, FALSE },
-   { OPTION_PANEL_SIZE,      "PanelSize",         OPTV_ANYSTR,  {0}, FALSE },
+    { OPTION_PANEL_SIZE,     "PanelSize",	  OPTV_ANYSTR,	{0}, FALSE },
+    { OPTION_USE_FBDEV,	     "UseFBDev",	  OPTV_BOOLEAN,	{0}, FALSE },
     { -1,		     NULL,		  OPTV_NONE,	{0}, FALSE }
 };
 
@@ -726,6 +728,14 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if(!pSmi->randrRotation && xf86GetOptValBool(pSmi->Options, OPTION_RANDRROTATION, &pSmi->randrRotation)){
        xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "RandRRotation %s.\n",
        pSmi->randrRotation ? "enabled" : "disabled");
+    }
+
+    if (IS_MSOC(pSmi)) {
+	from = X_DEFAULT;
+	if (xf86GetOptValBool(pSmi->Options, OPTION_USE_FBDEV, &pSmi->UseFBDev))
+	    from = X_CONFIG;
+	xf86DrvMsg(pScrn->scrnIndex, from, "UseFBDev %s.\n",
+		   pSmi->UseFBDev ? "enabled" : "disabled");
     }
 
     from = X_CONFIG;

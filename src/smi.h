@@ -266,6 +266,7 @@ typedef struct
     EntityInfoPtr	pEnt;
 
     Bool		IsSwitching; /* when switching modes */
+    Bool		UseFBDev;
 
 } SMIRec, *SMIPtr;
 

@@ -51,6 +51,8 @@ authorization from The XFree86 Project or Silicon Motion.
 
 static void SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 static char *format_integer_base2(int32_t word);
+static int32_t SMI501_FindClock(double clock, Bool lcd, int32_t *x2_select,
+				int32_t *x2_divider, int32_t *x2_shift);
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
 			    int32_t pll, int32_t value);
@@ -223,14 +225,30 @@ SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
     }
 }
 
+static double
+xf86ModeBandwidth(DisplayModePtr mode, int depth)
+{
+    float a_active, a_total, active_percent, pixels_per_second;
+    int bytes_per_pixel = (depth + 7) / 8;
+
+    if (!mode->HTotal || !mode->VTotal || !mode->Clock)
+	return 0.0;
+
+    a_active = mode->HDisplay * mode->VDisplay;
+    a_total = mode->HTotal * mode->VTotal;
+    active_percent = a_active / a_total;
+    pixels_per_second = active_percent * mode->Clock * 1000.0;
+
+    return ((double)(pixels_per_second * bytes_per_pixel));
+}
+
 Bool
 SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 {
     MSOCRegPtr	save;
     MSOCRegPtr	mode;
     SMIPtr	pSmi = SMIPTR(pScrn);
-    double	mclk;
-    int		diff, best, divider, shift, x2_divider, x2_shift;
+    int32_t	x2_select, x2_divider, x2_shift;
 
     save = pSmi->save;
     mode = pSmi->mode;
@@ -249,6 +267,9 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 
     /* Start with a fresh copy of registers before any mode change */
     memcpy(mode, save, sizeof(MSOCRegRec));
+
+    if (pSmi->UseFBDev)
+	return (TRUE);
 
     /* Enable DAC -- 0: enable - 1: disable */
     field(mode->misc_ctl, dac) = 0;
@@ -295,30 +316,12 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	    break;
     }
 
-    /* Find clock best matching mode */
-    best = 0x7fffffff;
-    for (mclk = 288000.0; mclk <= 336000.0; mclk += 48000.0) {
-	for (divider = 1; divider <= (pSmi->lcd ? 5 : 3); divider += 2) {
-	    /* Start at 1 to match division by 2 */
-	    for (shift = 1; shift <= 8; shift++) {
-		/* Shift starts at 1 to add a division by two, matching
-		 * description of P2XCLK and V2XCLK. */
-		diff = (mclk / (divider << shift)) - xf86mode->Clock;
-		if (diff < 0)
-		    diff = -diff;
-		if (diff < best) {
-		    x2_shift = shift - 1;
-		    x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
-
-		    /* Remember best diff */
-		    best = diff;
-		}
-	    }
-	}
-    }
+    (void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
+			   pSmi->lcd,
+			   &x2_select, &x2_divider, &x2_shift);
 
     if (pSmi->lcd) {
-	field(mode->clock, p2_select) = mclk == 288000.0 ? 0 : 1;
+	field(mode->clock, p2_select) = x2_select;
 	field(mode->clock, p2_divider) = x2_divider;
 	field(mode->clock, p2_shift) = x2_shift;
 
@@ -371,7 +374,7 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	    xf86mode->VSyncStart;
     }
     else {
-	field(mode->clock, v2_select) = mclk == 288000.0 ? 0 : 1;
+	field(mode->clock, v2_select) = x2_select;
 	field(mode->clock, v2_divider) = x2_divider;
 	field(mode->clock, v2_shift) = x2_shift;
 
@@ -384,12 +387,12 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	field(mode->crt_display_ctl, enable) = 1;
 
 	/* FIXME if non clone dual head, and secondary, need to
-	 * properly set crt fb address properly ... */
+	 * properly set crt fb address ... */
 	field(mode->crt_fb_address, address) = 0;
 	field(mode->crt_fb_address, mextern) = 0;	/* local memory */
 	field(mode->crt_fb_address, pending) = 0;	/* FIXME required? */
 
-	/* >> 4 because of the "unused fields" that should be set to 0 */
+	/* >> 4 because of the "unused bits" that should be set to 0 */
 	/* FIXME this should be used for virtual size? */
 	field(mode->crt_fb_width, offset) = pSmi->Stride >> 4;
 	field(mode->crt_fb_width, width) = pSmi->Stride >> 4;
@@ -434,7 +437,6 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     /* Update gate first */
     WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
 
-    /* Start with current value */
     clock.value = READ_SCR(pSmi, mode->current_clock);
 
     field(clock, m_select) = field(mode->clock, m_select);
@@ -556,6 +558,40 @@ format_integer_base2(int32_t word)
     return (buffer);
 }
 
+static int32_t
+SMI501_FindClock(double clock, Bool lcd,
+		 int32_t *x2_select, int32_t *x2_divider, int32_t *x2_shift)
+{
+    double	mclk;
+    int32_t	diff, best, divider, shift;
+
+    /* Find clock best matching mode */
+    best = 0x7fffffff;
+    for (mclk = 288000.0; mclk <= 336000.0; mclk += 48000.0) {
+	for (divider = 1; divider <= (lcd ? 5 : 3); divider += 2) {
+	    /* Start at 1 to match division by 2 */
+	    for (shift = 1; shift <= 8; shift++) {
+		/* Shift starts at 1 to add a division by two, matching
+		 * description of P2XCLK and V2XCLK. */
+		diff = (mclk / (divider << shift)) - clock;
+		if (diff < 0)
+		    diff = -diff;
+		if (diff < best) {
+		    *x2_shift = shift - 1;
+		    *x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
+
+		    /* Remember best diff */
+		    best = diff;
+		}
+	    }
+	}
+    }
+
+    *x2_select = mclk == 288000.0 ? 0 : 1;
+
+    return (diff);
+}
+
 static void
 SMI501_PrintRegs(ScrnInfoPtr pScrn)
 {
@@ -626,6 +662,6 @@ SMI501_SetClock(SMIPtr pSmi, int32_t port, int32_t pll, int32_t value)
     SMI501_WaitVSync(pSmi, 1);
 
     /* full register contents */
-    WRITE_SCR(pSmi, port, pll);
+    WRITE_SCR(pSmi, port, value);
     SMI501_WaitVSync(pSmi, 1);
 }
