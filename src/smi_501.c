@@ -49,10 +49,14 @@ authorization from The XFree86 Project or Silicon Motion.
 #undef VERBLEV
 #define VERBLEV		1
 
+#undef CALC_CLOCK
 static void SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 static char *format_integer_base2(int32_t word);
+
+#ifdef CALC_CLOCK
 static int32_t SMI501_FindClock(double clock, Bool lcd, int32_t *x2_select,
 				int32_t *x2_divider, int32_t *x2_shift);
+#endif
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
 			    int32_t pll, int32_t value);
@@ -225,6 +229,7 @@ SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
     }
 }
 
+#ifdef CALC_CLOCK
 static double
 xf86ModeBandwidth(DisplayModePtr mode, int depth)
 {
@@ -241,6 +246,7 @@ xf86ModeBandwidth(DisplayModePtr mode, int depth)
 
     return ((double)(pixels_per_second * bytes_per_pixel));
 }
+#endif
 
 Bool
 SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
@@ -248,7 +254,9 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     MSOCRegPtr	save;
     MSOCRegPtr	mode;
     SMIPtr	pSmi = SMIPTR(pScrn);
+#ifdef CALC_CLOCK
     int32_t	x2_select, x2_divider, x2_shift;
+#endif
 
     save = pSmi->save;
     mode = pSmi->mode;
@@ -316,14 +324,19 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	    break;
     }
 
-    (void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
-			   pSmi->lcd,
-			   &x2_select, &x2_divider, &x2_shift);
-
     if (pSmi->lcd) {
+#ifdef CALC_CLOCK
+	(void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
+			       TRUE,
+			       &x2_select, &x2_divider, &x2_shift);
 	field(mode->clock, p2_select) = x2_select;
 	field(mode->clock, p2_divider) = x2_divider;
 	field(mode->clock, p2_shift) = x2_shift;
+#else
+	field(mode->clock, p2_select) = 1;	/* 336 */
+	field(mode->clock, p2_divider) = 0;	/*   1 */
+	field(mode->clock, p2_shift) = 0;	/*   0 */
+#endif
 
 	field(mode->panel_display_ctl, format) =
 	    pScrn->bitsPerPixel == 8 ? 0 :
@@ -373,48 +386,56 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	field(mode->panel_vsync, height) = xf86mode->VSyncEnd -
 	    xf86mode->VSyncStart;
     }
-    else {
-	field(mode->clock, v2_select) = x2_select;
-	field(mode->clock, v2_divider) = x2_divider;
-	field(mode->clock, v2_shift) = x2_shift;
 
-	field(mode->crt_display_ctl, format) =
-	    pScrn->bitsPerPixel == 8 ? 0 :
-	    pScrn->bitsPerPixel == 16 ? 1 : 2;
+#ifdef CALC_CLOCK
+    (void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
+			   FALSE,
+			   &x2_select, &x2_divider, &x2_shift);
+    field(mode->clock, v2_select) = x2_select;
+    field(mode->clock, v2_divider) = x2_divider;
+    field(mode->clock, v2_shift) = x2_shift;
+#else
+    field(mode->clock, v2_select) = 1;	/* 336 */
+    field(mode->clock, v2_divider) = 0;	/*   1 */
+    field(mode->clock, v2_shift) = 0;	/*   0 */
+#endif
 
-	/* 0: select panel - 1: select crt */
-	field(mode->crt_display_ctl, select) = 1;
-	field(mode->crt_display_ctl, enable) = 1;
+    field(mode->crt_display_ctl, format) =
+	pScrn->bitsPerPixel == 8 ? 0 :
+	pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-	/* FIXME if non clone dual head, and secondary, need to
-	 * properly set crt fb address ... */
-	field(mode->crt_fb_address, address) = 0;
-	field(mode->crt_fb_address, mextern) = 0;	/* local memory */
-	field(mode->crt_fb_address, pending) = 0;	/* FIXME required? */
+    /* 0: select panel - 1: select crt */
+    field(mode->crt_display_ctl, select) = 1;
+    field(mode->crt_display_ctl, enable) = 1;
 
-	/* >> 4 because of the "unused bits" that should be set to 0 */
-	/* FIXME this should be used for virtual size? */
-	field(mode->crt_fb_width, offset) = pSmi->Stride >> 4;
-	field(mode->crt_fb_width, width) = pSmi->Stride >> 4;
+    /* FIXME if non clone dual head, and secondary, need to
+     * properly set crt fb address ... */
+    field(mode->crt_fb_address, address) = 0;
+    field(mode->crt_fb_address, mextern) = 0;	/* local memory */
+    field(mode->crt_fb_address, pending) = 0;	/* FIXME required? */
 
-	/* 0 means pulse high */
-	field(mode->crt_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
-	field(mode->crt_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
+    /* >> 4 because of the "unused bits" that should be set to 0 */
+    /* FIXME this should be used for virtual size? */
+    field(mode->crt_fb_width, offset) = pSmi->Stride >> 4;
+    field(mode->crt_fb_width, width) = pSmi->Stride >> 4;
 
-	field(mode->crt_htotal, total) = xf86mode->HTotal - 1;
-	field(mode->crt_htotal, end) = xf86mode->HDisplay - 1;
+    /* 0 means pulse high */
+    field(mode->crt_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
+    field(mode->crt_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
 
-	field(mode->crt_hsync, start) = xf86mode->HSyncStart;
-	field(mode->crt_hsync, width) = xf86mode->HSyncEnd -
-	    xf86mode->HSyncStart;
+    field(mode->crt_htotal, total) = xf86mode->HTotal - 1;
+    field(mode->crt_htotal, end) = xf86mode->HDisplay - 1;
 
-	field(mode->crt_vtotal, total) = xf86mode->VTotal - 1;
-	field(mode->crt_vtotal, end) = xf86mode->VDisplay - 1;
+    field(mode->crt_hsync, start) = xf86mode->HSyncStart;
+    field(mode->crt_hsync, width) = xf86mode->HSyncEnd -
+	xf86mode->HSyncStart;
 
-	field(mode->crt_vsync, start) = xf86mode->HSyncStart;
-	field(mode->crt_vsync, height) = xf86mode->HSyncEnd -
-	    xf86mode->HSyncStart;
-    }
+    field(mode->crt_vtotal, total) = xf86mode->VTotal - 1;
+    field(mode->crt_vtotal, end) = xf86mode->VDisplay - 1;
+
+    field(mode->crt_vsync, start) = xf86mode->HSyncStart;
+    field(mode->crt_vsync, height) = xf86mode->HSyncEnd -
+	xf86mode->HSyncStart;
 
     SMI501_ModeSet(pScrn, mode);
 
@@ -451,12 +472,18 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     field(clock, m2_shift) = field(mode->clock, m2_shift);
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    if (pSmi->lcd)
+    if (pSmi->lcd) {
 	field(clock, p2_select) = field(mode->clock, p2_select);
-    else
-	field(clock, v2_select) = field(mode->clock, v2_select);
+	pll = clock.value;
+	field(clock, p2_divider) = field(mode->clock, p2_divider);
+	field(clock, p2_shift) = field(mode->clock, p2_shift);
+	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+    }
+
+    field(clock, v2_select) = field(mode->clock, v2_select);
     pll = clock.value;
-    clock.value = mode->clock.value;
+    field(clock, v2_divider) = field(mode->clock, v2_divider);
+    field(clock, v2_shift) = field(mode->clock, v2_shift);
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
     WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
@@ -502,18 +529,17 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 	field(mode->crt_display_ctl, select) = 0;
 	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
     }
-    else {
-	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
-	WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
-	WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
-	WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
-	WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
-	WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
-	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 
-	/* Turn CRT on */
-	SMI501_DisplayPowerManagementSet(pScrn, DPMSModeOn, 0);
-    }
+    WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
+    WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
+    WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
+    WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
+    WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
+    WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
+    WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+
+    /* Turn CRT on */
+    SMI501_DisplayPowerManagementSet(pScrn, DPMSModeOn, 0);
 
     WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
 
@@ -558,6 +584,7 @@ format_integer_base2(int32_t word)
     return (buffer);
 }
 
+#ifdef CALC_CLOCK
 static int32_t
 SMI501_FindClock(double clock, Bool lcd,
 		 int32_t *x2_select, int32_t *x2_divider, int32_t *x2_shift)
@@ -591,6 +618,7 @@ SMI501_FindClock(double clock, Bool lcd,
 
     return (diff);
 }
+#endif
 
 static void
 SMI501_PrintRegs(ScrnInfoPtr pScrn)
