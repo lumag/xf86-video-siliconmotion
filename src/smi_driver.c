@@ -418,19 +418,11 @@ SMI_FreeRec(ScrnInfoPtr pScrn)
 
     ENTER();
 
-    if (pScrn->driverPrivate != NULL) {
+    if (pSmi) {
+	xfree(pSmi->save);
+	xfree(pSmi->mode);
 	xfree(pScrn->driverPrivate);
 	pScrn->driverPrivate = NULL;
-    }
-
-    if (pSmi->save) {
-	xfree(pSmi->save);
-	pSmi->save = NULL;
-    }
-
-    if (pSmi->mode) {
-	xfree(pSmi->mode);
-	pSmi->mode = NULL;
     }
 
     LEAVE();
@@ -1054,7 +1046,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->clockIndex = -1;
     clockRanges->interlaceAllowed = FALSE;
     clockRanges->doubleScanAllowed = FALSE;
-		
+
     i = xf86ValidateModes(
 		pScrn,				/* Screen pointer			  */
 		pScrn->monitor->Modes,		/* Available monitor modes		  */

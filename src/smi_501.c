@@ -244,7 +244,7 @@ xf86ModeBandwidth(DisplayModePtr mode, int depth)
     active_percent = a_active / a_total;
     pixels_per_second = active_percent * mode->Clock * 1000.0;
 
-    return ((double)(pixels_per_second * bytes_per_pixel));
+    return ((double)(pixels_per_second * bytes_per_pixel) / 1000.0);
 }
 #endif
 
@@ -300,6 +300,10 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     field(mode->clock, m_divider) = 1;
     field(mode->clock, m_shift) = 0;
 
+    /* FIXME probably should not "touch" m2clk. A value other then 112Mhz
+     * will instant lock on my test prototype, "or" maybe it just means
+     * that m2clk value must be equal to mclk value? (and mclk must be
+     * set first!?) */
     switch (pSmi->MCLK) {
 	case 168000:	    /* 336/1/1 */
 	    field(mode->clock, m2_select) = 1;
