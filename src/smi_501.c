@@ -148,7 +148,7 @@ SMI501_Save(ScrnInfoPtr pScrn)
     /* Read it first to know if current power mode */
     save->power_ctl.value = READ_SCR(pSmi, POWER_CTL);
 
-    switch (field(save->power_ctl, mode)) {
+    switch (save->power_ctl.f.mode) {
 	case 0:
 	    save->current_gate  = POWER0_GATE;
 	    save->current_clock = POWER0_CLOCK;
@@ -209,20 +209,20 @@ SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
 	mode->system_ctl.value = READ_SCR(pSmi, SYSTEM_CTL);
 	switch (PowerManagementMode) {
 	    case DPMSModeOn:
-		field(mode->system_ctl, dpmsh) = 1;
-		field(mode->system_ctl, dpmsv) = 1;
+		mode->system_ctl.f.dpmsh = 1;
+		mode->system_ctl.f.dpmsv = 1;
 		break;
 	    case DPMSModeStandby:
-		field(mode->system_ctl, dpmsh) = 0;
-		field(mode->system_ctl, dpmsv) = 1;
+		mode->system_ctl.f.dpmsh = 0;
+		mode->system_ctl.f.dpmsv = 1;
 		break;
 	    case DPMSModeSuspend:
-		field(mode->system_ctl, dpmsh) = 1;
-		field(mode->system_ctl, dpmsv) = 0;
+		mode->system_ctl.f.dpmsh = 1;
+		mode->system_ctl.f.dpmsv = 0;
 		break;
 	    case DPMSModeOff:
-		field(mode->system_ctl, dpmsh) = 0;
-		field(mode->system_ctl, dpmsv) = 0;
+		mode->system_ctl.f.dpmsh = 0;
+		mode->system_ctl.f.dpmsv = 0;
 		break;
 	}
 	WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
@@ -281,25 +281,25 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	return (TRUE);
 
     /* Enable DAC -- 0: enable - 1: disable */
-    field(mode->misc_ctl, dac) = 0;
+    mode->misc_ctl.f.dac = 0;
 
     /* Enable 2D engine */
-    field(mode->gate, engine) = 1;
+    mode->gate.f.engine = 1;
     /* Color space conversion */
-    field(mode->gate, csc) = 1;
+    mode->gate.f.csc = 1;
     /* ZV port */
-    field(mode->gate, zv) = 1;
+    mode->gate.f.zv = 1;
     /* Gpio, Pwm, and I2c */
-    field(mode->gate, gpio) = 1;
+    mode->gate.f.gpio = 1;
 
     /* FIXME fixed at power mode 0 as in the smi sources */
-    field(mode->power_ctl, status) = 0;
-    field(mode->power_ctl, mode) = 0;
+    mode->power_ctl.f.status = 0;
+    mode->power_ctl.f.mode = 0;
 
     /* FIXME fixed at 336/3/0 as in the smi sources */
-    field(mode->clock, m_select) = 1;
-    field(mode->clock, m_divider) = 1;
-    field(mode->clock, m_shift) = 0;
+    mode->clock.f.m_select = 1;
+    mode->clock.f.m_divider = 1;
+    mode->clock.f.m_shift = 0;
 
     /* FIXME probably should not "touch" m1clk. A value other then 112Mhz
      * will instant lock on my test prototype, "or" maybe it just means
@@ -307,25 +307,25 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
      * set first!?) */
     switch (pSmi->MCLK) {
 	case 168000:	    /* 336/1/1 */
-	    field(mode->clock, m1_select) = 1;
-	    field(mode->clock, m1_divider) = 0;
-	    field(mode->clock, m1_shift) = 1;
+	    mode->clock.f.m1_select = 1;
+	    mode->clock.f.m1_divider = 0;
+	    mode->clock.f.m1_shift = 1;
 	    break;
 	case 96000:	    /* 288/3/0 */
-	    field(mode->clock, m1_select) = 0;
-	    field(mode->clock, m1_divider) = 1;
-	    field(mode->clock, m1_shift) = 0;
+	    mode->clock.f.m1_select = 0;
+	    mode->clock.f.m1_divider = 1;
+	    mode->clock.f.m1_shift = 0;
 	    break;
 	case 144000:	    /* 288/1/1 */
-	    field(mode->clock, m1_select) = 0;
-	    field(mode->clock, m1_divider) = 0;
-	    field(mode->clock, m1_shift) = 1;
+	    mode->clock.f.m1_select = 0;
+	    mode->clock.f.m1_divider = 0;
+	    mode->clock.f.m1_shift = 1;
 	    break;
 	case 112000:	    /* 336/3/0 */
 	default:
-	    field(mode->clock, m1_select) = 1;
-	    field(mode->clock, m1_divider) = 1;
-	    field(mode->clock, m1_shift) = 0;
+	    mode->clock.f.m1_select = 1;
+	    mode->clock.f.m1_divider = 1;
+	    mode->clock.f.m1_shift = 0;
 	    break;
     }
 
@@ -334,13 +334,13 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	(void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
 			       TRUE,
 			       &x2_select, &x2_divider, &x2_shift);
-	field(mode->clock, p2_select) = x2_select;
-	field(mode->clock, p2_divider) = x2_divider;
-	field(mode->clock, p2_shift) = x2_shift;
+	mode->clock.f.p2_select = x2_select;
+	mode->clock.f.p2_divider = x2_divider;
+	mode->clock.f.p2_shift = x2_shift;
 #else
-	field(mode->clock, p2_select) = 1;	/* 336 */
-	field(mode->clock, p2_divider) = 0;	/*   1 */
-	field(mode->clock, p2_shift) = 0;	/*   0 */
+	mode->clock.f.p2_select = 1;	/* 336 */
+	mode->clock.f.p2_divider = 0;	/*   1 */
+	mode->clock.f.p2_shift = 0;	/*   0 */
 
 	/* FIXME <<This the magic for the GDIUM>>
 	 * But this is not yet fully correct as it is dependant on boot
@@ -351,56 +351,56 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	 * and the documentation for PLL_CTL is almost nil, i.e:
 	 * <<0:7 M value; 8:14 N Value>>, but what is M and what is N?
 	 */
-	field(mode->clock, pll_select) = 1;
-	field(mode->clock, p2_disable) = 1;
+	mode->clock.f.pll_select = 1;
+	mode->clock.f.p2_disable = 1;
 #endif
 
-	field(mode->panel_display_ctl, format) =
+	mode->panel_display_ctl.f.format =
 	    pScrn->bitsPerPixel == 8 ? 0 :
 	    pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-	field(mode->panel_display_ctl, enable) = 1;
-	field(mode->panel_display_ctl, timing) = 1;
+	mode->panel_display_ctl.f.enable = 1;
+	mode->panel_display_ctl.f.timing = 1;
 
 	/* FIXME if non clone dual head, and secondary, need to
 	 * properly set panel fb address properly ... */
-	field(mode->panel_fb_address, address) = 0;
-	field(mode->panel_fb_address, mextern) = 0;	/* local memory */
-	field(mode->panel_fb_address, pending) = 0;	/* FIXME required? */
+	mode->panel_fb_address.f.address = 0;
+	mode->panel_fb_address.f.mextern = 0;	/* local memory */
+	mode->panel_fb_address.f.pending = 0;	/* FIXME required? */
 
 	/* >> 4 because of the "unused bits" that should be set to 0 */
 	/* FIXME this should be used for virtual size? */
-	field(mode->panel_fb_width, offset) = pSmi->Stride >> 4;
-	field(mode->panel_fb_width, width) = pSmi->Stride >> 4;
+	mode->panel_fb_width.f.offset = pSmi->Stride >> 4;
+	mode->panel_fb_width.f.width = pSmi->Stride >> 4;
 
-	field(mode->panel_wwidth, x) = 0;
-	field(mode->panel_wwidth, width) = xf86mode->HDisplay;
+	mode->panel_wwidth.f.x = 0;
+	mode->panel_wwidth.f.width = xf86mode->HDisplay;
 
-	field(mode->panel_wheight, y) = 0;
-	field(mode->panel_wheight, height) = xf86mode->VDisplay;
+	mode->panel_wheight.f.y = 0;
+	mode->panel_wheight.f.height = xf86mode->VDisplay;
 
-	field(mode->panel_plane_tl, top) = 0;
-	field(mode->panel_plane_tl, left) = 0;
+	mode->panel_plane_tl.f.top = 0;
+	mode->panel_plane_tl.f.left = 0;
 
-	field(mode->panel_plane_br, right) = xf86mode->HDisplay - 1;
-	field(mode->panel_plane_br, bottom) = xf86mode->VDisplay - 1;
+	mode->panel_plane_br.f.right = xf86mode->HDisplay - 1;
+	mode->panel_plane_br.f.bottom = xf86mode->VDisplay - 1;
 
 	/* 0 means pulse high */
-	field(mode->panel_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
-	field(mode->panel_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
+	mode->panel_display_ctl.f.hsync = !(xf86mode->Flags & V_PHSYNC);
+	mode->panel_display_ctl.f.vsync = !(xf86mode->Flags & V_PVSYNC);
 
-	field(mode->panel_htotal, total) = xf86mode->HTotal - 1;
-	field(mode->panel_htotal, end) = xf86mode->HDisplay - 1;
+	mode->panel_htotal.f.total = xf86mode->HTotal - 1;
+	mode->panel_htotal.f.end = xf86mode->HDisplay - 1;
 
-	field(mode->panel_hsync, start) = xf86mode->HSyncStart;
-	field(mode->panel_hsync, width) = xf86mode->HSyncEnd -
+	mode->panel_hsync.f.start = xf86mode->HSyncStart;
+	mode->panel_hsync.f.width = xf86mode->HSyncEnd -
 	    xf86mode->HSyncStart;
 
-	field(mode->panel_vtotal, total) = xf86mode->VTotal - 1;
-	field(mode->panel_vtotal, end) = xf86mode->VDisplay - 1;
+	mode->panel_vtotal.f.total = xf86mode->VTotal - 1;
+	mode->panel_vtotal.f.end = xf86mode->VDisplay - 1;
 
-	field(mode->panel_vsync, start) = xf86mode->VSyncStart;
-	field(mode->panel_vsync, height) = xf86mode->VSyncEnd -
+	mode->panel_vsync.f.start = xf86mode->VSyncStart;
+	mode->panel_vsync.f.height = xf86mode->VSyncEnd -
 	    xf86mode->VSyncStart;
     }
     else {
@@ -408,52 +408,52 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	(void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
 			       FALSE,
 			       &x2_select, &x2_divider, &x2_shift);
-	field(mode->clock, v2_select) = x2_select;
-	field(mode->clock, v2_divider) = x2_divider;
-	field(mode->clock, v2_shift) = x2_shift;
+	mode->clock.f.v2_select = x2_select;
+	mode->clock.f.v2_divider = x2_divider;
+	mode->clock.f.v2_shift = x2_shift;
 #else
-	field(mode->clock, v2_select) = 1;	/* 336 */
-	field(mode->clock, v2_divider) = 0;	/*   1 */
-	field(mode->clock, v2_shift) = 0;	/*   0 */
+	mode->clock.f.v2_select = 1;	/* 336 */
+	mode->clock.f.v2_divider = 0;	/*   1 */
+	mode->clock.f.v2_shift = 0;	/*   0 */
 
-	field(mode->clock, v2_disable) = 0;
+	mode->clock.f.v2_disable = 0;
 #endif
 
-	field(mode->crt_display_ctl, format) =
+	mode->crt_display_ctl.f.format =
 	    pScrn->bitsPerPixel == 8 ? 0 :
 	    pScrn->bitsPerPixel == 16 ? 1 : 2;
 
 	/* 0: select panel - 1: select crt */
-	field(mode->crt_display_ctl, select) = 1;
-	field(mode->crt_display_ctl, enable) = 1;
+	mode->crt_display_ctl.f.select = 1;
+	mode->crt_display_ctl.f.enable = 1;
 
 	/* FIXME if non clone dual head, and secondary, need to
 	 * properly set crt fb address ... */
-	field(mode->crt_fb_address, address) = 0;
-	field(mode->crt_fb_address, mextern) = 0;	/* local memory */
-	field(mode->crt_fb_address, pending) = 0;	/* FIXME required? */
+	mode->crt_fb_address.f.address = 0;
+	mode->crt_fb_address.f.mextern = 0;	/* local memory */
+	mode->crt_fb_address.f.pending = 0;	/* FIXME required? */
 
 	/* >> 4 because of the "unused bits" that should be set to 0 */
 	/* FIXME this should be used for virtual size? */
-	field(mode->crt_fb_width, offset) = pSmi->Stride >> 4;
-	field(mode->crt_fb_width, width) = pSmi->Stride >> 4;
+	mode->crt_fb_width.f.offset = pSmi->Stride >> 4;
+	mode->crt_fb_width.f.width = pSmi->Stride >> 4;
 
 	/* 0 means pulse high */
-	field(mode->crt_display_ctl, hsync) = !(xf86mode->Flags & V_PHSYNC);
-	field(mode->crt_display_ctl, vsync) = !(xf86mode->Flags & V_PVSYNC);
+	mode->crt_display_ctl.f.hsync = !(xf86mode->Flags & V_PHSYNC);
+	mode->crt_display_ctl.f.vsync = !(xf86mode->Flags & V_PVSYNC);
 
-	field(mode->crt_htotal, total) = xf86mode->HTotal - 1;
-	field(mode->crt_htotal, end) = xf86mode->HDisplay - 1;
+	mode->crt_htotal.f.total = xf86mode->HTotal - 1;
+	mode->crt_htotal.f.end = xf86mode->HDisplay - 1;
 
-	field(mode->crt_hsync, start) = xf86mode->HSyncStart;
-	field(mode->crt_hsync, width) = xf86mode->HSyncEnd -
+	mode->crt_hsync.f.start = xf86mode->HSyncStart;
+	mode->crt_hsync.f.width = xf86mode->HSyncEnd -
 	    xf86mode->HSyncStart;
 
-	field(mode->crt_vtotal, total) = xf86mode->VTotal - 1;
-	field(mode->crt_vtotal, end) = xf86mode->VDisplay - 1;
+	mode->crt_vtotal.f.total = xf86mode->VTotal - 1;
+	mode->crt_vtotal.f.end = xf86mode->VDisplay - 1;
 
-	field(mode->crt_vsync, start) = xf86mode->HSyncStart;
-	field(mode->crt_vsync, height) = xf86mode->HSyncEnd -
+	mode->crt_vsync.f.start = xf86mode->HSyncStart;
+	mode->crt_vsync.f.height = xf86mode->HSyncEnd -
 	    xf86mode->HSyncStart;
     }
 
@@ -480,33 +480,33 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 
     clock.value = READ_SCR(pSmi, mode->current_clock);
 
-    field(clock, m_select) = field(mode->clock, m_select);
+    clock.f.m_select = mode->clock.f.m_select;
     pll = clock.value;
-    field(clock, m_divider) = field(mode->clock, m_divider);
-    field(clock, m_shift) = field(mode->clock, m_shift);
+    clock.f.m_divider = mode->clock.f.m_divider;
+    clock.f.m_shift = mode->clock.f.m_shift;
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    field(clock, m1_select) = field(mode->clock, m1_select);
+    clock.f.m1_select = mode->clock.f.m1_select;
     pll = clock.value;
-    field(clock, m1_divider) = field(mode->clock, m1_divider);
-    field(clock, m1_shift) = field(mode->clock, m1_shift);
+    clock.f.m1_divider = mode->clock.f.m1_divider;
+    clock.f.m1_shift = mode->clock.f.m1_shift;
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
     if (pSmi->lcd) {
-	field(clock, p2_select) = field(mode->clock, p2_select);
+	clock.f.p2_select = mode->clock.f.p2_select;
 	pll = clock.value;
-	field(clock, p2_divider) = field(mode->clock, p2_divider);
-	field(clock, p2_shift) = field(mode->clock, p2_shift);
-	field(clock, pll_select) = field(mode->clock, pll_select);
-	field(clock, p2_disable) = field(mode->clock, p2_disable);
+	clock.f.p2_divider = mode->clock.f.p2_divider;
+	clock.f.p2_shift = mode->clock.f.p2_shift;
+	clock.f.pll_select = mode->clock.f.pll_select;
+	clock.f.p2_disable = mode->clock.f.p2_disable;
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
     else {
-	field(clock, v2_select) = field(mode->clock, v2_select);
+	clock.f.v2_select = mode->clock.f.v2_select;
 	pll = clock.value;
-	field(clock, v2_divider) = field(mode->clock, v2_divider);
-	field(clock, v2_shift) = field(mode->clock, v2_shift);
-	field(clock, v2_disable) = field(mode->clock, v2_disable);
+	clock.f.v2_divider = mode->clock.f.v2_divider;
+	clock.f.v2_shift = mode->clock.f.v2_shift;
+	clock.f.v2_disable = mode->clock.f.v2_disable;
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
 
@@ -529,28 +529,28 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 
 	/* Power up sequence for panel */
-	field(mode->panel_display_ctl, vdd) = 1;
+	mode->panel_display_ctl.f.vdd = 1;
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 	SMI501_WaitVSync(pSmi, 4);
 
-	field(mode->panel_display_ctl, signal) = 1;
+	mode->panel_display_ctl.f.signal = 1;
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 	SMI501_WaitVSync(pSmi, 4);
 
-	field(mode->panel_display_ctl, bias) = 1;
+	mode->panel_display_ctl.f.bias = 1;
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 	SMI501_WaitVSync(pSmi, 4);
 
-	field(mode->panel_display_ctl, fp) = 1;
+	mode->panel_display_ctl.f.fp = 1;
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 	SMI501_WaitVSync(pSmi, 4);
 
 	/* FIXME: No dual head setup, and in this case, crt may
 	 * just be another panel */
 	/* crt clones panel */
-	field(mode->crt_display_ctl, enable) = 1;
+	mode->crt_display_ctl.f.enable = 1;
 	/* 0: select panel - 1: select crt */
-	field(mode->crt_display_ctl, select) = 0;
+	mode->crt_display_ctl.f.select = 0;
 	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
     }
     else {
@@ -572,9 +572,9 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     /* FIXME some other fields should also be set, otherwise, since
      * neither kernel nor driver change it, a reboot is required to
      * modify or reset to default */
-    field(mode->system_ctl, burst) = field(mode->system_ctl, burst_read) =
+    mode->system_ctl.f.burst = mode->system_ctl.f.burst_read =
 	pSmi->PCIBurst != FALSE;
-    field(mode->system_ctl, retry) = pSmi->PCIRetry != FALSE;
+    mode->system_ctl.f.retry = pSmi->PCIRetry != FALSE;
     WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
 }
 
