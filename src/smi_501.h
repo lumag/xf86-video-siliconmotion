@@ -32,6 +32,8 @@ authorization from the XFree86 Project and Silicon Motion.
 /*
  * Documentation:
  * ftp://ftp.siliconmotion.com.tw/databooks/SM501MSOCDatabook_VersionB_1.pdf
+ *
+ * ftp://ftp.siliconmotion.com.tw/databooks/SM502_MMCC_Databook_V1.00.pdf
  */
 
 #include <stdint.h>
@@ -48,86 +50,92 @@ authorization from the XFree86 Project and Silicon Motion.
 
 #define POWER0_CLOCK			0x000044
 #define POWER1_CLOCK			0x00004c
-/*  POWER MODE 0 CLOCK
- *  Read/Write MMIO_base + 0x000044
- *  Power-on Default 0x2A1A0A09
+/*	POWER MODE 0 CLOCK
+ *	Read/Write MMIO_base + 0x000044
+ *	Power-on Default 0x2A1A0A09
  *
- *  POWER MODE 1 CLOCK
- *  Read/Write MMIO_base + 0x00004C
- *  Power-on Default 0x2A1A0A09
+ *	POWER MODE 1 CLOCK
+ *	Read/Write MMIO_base + 0x00004C
+ *	Power-on Default 0x2A1A0A09
  *
- *  0:3     M2XCLK Frequency Divider
- *	    0000 / 1	    1000 / 3
- *	    0001 / 2	    1001 / 6
- *	    0010 / 4	    1010 / 12
- *	    0011 / 8	    1011 / 24
- *	    0100 / 16	    1100 / 48
- *	    0101 / 32	    1101 / 96
- *	    0110 / 64	    1110 / 192
- *	    0111 / 128	    1111 / 384
- *  4:4     M2XCLK Frequency Input Select.
- *	    0: 288 MHz.
- *	    1: 336 MHz/288 MHz/240 MHz/192 MHz
- *	       (see bits 5:4 in the Miscellaneous Timing register
- *		at offset 0x68 on page 2-42).
- *  8:11    MCLK Frequency Divider.
- *	    0000 / 1	    1000 / 3
- *	    0001 / 2	    1001 / 6
- *	    0010 / 4	    1010 / 12
- *	    0011 / 8	    1011 / 24
- *	    0100 / 16	    1100 / 48
- *	    0101 / 32	    1101 / 96
- *	    0110 / 64	    1110 / 192
- *	    0111 / 128	    1111 / 384
- *  12:12   MCLK Frequency Input Select.
- *	    0: 288 MHz.
- *	    1: 336 MHz/288 MHz/240 MHz/192 MHz
- *	       (see bits 5:4 in the Miscellaneous Timing register
- *		at offset 0x68 on page 2-42).
- * 16:19    V2XCLK DIVIDER
- *	    0000 / 1	    1000 / 3
- *	    0001 / 2	    1001 / 6
- *	    0010 / 4	    1010 / 12
- *	    0011 / 8	    1011 / 24
- *	    0100 / 16	    1100 / 48
- *	    0101 / 32	    1101 / 96
- *	    0110 / 64	    1110 / 192
- *	    0111 / 128	    1111 / 384
- * 20:20    V2XCLK SELECT (Crt clock)
- *	    0: 288 MHz
- *	    1: 336 MHz/288 MHz/240 MHz/192 MHz
- *	       (see bits 5:4 in the Miscellaneous Timing register
- *		at offset 0x68 on page 2-42).
- * 24:28    P2XCLK DIVIDER
- *	    00000 / 1	    01000 / 3	    10000 / 5
- *	    00001 / 2	    01001 / 6	    10001 / 10
- *	    00010 / 4	    01010 / 12	    10010 / 20
- *	    00011 / 8	    01011 / 24	    10011 / 40
- *	    00100 / 16	    01100 / 48	    10100 / 80
- *	    00101 / 32	    01101 / 96	    10101 / 160
- *	    00110 / 64	    01110 / 192     10110 / 320
- *	    00111 / 128     01111 / 384     10111 / 640
- *  29:29   P2XCLK SELECT (Panel clock)
- *	    0: 288 MHz
- *	    1: 336 MHz/288 MHz/240 MHz/192 MHz
- *	      (see bits 5:4 in the Miscellaneous Timing register
- *	       at offset 0x68 on page 2-42).
+ *	0:3	M1XCLK Frequency Divider
+ *		0000 / 1		1000 / 3
+ *		0001 / 2		1001 / 6
+ *		0010 / 4		1010 / 12
+ *		0011 / 8		1011 / 24
+ *		0100 / 16		1100 / 48
+ *		0101 / 32		1101 / 96
+ *		0110 / 64		1110 / 192
+ *		0111 / 128		1111 / 384
+ *	4:4	M2XCLK Frequency Input Select.
+ *		0: 288 MHz.
+ *		1: 336 MHz/288 MHz/240 MHz/192 MHz
+ *		   (see bits 5:4 in the Miscellaneous Timing register
+ *		    at offset 0x68 on page 2-42).
+ * 	8:11	MCLK Frequency Divider.
+ *		0000 / 1		1000 / 3
+ *		0001 / 2		1001 / 6
+ *		0010 / 4		1010 / 12
+ *		0011 / 8		1011 / 24
+ *		0100 / 16		1100 / 48
+ *		0101 / 32		1101 / 96
+ *		0110 / 64		1110 / 192
+ *		0111 / 128		1111 / 384
+ *	12:12	MCLK Frequency Input Select.
+ *		0: 288 MHz.
+ *		1: 336 MHz/288 MHz/240 MHz/192 MHz
+ *		   (see bits 5:4 in the Miscellaneous Timing register
+ *		    at offset 0x68 on page 2-42).
+ *	16:19	V2XCLK DIVIDER
+ *		0000 / 1		1000 / 3
+ *		0001 / 2		1001 / 6
+ *		0010 / 4		1010 / 12
+ *		0011 / 8		1011 / 24
+ *		0100 / 16		1100 / 48
+ *		0101 / 32		1101 / 96
+ *		0110 / 64		1110 / 192
+ *		0111 / 128		1111 / 384
+ *	20:20	V2XCLK SELECT (Crt clock)
+ *		0: 288 MHz
+ *		1: 336 MHz/288 MHz/240 MHz/192 MHz
+ *		   (see bits 5:4 in the Miscellaneous Timing register
+ *		    at offset 0x68 on page 2-42).
+ *	21:21	Disable 2X V2XCLK.
+ *		0: Normal.
+ *		1: No need to feed 2X VCLK.
+ *	24:28	P2XCLK DIVIDER
+ *		00000 / 1	01000 / 3	10000 / 5
+ *		00001 / 2	01001 / 6	10001 / 10
+ *		00010 / 4	01010 / 12	10010 / 20
+ *		00011 / 8	01011 / 24	10011 / 40
+ *		00100 / 16	01100 / 48	10100 / 80
+ *		00101 / 32	01101 / 96	10101 / 160
+ *		00110 / 64	01110 / 192	10110 / 320
+ *		00111 / 128	01111 / 384	10111 / 640
+ *	29:30	P2XCLK SELECT (Panel clock)
+ *		00: 288 MHz
+ *		01: 336 MHz/288 MHz/240 MHz/192 MHz
+ *		  (see bits 5:4 in the Miscellaneous Timing register
+ *		   at offset 0x68 on page 2-42).
+ *	31:31	Disable 2X P2XCLK.
+ *		0: Normal.
+ *		1: 1X clock for P2CLK.
  *
- * Remarks:
- *  Table 2-2: Programmable Clock Branches
- *  Clock Description
- *  P2XCLK  2X clock source for the Panel interface timing.
- *	    The actual rate at which the pixels are shifted
- *	    out is P2XCLK divided by two.
- *  V2XCLK  2X clock source for the CRT interface timing.
- *	    The actual rate at which the pixels are shifted
- *	    out is V2XCLK divided by two
+ *	Remarks:
+ *	Table 2-2: Programmable Clock Branches
+ *	Clock Description
+ *	P2XCLK  2X clock source for the Panel interface timing.
+ *		The actual rate at which the pixels are shifted
+ *		out is P2XCLK divided by two.
+ *	V2XCLK	2X clock source for the CRT interface timing.
+ *		The actual rate at which the pixels are shifted
+ *		out is V2XCLK divided by two
  */
 typedef union _MSOCClockRec {
     struct {
-	int32_t 	m2_shift	: bitfield( 0,  2);
-	int32_t 	m2_divider	: bitfield( 3,  3);
-	int32_t		m2_select	: bitfield( 4,  4);
+	int32_t 	m1_shift	: bitfield( 0,  2);
+	int32_t 	m1_divider	: bitfield( 3,  3);
+	int32_t		m1_select	: bitfield( 4,  4);
 	int32_t 	u0		: bitfield( 5,  7);
 	int32_t 	m_shift		: bitfield( 8, 10);
 	int32_t 	m_divider	: bitfield(11, 11);
@@ -136,10 +144,13 @@ typedef union _MSOCClockRec {
 	int32_t 	v2_shift	: bitfield(16, 18);
 	int32_t 	v2_divider	: bitfield(19, 19);
 	int32_t 	v2_select	: bitfield(20, 20);
-	int32_t 	u2		: bitfield(21, 23);
+	int32_t 	v2_disable	: bitfield(21, 21);
+	int32_t 	u2		: bitfield(22, 23);
 	int32_t 	p2_shift	: bitfield(24, 26);
 	int32_t 	p2_divider	: bitfield(27, 28);
 	int32_t 	p2_select	: bitfield(29, 29);
+	int32_t		pll_select	: bitfield(30, 30);
+	int32_t 	p2_disable	: bitfield(31, 31);
     } detail;
     int32_t		value;
 } MSOCClockRec, *MSOCClockPtr;
@@ -290,7 +301,7 @@ typedef struct _MSOCRegRec {
     } power_ctl;
 
 
-#define TIMING_CONTROL			0x000068
+#define TIMING_CTL			0x000068
     /*	Miscellaneous Control
      *	Read/Write MMIO_base + 0x000068
      *	Power-on Default 0x00000000
@@ -307,7 +318,38 @@ typedef struct _MSOCRegRec {
 	    int32_t	pll		: bitfield( 4,  5);
 	} detail;
 	int32_t	value;
-    } timing_control;
+    } timing_ctl;
+
+#define PLL_CTL				0x000074
+    /* FIXME M, N and K (bit 15) need to be set to program SM502 modes,
+     * but a more complete description is required for what should be
+     * programmed on those fields.
+     */
+    /*	Programmable PLL Control
+     *	Read/Write MMIO_base + 0x000074
+     *	Power-on Default 0x000000FF
+     *	0:7	PLL M Value
+     *	8:14	PLL N Value
+     *	15:15	PLL Output Divided by 2.
+     *		0: Disable.
+     *		1: Enable.
+     *	16:16	PLL Clock Select.
+     *		0: Crystal input.
+     *		1: Test clock input.
+     *	17:17	PLL Power Down.
+     *		0: Power down.
+     *		1: Power on.
+     */
+    union {
+	struct {
+	    int32_t	m		: bitfield( 0,  7);
+	    int32_t	n		: bitfield( 8, 14);
+	    int32_t	divider		: bitfield(15, 15);
+	    int32_t	select		: bitfield(16, 16);
+	    int32_t	power		: bitfield(17, 17);
+	} detail;
+	int32_t	value;
+    } pll_ctl;
 
 #define PANEL_DISPLAY_CTL		0x080000
     /*	PANEL DISPLAY CONTROL

@@ -172,7 +172,8 @@ SMI501_Save(ScrnInfoPtr pScrn)
     save->clock.value = READ_SCR(pSmi, save->current_clock);
 
     /* FIXME Never changed */
-    save->power_ctl.value = READ_SCR(pSmi, TIMING_CONTROL);
+    save->timing_ctl.value = READ_SCR(pSmi, TIMING_CTL);
+    save->pll_ctl.value = READ_SCR(pSmi, PLL_CTL);
 
     save->sleep_gate.value = READ_SCR(pSmi, SLEEP_GATE);
 
@@ -300,31 +301,31 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     field(mode->clock, m_divider) = 1;
     field(mode->clock, m_shift) = 0;
 
-    /* FIXME probably should not "touch" m2clk. A value other then 112Mhz
+    /* FIXME probably should not "touch" m1clk. A value other then 112Mhz
      * will instant lock on my test prototype, "or" maybe it just means
-     * that m2clk value must be equal to mclk value? (and mclk must be
+     * that m1clk value must be equal to mclk value? (and mclk must be
      * set first!?) */
     switch (pSmi->MCLK) {
 	case 168000:	    /* 336/1/1 */
-	    field(mode->clock, m2_select) = 1;
-	    field(mode->clock, m2_divider) = 0;
-	    field(mode->clock, m2_shift) = 1;
+	    field(mode->clock, m1_select) = 1;
+	    field(mode->clock, m1_divider) = 0;
+	    field(mode->clock, m1_shift) = 1;
 	    break;
 	case 96000:	    /* 288/3/0 */
-	    field(mode->clock, m2_select) = 0;
-	    field(mode->clock, m2_divider) = 1;
-	    field(mode->clock, m2_shift) = 0;
+	    field(mode->clock, m1_select) = 0;
+	    field(mode->clock, m1_divider) = 1;
+	    field(mode->clock, m1_shift) = 0;
 	    break;
 	case 144000:	    /* 288/1/1 */
-	    field(mode->clock, m2_select) = 0;
-	    field(mode->clock, m2_divider) = 0;
-	    field(mode->clock, m2_shift) = 1;
+	    field(mode->clock, m1_select) = 0;
+	    field(mode->clock, m1_divider) = 0;
+	    field(mode->clock, m1_shift) = 1;
 	    break;
 	case 112000:	    /* 336/3/0 */
 	default:
-	    field(mode->clock, m2_select) = 1;
-	    field(mode->clock, m2_divider) = 1;
-	    field(mode->clock, m2_shift) = 0;
+	    field(mode->clock, m1_select) = 1;
+	    field(mode->clock, m1_divider) = 1;
+	    field(mode->clock, m1_shift) = 0;
 	    break;
     }
 
@@ -340,6 +341,18 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	field(mode->clock, p2_select) = 1;	/* 336 */
 	field(mode->clock, p2_divider) = 0;	/*   1 */
 	field(mode->clock, p2_shift) = 0;	/*   0 */
+
+	/* FIXME <<This the magic for the GDIUM>>
+	 * But this is not yet fully correct as it is dependant on boot
+	 * defaults elsewhere (probably PLL_CTL), and also, in the smi
+	 * sample source it checks, and oly sets pll_select if hw_rev >= 0xC0.
+	 * This field is not documented, and actually, the documentation
+	 * is not fully accurate as it says bits 29:30 are used for p2_select,
+	 * and the documentation for PLL_CTL is almost nil, i.e:
+	 * <<0:7 M value; 8:14 N Value>>, but what is M and what is N?
+	 */
+	field(mode->clock, pll_select) = 1;
+	field(mode->clock, p2_disable) = 1;
 #endif
 
 	field(mode->panel_display_ctl, format) =
@@ -402,6 +415,8 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	field(mode->clock, v2_select) = 1;	/* 336 */
 	field(mode->clock, v2_divider) = 0;	/*   1 */
 	field(mode->clock, v2_shift) = 0;	/*   0 */
+
+	field(mode->clock, v2_disable) = 0;
 #endif
 
 	field(mode->crt_display_ctl, format) =
@@ -471,10 +486,10 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     field(clock, m_shift) = field(mode->clock, m_shift);
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    field(clock, m2_select) = field(mode->clock, m2_select);
+    field(clock, m1_select) = field(mode->clock, m1_select);
     pll = clock.value;
-    field(clock, m2_divider) = field(mode->clock, m2_divider);
-    field(clock, m2_shift) = field(mode->clock, m2_shift);
+    field(clock, m1_divider) = field(mode->clock, m1_divider);
+    field(clock, m1_shift) = field(mode->clock, m1_shift);
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
     if (pSmi->lcd) {
@@ -482,6 +497,8 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 	pll = clock.value;
 	field(clock, p2_divider) = field(mode->clock, p2_divider);
 	field(clock, p2_shift) = field(mode->clock, p2_shift);
+	field(clock, pll_select) = field(mode->clock, pll_select);
+	field(clock, p2_disable) = field(mode->clock, p2_disable);
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
     else {
@@ -489,6 +506,7 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 	pll = clock.value;
 	field(clock, v2_divider) = field(mode->clock, v2_divider);
 	field(clock, v2_shift) = field(mode->clock, v2_shift);
+	field(clock, v2_disable) = field(mode->clock, v2_disable);
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
 
