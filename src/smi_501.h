@@ -143,13 +143,18 @@ typedef union _MSOCClockRec {
 	int32_t 	v2_shift	: bitfield(16, 18);
 	int32_t 	v2_divider	: bitfield(19, 19);
 	int32_t 	v2_select	: bitfield(20, 20);
-	int32_t 	v2_disable	: bitfield(21, 21);
+	int32_t 	v2_1xclck	: bitfield(21, 21);
 	int32_t 	u2		: bitfield(22, 23);
 	int32_t 	p2_shift	: bitfield(24, 26);
 	int32_t 	p2_divider	: bitfield(27, 28);
 	int32_t 	p2_select	: bitfield(29, 29);
+	/* If pll_select is set, an alternate clock selection, available
+	 * only in the 502 (using PLL_CTL, MMIO 0x074), will be used,
+	 * and p2_* values will be ignored. */
 	int32_t		pll_select	: bitfield(30, 30);
-	int32_t 	p2_disable	: bitfield(31, 31);
+	/* If p2_1xclck is set, it means use 1x clock, otherwise
+	 * 2x clocks must be specified in p2_{shift,divider,select}. */
+	int32_t 	p2_1xclck	: bitfield(31, 31);
     } f;
     int32_t		value;
 } MSOCClockRec, *MSOCClockPtr;
@@ -300,6 +305,23 @@ typedef struct _MSOCRegRec {
     } power_ctl;
 
 
+#define DEVICE_ID			0x000060
+    /*	DEVICE ID
+     *	Read/Write MMIO_base + 0x000060
+     *	Power-on Default 0x050100A0
+     *
+     *	0:7	Revision Identification: (0xC0 for the 502).
+     *	16:31	DeviceId Device Identification: 0x0501.
+     */
+    union {
+	struct {
+	    int32_t	revision	: bitfield( 0,  7);
+	    int32_t	u0		: bitfield( 8, 15);
+	    int32_t	ident		: bitfield(16, 31);
+	} f;
+	int32_t		value;
+    } device_id;
+
 #define TIMING_CTL			0x000068
     /*	Miscellaneous Control
      *	Read/Write MMIO_base + 0x000068
@@ -320,10 +342,6 @@ typedef struct _MSOCRegRec {
     } timing_ctl;
 
 #define PLL_CTL				0x000074
-    /* FIXME M, N and K (bit 15) need to be set to program SM502 modes,
-     * but a more complete description is required for what should be
-     * programmed on those fields.
-     */
     /*	Programmable PLL Control
      *	Read/Write MMIO_base + 0x000074
      *	Power-on Default 0x000000FF
@@ -338,6 +356,13 @@ typedef struct _MSOCRegRec {
      *	17:17	PLL Power Down.
      *		0: Power down.
      *		1: Power on.
+     *
+     *	The formula is:
+     *		Requested Pixel Clock = Input Frequency * M / N
+     *	Input Frequency is the input crystal frequency value (24 MHz in
+     *	the SMI VGX Demo Board). N must be a value between 2 and 24.
+     *	M can be any (7 bits) value, and a loop testing all possible N
+     *	values should be the best approach to calculate it's value.
      */
     union {
 	struct {

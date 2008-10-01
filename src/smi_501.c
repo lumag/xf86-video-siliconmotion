@@ -49,19 +49,27 @@ authorization from The XFree86 Project or Silicon Motion.
 #undef VERBLEV
 #define VERBLEV		1
 
-#undef CALC_CLOCK
+
+/*
+ * Prototypes
+ */
 static void SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 static char *format_integer_base2(int32_t word);
 
-#ifdef CALC_CLOCK
-static int32_t SMI501_FindClock(double clock, Bool lcd, int32_t *x2_select,
+static double SMI501_FindClock(double clock, int max_divider,
+				int32_t *x2_1xclck,
+				int32_t *x2_select,
 				int32_t *x2_divider, int32_t *x2_shift);
-#endif
+static double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n);
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
 			    int32_t pll, int32_t value);
 static void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);
 
+
+/*
+ * Implemementation
+ */
 Bool
 SMI501_EnterVT(int scrnIndex, int flags)
 {
@@ -173,8 +181,9 @@ SMI501_Save(ScrnInfoPtr pScrn)
 
     /* FIXME Never changed */
     save->timing_ctl.value = READ_SCR(pSmi, TIMING_CTL);
-    save->pll_ctl.value = READ_SCR(pSmi, PLL_CTL);
 
+    save->pll_ctl.value = READ_SCR(pSmi, PLL_CTL);
+    save->device_id.value = READ_SCR(pSmi, DEVICE_ID);
     save->sleep_gate.value = READ_SCR(pSmi, SLEEP_GATE);
 
     save->panel_display_ctl.value = READ_SCR(pSmi, PANEL_DISPLAY_CTL);
@@ -230,34 +239,14 @@ SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
     }
 }
 
-#ifdef CALC_CLOCK
-static double
-xf86ModeBandwidth(DisplayModePtr mode, int depth)
-{
-    float a_active, a_total, active_percent, pixels_per_second;
-    int bytes_per_pixel = (depth + 7) / 8;
-
-    if (!mode->HTotal || !mode->VTotal || !mode->Clock)
-	return 0.0;
-
-    a_active = mode->HDisplay * mode->VDisplay;
-    a_total = mode->HTotal * mode->VTotal;
-    active_percent = a_active / a_total;
-    pixels_per_second = active_percent * mode->Clock * 1000.0;
-
-    return ((double)(pixels_per_second * bytes_per_pixel) / 1000.0);
-}
-#endif
-
 Bool
 SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 {
     MSOCRegPtr	save;
     MSOCRegPtr	mode;
     SMIPtr	pSmi = SMIPTR(pScrn);
-#ifdef CALC_CLOCK
-    int32_t	x2_select, x2_divider, x2_shift;
-#endif
+    double	p2_diff, pll_diff;
+    int32_t	x2_select, x2_divider, x2_shift, x2_1xclck, p2_pll;
 
     save = pSmi->save;
     mode = pSmi->mode;
@@ -330,30 +319,49 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     }
 
     if (pSmi->lcd) {
-#ifdef CALC_CLOCK
-	(void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
-			       TRUE,
-			       &x2_select, &x2_divider, &x2_shift);
+	/* P2CLK can have dividers 1, 3 and 5 */
+	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		       "Clock request %5.2f (max_divider %d)\n",
+		       (double)xf86mode->Clock, 5);
+	p2_diff = SMI501_FindClock(xf86mode->Clock, 5, &x2_1xclck,
+				   &x2_select, &x2_divider, &x2_shift);
 	mode->clock.f.p2_select = x2_select;
 	mode->clock.f.p2_divider = x2_divider;
 	mode->clock.f.p2_shift = x2_shift;
-#else
-	mode->clock.f.p2_select = 1;	/* 336 */
-	mode->clock.f.p2_divider = 0;	/*   1 */
-	mode->clock.f.p2_shift = 0;	/*   0 */
+	mode->clock.f.p2_1xclck = x2_1xclck;
 
-	/* FIXME <<This the magic for the GDIUM>>
-	 * But this is not yet fully correct as it is dependant on boot
-	 * defaults elsewhere (probably PLL_CTL), and also, in the smi
-	 * sample source it checks, and oly sets pll_select if hw_rev >= 0xC0.
-	 * This field is not documented, and actually, the documentation
-	 * is not fully accurate as it says bits 29:30 are used for p2_select,
-	 * and the documentation for PLL_CTL is almost nil, i.e:
-	 * <<0:7 M value; 8:14 N Value>>, but what is M and what is N?
-	 */
-	mode->clock.f.pll_select = 1;
-	mode->clock.f.p2_disable = 1;
-#endif
+	/* Check if it is a SMI 502 */
+	/* FIXME May need to add a Boolean option here, (or use extra
+	 * xorg.conf options?) to force it to not use 502 mode set. */
+	if ((uint32_t)mode->device_id.f.revision >= 0xc0) {
+	    int32_t	m, n;
+
+	    pll_diff = SMI501_FindPLLClock(xf86mode->Clock, &m, &n);
+	    if (pll_diff < p2_diff) {
+
+		/* FIXME Need to clarify. This is required for the GDIUM,
+		 * that should have set it to 0 earlier, but is there some
+		 * rule to choose the value? */
+		mode->clock.f.p2_1xclck = 1;
+
+		mode->clock.f.pll_select = 1;
+		mode->pll_ctl.f.m = m;
+		mode->pll_ctl.f.n = n;
+
+		/* 0: Crystal input	1: Test clock input */
+		mode->pll_ctl.f.select = 0;
+
+		/* FIXME Divider means (redundant) enable p2xxx or does
+		 * it mean it can also calculate with 12MHz output, or
+		 * something else? */
+		mode->pll_ctl.f.divider = 0;
+		mode->pll_ctl.f.power = 1;
+	    }
+	    else
+		mode->clock.f.pll_select = 0;
+	}
+	else
+	    mode->clock.f.pll_select = 0;
 
 	mode->panel_display_ctl.f.format =
 	    pScrn->bitsPerPixel == 8 ? 0 :
@@ -404,20 +412,16 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	    xf86mode->VSyncStart;
     }
     else {
-#ifdef CALC_CLOCK
-	(void)SMI501_FindClock(xf86ModeBandwidth(xf86mode, pScrn->depth),
-			       FALSE,
+	/* V2CLK can have dividers 1 and 3 */
+	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		       "Clock request %5.2f (max_divider %d)\n",
+		       (double)xf86mode->Clock, 3);
+	(void)SMI501_FindClock(xf86mode->Clock, 3, &x2_1xclck,
 			       &x2_select, &x2_divider, &x2_shift);
 	mode->clock.f.v2_select = x2_select;
 	mode->clock.f.v2_divider = x2_divider;
 	mode->clock.f.v2_shift = x2_shift;
-#else
-	mode->clock.f.v2_select = 1;	/* 336 */
-	mode->clock.f.v2_divider = 0;	/*   1 */
-	mode->clock.f.v2_shift = 0;	/*   0 */
-
-	mode->clock.f.v2_disable = 0;
-#endif
+	mode->clock.f.v2_1xclck = x2_1xclck;
 
 	mode->crt_display_ctl.f.format =
 	    pScrn->bitsPerPixel == 8 ? 0 :
@@ -493,12 +497,16 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
     if (pSmi->lcd) {
+	/* Alternate pll_select is only available for the SMI 502,
+	 * and the bit should be only set in that case. */
+	if (mode->clock.f.pll_select)
+	    WRITE_SCR(pSmi, PLL_CTL, mode->pll_ctl.value);
 	clock.f.p2_select = mode->clock.f.p2_select;
 	pll = clock.value;
 	clock.f.p2_divider = mode->clock.f.p2_divider;
 	clock.f.p2_shift = mode->clock.f.p2_shift;
 	clock.f.pll_select = mode->clock.f.pll_select;
-	clock.f.p2_disable = mode->clock.f.p2_disable;
+	clock.f.p2_1xclck = mode->clock.f.p2_1xclck;
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
     else {
@@ -506,7 +514,7 @@ SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 	pll = clock.value;
 	clock.f.v2_divider = mode->clock.f.v2_divider;
 	clock.f.v2_shift = mode->clock.f.v2_shift;
-	clock.f.v2_disable = mode->clock.f.v2_disable;
+	clock.f.v2_1xclck = mode->clock.f.v2_1xclck;
 	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
     }
 
@@ -609,41 +617,77 @@ format_integer_base2(int32_t word)
     return (buffer);
 }
 
-#ifdef CALC_CLOCK
-static int32_t
-SMI501_FindClock(double clock, Bool lcd,
+static double
+SMI501_FindClock(double clock, int32_t max_divider, int32_t *x2_1xclck,
 		 int32_t *x2_select, int32_t *x2_divider, int32_t *x2_shift)
 {
-    double	mclk;
-    int32_t	diff, best, divider, shift;
+    double	diff, best, mclk;
+    int32_t	multiplier, divider, shift, xclck;
+
+    /* The Crystal input frequency is 24Mhz, and can have be multiplied
+     * by 12 or 14 (actually, there are other values, see TIMING_CTL,
+     * MMIO 0x068) */
 
     /* Find clock best matching mode */
     best = 0x7fffffff;
-    for (mclk = 288000.0; mclk <= 336000.0; mclk += 48000.0) {
-	for (divider = 1; divider <= (lcd ? 5 : 3); divider += 2) {
-	    /* Start at 1 to match division by 2 */
-	    for (shift = 1; shift <= 8; shift++) {
-		/* Shift starts at 1 to add a division by two, matching
-		 * description of P2XCLK and V2XCLK. */
-		diff = (mclk / (divider << shift)) - clock;
-		if (diff < 0)
-		    diff = -diff;
-		if (diff < best) {
-		    *x2_shift = shift - 1;
-		    *x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
+    for (multiplier = 12, mclk  = multiplier * 24 * 1000.0;
+	 mclk <= 14 * 24 * 1000.0;
+	 multiplier += 2, mclk  = multiplier * 24 * 1000.0) {
+	for (divider = 1; divider <= max_divider; divider += 2) {
+	    for (shift = 0; shift < 8; shift++) {
+		for (xclck = 0; xclck <= 1; xclck++) {
+		    diff = (mclk / (divider << shift << xclck)) - clock;
+		    if (fabs(diff) < best) {
+			*x2_shift = shift;
+			*x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
+			*x2_1xclck = xclck == 0;
 
-		    /* Remember best diff */
-		    best = diff;
+			/* Remember best diff */
+			best = fabs(diff);
+		    }
 		}
 	    }
 	}
     }
 
-    *x2_select = mclk == 288000.0 ? 0 : 1;
+    *x2_select = mclk == 12 * 24 * 1000.0 ? 0 : 1;
 
-    return (diff);
+    xf86ErrorFVerb(VERBLEV,
+		   "\tMatching clock %5.2f, diff %5.2f (%d/%d/%d/%d)\n",
+		   ((*x2_select ? 14 : 12) * 24 * 1000.0) /
+		   ((*x2_divider == 0 ? 1 : *x2_divider == 1 ? 3 : 5) <<
+		    *x2_shift << (*x2_1xclck ? 0 : 1)),
+		   best, *x2_shift, *x2_divider, *x2_select, *x2_1xclck);
+
+    return (best);
 }
-#endif
+
+static double
+SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n)
+{
+    int32_t	M, N;
+    double	diff, best;
+
+    best = 0x7fffffff;
+    for (N = 2; N <= 24; N++) {
+	M = clock * N / 24 / 1000.0;
+	diff = clock - (24 * 1000.0 * M / N);
+	/* Paranoia check for 7 bits range */
+	if (M >= 0 && M < 128 && fabs(diff) < best) {
+	    *m = M;
+	    *n = N;
+
+	    /* Remember best diff */
+	    best = fabs(diff);
+	}
+    }
+
+    xf86ErrorFVerb(VERBLEV,
+		   "\tMatching alternate clock %5.2f, diff %5.2f (%d/%d)\n",
+		   24 * 1000.0 * *m / *n, best, *m, *n);
+
+    return (best);
+}
 
 static void
 SMI501_PrintRegs(ScrnInfoPtr pScrn)
