@@ -111,11 +111,15 @@ authorization from the XFree86 Project and Silicon Motion.
  *		00101 / 32	01101 / 96	10101 / 160
  *		00110 / 64	01110 / 192	10110 / 320
  *		00111 / 128	01111 / 384	10111 / 640
- *	29:30	P2XCLK SELECT (Panel clock)
+ *	29:29	P2XCLK SELECT (Panel clock)
  *		00: 288 MHz
  *		01: 336 MHz/288 MHz/240 MHz/192 MHz
  *		  (see bits 5:4 in the Miscellaneous Timing register
  *		   at offset 0x68 on page 2-42).
+ *	30:30	PLL SELECT
+ *		0: Use standard p2_xxx clock
+ *		1: Use PLL_CONTROL (MMIO 0x074) for clock setting.
+ *		   Available only for the panel.
  *	31:31	Disable 2X P2XCLK.
  *		0: Normal.
  *		1: 1X clock for P2CLK.

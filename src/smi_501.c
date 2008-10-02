@@ -30,18 +30,10 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "config.h"
 #endif
 
-#include "xf86Resources.h"
-#include "xf86RAC.h"
-#include "xf86DDC.h"
-#include "xf86int10.h"
-#include "vbe.h"
-#include "shadowfb.h"
-
 #include "smi.h"
 #include "smi_501.h"
 #include "regsmi.h"
 
-#include "globals.h"
 #define DPMS_SERVER
 #include <X11/extensions/dpms.h>
 
@@ -60,7 +52,8 @@ static double SMI501_FindClock(double clock, int max_divider,
 				int32_t *x2_1xclck,
 				int32_t *x2_select,
 				int32_t *x2_divider, int32_t *x2_shift);
-static double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n);
+static double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n,
+				  int32_t *xclck);
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
 			    int32_t pll, int32_t value);
@@ -334,27 +327,27 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	/* FIXME May need to add a Boolean option here, (or use extra
 	 * xorg.conf options?) to force it to not use 502 mode set. */
 	if ((uint32_t)mode->device_id.f.revision >= 0xc0) {
-	    int32_t	m, n;
+	    int32_t	m, n, xclck;
 
-	    pll_diff = SMI501_FindPLLClock(xf86mode->Clock, &m, &n);
+	    pll_diff = SMI501_FindPLLClock(xf86mode->Clock, &m, &n, &xclck);
 	    if (pll_diff < p2_diff) {
 
 		/* FIXME Need to clarify. This is required for the GDIUM,
-		 * that should have set it to 0 earlier, but is there some
-		 * rule to choose the value? */
+		 * but based on the sample smi source code, it is not
+		 * always required to set this field to 1. */
 		mode->clock.f.p2_1xclck = 1;
 
 		mode->clock.f.pll_select = 1;
 		mode->pll_ctl.f.m = m;
 		mode->pll_ctl.f.n = n;
 
-		/* 0: Crystal input	1: Test clock input */
+		/* 0: Crystal input
+		 * 1: Test clock input */
 		mode->pll_ctl.f.select = 0;
 
-		/* FIXME Divider means (redundant) enable p2xxx or does
-		 * it mean it can also calculate with 12MHz output, or
-		 * something else? */
-		mode->pll_ctl.f.divider = 0;
+		/* 0: pll output divided by 1
+		 * 1: pll output divided by 2 */
+		mode->pll_ctl.f.divider = xclck != 1;
 		mode->pll_ctl.f.power = 1;
 	    }
 	    else
@@ -635,6 +628,7 @@ SMI501_FindClock(double clock, int32_t max_divider, int32_t *x2_1xclck,
 	 multiplier += 2, mclk  = multiplier * 24 * 1000.0) {
 	for (divider = 1; divider <= max_divider; divider += 2) {
 	    for (shift = 0; shift < 8; shift++) {
+		/* FIXME is divider 1 available for cards older then 502? */
 		for (xclck = 0; xclck <= 1; xclck++) {
 		    diff = (mclk / (divider << shift << xclck)) - clock;
 		    if (fabs(diff) < best) {
@@ -663,28 +657,49 @@ SMI501_FindClock(double clock, int32_t max_divider, int32_t *x2_1xclck,
 }
 
 static double
-SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n)
+SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
 {
-    int32_t	M, N;
+    int32_t	M, N, K;
     double	diff, best;
+
+    /*   This method, available only on the 502 is intended to cover the
+     * disadvantage of the other method where certain modes cannot be
+     * displayed correctly due to the big difference on the requested
+     * pixel clock, with the actual pixel clock that can be achieved by
+     * those divisions. In this method, N can be any integer between 2
+     * and 24, M can be any positive, 7 bits integer, and K is either 1
+     * or 2.
+     *	FIXME Needs a better description for K?
+     *   To calculate the programmable PLL, the following formula is
+     * used:
+     *
+     *	Requested Pixel Clock = Input Frequency * M / N
+     *
+     *   Input Frequency is the crystal input frequency value (24 MHz in
+     * the SMI VGX Demo Board).
+     */
 
     best = 0x7fffffff;
     for (N = 2; N <= 24; N++) {
-	M = clock * N / 24 / 1000.0;
-	diff = clock - (24 * 1000.0 * M / N);
-	/* Paranoia check for 7 bits range */
-	if (M >= 0 && M < 128 && fabs(diff) < best) {
-	    *m = M;
-	    *n = N;
+	for (K = 1; K <= 2; K++) {
+	    M = (clock * K) * N / 24 / 1000.0;
+	    diff = (24 * 1000.0 * M / N) - (clock * K);
+	    /* Ensure M is larger then 0 and fits in 7 bits */
+	    if (M > 0 && M < 0x80 && fabs(diff) < best) {
+		*m = M;
+		*n = N;
+		*xclck = K == 1;
 
-	    /* Remember best diff */
-	    best = fabs(diff);
+		/* Remember best diff */
+		best = fabs(diff);
+	    }
 	}
     }
 
     xf86ErrorFVerb(VERBLEV,
-		   "\tMatching alternate clock %5.2f, diff %5.2f (%d/%d)\n",
-		   24 * 1000.0 * *m / *n, best, *m, *n);
+		   "\tMatching alternate clock %5.2f, diff %5.2f (%d/%d/%d)\n",
+		   24 * 1000.0 * *m / *n / (*xclck ? 1 : 2), best,
+		   *m, *n, *xclck);
 
     return (best);
 }
