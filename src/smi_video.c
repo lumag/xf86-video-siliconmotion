@@ -1288,9 +1288,11 @@ SMI_PutVideo(
     width = (x2 - x1) >> 16;
     height = (y2 - y1) >> 16;
 
-    if (!IS_MSOC(pSmi)) {
-	OUT_SEQ(pSmi, 0x21, IN_SEQ(pSmi, 0x21) & ~0x04);
-    }
+    if (!IS_MSOC(pSmi))
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+		      0x21,
+		      VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+				   0x21) & ~0x04);
     WRITE_VPR(pSmi, 0x54, READ_VPR(pSmi, 0x54) | 0x00200000);
 #if 0
 	SMI_WaitForSync(pScrn);
@@ -1387,7 +1389,6 @@ SMI_StopVideo(
 		WRITE_CPR(pSmi, 0x00, READ_CPR(pSmi, 0x00) & ~0x00000001);
 		WRITE_VPR(pSmi, 0x54, READ_VPR(pSmi, 0x54) & ~0x00F00000);
 	    }
-/* #864		OUT_SEQ(pSmi, 0x21, IN_SEQ(pSmi, 0x21) | 0x04); */
 #endif
 	}
         if (pPort->video_memory != NULL) {

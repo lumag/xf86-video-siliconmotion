@@ -101,11 +101,6 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
     }
 }
 
-#define OUT_SEQ(pSmi, index, data)	\
-	VGAOUT8_INDEX((pSmi), VGA_SEQ_INDEX, VGA_SEQ_DATA, (index), (data))
-#define IN_SEQ(pSmi, index)			\
-	VGAIN8_INDEX((pSmi), VGA_SEQ_INDEX, VGA_SEQ_DATA, (index))
-
 #define WRITE_DPR(pSmi, dpr, data)					\
     do {								\
 	MMIO_OUT32(pSmi->DPRBase, dpr, data);				\
