@@ -312,7 +312,7 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
     }
 
     if (pSmi->lcd) {
-	/* P2CLK can have dividers 1, 3 and 5 */
+	/* P2CLK have dividers 1, 3 and 5 */
 	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 		       "Clock request %5.2f (max_divider %d)\n",
 		       (double)xf86mode->Clock, 5);
@@ -405,7 +405,7 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	    xf86mode->VSyncStart;
     }
     else {
-	/* V2CLK can have dividers 1 and 3 */
+	/* V2CLK have dividers 1 and 3 */
 	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 		       "Clock request %5.2f (max_divider %d)\n",
 		       (double)xf86mode->Clock, 3);
