@@ -2427,19 +2427,17 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
 	pSmi->saveBufferSize = pSmi->ShadowWidthBytes * pSmi->ShadowHeight;
 	pSmi->FBReserved -= pSmi->saveBufferSize;
 	pSmi->FBReserved &= ~0x15;
-	WRITE_VPR(pSmi, IS_MSOC(pSmi) && pSmi->IsSecondary ?
-		  DCR204 : DCR0C, (pSmi->FBOffset = pSmi->FBReserved) >> 3);
 
-	if (pSmi->Chipset == SMI_COUGAR3DR) {
+	if (!IS_MSOC(pSmi))
+	    WRITE_VPR(pSmi, 0x0c, (pSmi->FBOffset = pSmi->FBReserved) >> 3);
+
+	if (pSmi->Chipset == SMI_COUGAR3DR)
 	    WRITE_FPR(pSmi, FPR0C, (pSmi->FBOffset = pSmi->FBReserved) >> 3);
-	}
 	else if (IS_MSOC(pSmi)) {
-	    if (pSmi->IsSecondary) {
-		WRITE_DCR(pSmi, DCR204, pSmi->FBOffset);
-	    }
-	    else {
-		WRITE_DCR(pSmi, DCR0C, pSmi->FBOffset);
-	    }
+	    if (pSmi->IsSecondary)
+		WRITE_DCR(pSmi, 0x0204, pSmi->FBOffset);
+	    else
+		WRITE_DCR(pSmi, 0x000c, pSmi->FBOffset);
 	}
 
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
@@ -2477,12 +2475,12 @@ SMI_InternalScreenInit(int scrnIndex, ScreenPtr pScreen)
     if (IS_MSOC(pSmi) && pScrn->bitsPerPixel == 8) {
 	/* Initialize Palette entries 0 and 1, they don't seem to get hit */
 	if (pSmi->IsSecondary) {
-	    WRITE_DCR (pSmi, DCR400 + 0, 0x00000000);	/* CRT Palette       */
-	    WRITE_DCR (pSmi, DCR400 + 4, 0x00FFFFFF);	/* CRT Palette       */
+	    WRITE_DCR(pSmi, 0x0400 + 0, 0x00000000);	/* CRT Palette	*/
+	    WRITE_DCR(pSmi, 0x0400 + 4, 0x00FFFFFF);	/* CRT Palette	*/
 	}
 	else {
-	    WRITE_DCR (pSmi, DCR800 + 0, 0x00000000);	/* Panel Palette */
-	    WRITE_DCR (pSmi, DCR800 + 4, 0x00FFFFFF);	/* Panel Palette */
+	    WRITE_DCR(pSmi, 0x0800 + 0, 0x00000000);	/* Panel Palette */
+	    WRITE_DCR(pSmi, 0x0800 + 4, 0x00FFFFFF);	/* Panel Palette */
 	}
     }
 
@@ -3172,12 +3170,10 @@ SMI_AdjustFrame(int scrnIndex, int x, int y, int flags)
 #endif
     }
     else if (IS_MSOC(pSmi)) {
-	if (!pSmi->IsSecondary) {
-	    WRITE_DCR(pSmi, DCR204, Base);
-	}
-	else {
-	    WRITE_DCR(pSmi, DCR0C, 0);
-	}
+	if (!pSmi->IsSecondary)
+	    WRITE_DCR(pSmi, 0x0204, Base);
+	else
+	    WRITE_DCR(pSmi, 0x000C, 0);
     }
     else {
 	Base = (Base + 7) & ~7;

@@ -341,14 +341,14 @@ SMI_LoadCursorImage(ScrnInfoPtr pScrn, unsigned char *src)
 	/* Write address, disabling the HW cursor */
 	if (!pSmi->IsSecondary) {
 	    /* Panel HWC Addr */
-	    WRITE_DCR(pSmi, DCRF0, pSmi->FBCursorOffset);
+	    WRITE_DCR(pSmi, 0x00f0, pSmi->FBCursorOffset);
 	    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 			   "Primary FBCursorOffset at 0x%08X\n",
 			   (unsigned int)pSmi->FBCursorOffset);
 	}
 	else {
 	    /* CRT   HWC Addr */
-	    WRITE_DCR(pSmi, DCR230, pSmi->videoRAMBytes + pSmi->FBCursorOffset);
+	    WRITE_DCR(pSmi, 0x0230, pSmi->videoRAMBytes + pSmi->FBCursorOffset);
 	    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 			   "Secondary FBCursorOffset at 0x%08X\n",
 			   (unsigned int)pSmi->FBCursorOffset);
@@ -393,14 +393,14 @@ SMI_ShowCursor(ScrnInfoPtr pScrn)
 	CARD32	uiCrtTmp;
 
 	if (!pSmi->IsSecondary) {
-	    uiPanelTmp = READ_DCR(pSmi, DCRF0);
+	    uiPanelTmp = READ_DCR(pSmi, 0x00f0);
 	    uiPanelTmp |= SMI501_MASK_HWCENABLE;
-	    WRITE_DCR(pSmi, DCRF0, uiPanelTmp);
+	    WRITE_DCR(pSmi, 0x00f0, uiPanelTmp);
 	}
 	else {
-	    uiCrtTmp = READ_DCR(pSmi, DCR230);
+	    uiCrtTmp = READ_DCR(pSmi, 0x0230);
 	    uiCrtTmp |= SMI501_MASK_HWCENABLE;
-	    WRITE_DCR(pSmi, DCR230, uiCrtTmp);
+	    WRITE_DCR(pSmi, 0x0230, uiCrtTmp);
 	}
     }
     else {
@@ -436,14 +436,14 @@ SMI_HideCursor(ScrnInfoPtr pScrn)
 	CARD32	uiCrtTmp;
 
 	if (!pSmi->IsSecondary) {
-	    uiPanelTmp = READ_DCR (pSmi, DCRF0);
+	    uiPanelTmp = READ_DCR(pSmi, 0x00f0);
 	    uiPanelTmp &= ~SMI501_MASK_HWCENABLE;
-	    WRITE_DCR(pSmi, DCRF0, uiPanelTmp);
+	    WRITE_DCR(pSmi, 0x00f0, uiPanelTmp);
 	}
 	else {
-	    uiCrtTmp = READ_DCR (pSmi, DCR230);
+	    uiCrtTmp = READ_DCR(pSmi, 0x0230);
 	    uiCrtTmp &= ~SMI501_MASK_HWCENABLE;
-	    WRITE_DCR(pSmi, DCR230, uiCrtTmp);
+	    WRITE_DCR(pSmi, 0x0230, uiCrtTmp);
 	}
     }
     else {
@@ -507,12 +507,10 @@ SMI_SetCursorPosition(ScrnInfoPtr pScrn, int x, int y)
 			  SMI501_MASK_BOUNDARY) << 16;
 
 	/* Program combined coordinates */
-	if (!pSmi->IsSecondary) {
-	    WRITE_DCR (pSmi, DCRF4, hwcLocVal);		/* Panel HWC Location */
-	}
-	else {
-	    WRITE_DCR (pSmi, DCR234, hwcLocVal);	/* CRT   HWC Location */
-	}
+	if (!pSmi->IsSecondary)
+	    WRITE_DCR(pSmi, 0x00f4, hwcLocVal);		/* Panel HWC Location */
+	else
+	    WRITE_DCR(pSmi, 0x0234, hwcLocVal);		/* CRT   HWC Location */
     }
     else {
 	if (xoff >= 0) {
@@ -591,22 +589,18 @@ SMI_SetCursorColors(ScrnInfoPtr pScrn, int bg, int fg)
 	packedFGBG |= (bg & 0xF80000) << 8
 	    | (bg & 0x00FC00) << 11 | (bg & 0x0000F8) << 13;
 
-	if (!pSmi->IsSecondary) {
-	    WRITE_DCR(pSmi, DCRF8, packedFGBG);		/* Panel HWC Color 1,2 */
-	}
-	else {
-	    WRITE_DCR(pSmi, DCR238, packedFGBG);	/* CRT  HWC Color 1,2 */
-	}
+	if (!pSmi->IsSecondary)
+	    WRITE_DCR(pSmi, 0x00f8, packedFGBG);	/* Panel HWC Color 1,2 */
+	else
+	    WRITE_DCR(pSmi, 0x0238, packedFGBG);	/* CRT  HWC Color 1,2 */
 
 
 	packedFGBG = (fg & 0xF80000) >> 8
 	    | (fg & 0x00FC00) >> 5 | (fg & 0x0000F8) >> 3;
-	if (!pSmi->IsSecondary) {
-	    WRITE_DCR(pSmi, DCRFC, packedFGBG);		/* Panel HWC Color 3 */
-	}
-	else {
-	    WRITE_DCR(pSmi, DCR23C, packedFGBG);	/* CRT   HWC Color 3 */
-	}
+	if (!pSmi->IsSecondary)
+	    WRITE_DCR(pSmi, 0x00fc, packedFGBG);	/* Panel HWC Color 3 */
+	else
+	    WRITE_DCR(pSmi, 0x023c, packedFGBG);	/* CRT   HWC Color 3 */
     }
     else {
 	/* Pack the true color into 8 bit */

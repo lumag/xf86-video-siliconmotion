@@ -1376,14 +1376,12 @@ SMI_StopVideo(
 
     if (shutdown) {
 	if (pPort->videoStatus & CLIENT_VIDEO_ON) {
-	    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	    if (pSmi->Chipset == SMI_COUGAR3DR)
 		WRITE_FPR(pSmi, FPR00, READ_FPR(pSmi, 0x00) & ~(FPR00_VWIENABLE));
-	    }
-	    else if (IS_MSOC(pSmi)) {
-		WRITE_DCR(pSmi, DCR40, READ_DCR (pSmi, DCR40) & ~0x00000004);
-	    } else {
+	    else if (IS_MSOC(pSmi))
+		WRITE_DCR(pSmi, 0x0040, READ_DCR(pSmi, 0x0040) & ~0x00000004);
+	    else
 		WRITE_VPR(pSmi, 0x00, READ_VPR(pSmi, 0x00) & ~0x01000008);
-	    }
 #if SMI_USE_CAPTURE
 	    if (!IS_MSOC(pSmi) && pSmi->Chipset != SMI_COUGAR3DR) {
 		WRITE_CPR(pSmi, 0x00, READ_CPR(pSmi, 0x00) & ~0x00000001);
@@ -1997,7 +1995,7 @@ SMI_DisplayVideo0501(ScrnInfoPtr pScrn,
 
     ENTER();
 
-    dcr40 = READ_DCR(pSmi, DCR40) & ~0x00003FFF;
+    dcr40 = READ_DCR(pSmi, 0x0040) & ~0x00003FFF;
 
     switch (id) {
 	case FOURCC_YV12:
@@ -2041,18 +2039,18 @@ SMI_DisplayVideo0501(ScrnInfoPtr pScrn,
 
     /* Set Color Key Enable bit */
 
-    WRITE_DCR(pSmi, DCR00, READ_DCR(pSmi, DCR00) | (1 << 9));
-    WRITE_DCR(pSmi, DCR50, dstBox->x1 | (dstBox->y1 << 16));
-    WRITE_DCR(pSmi, DCR54, dstBox->x2 | (dstBox->y2 << 16));
-    WRITE_DCR(pSmi, DCR44, offset);
+    WRITE_DCR(pSmi, 0x0000, READ_DCR(pSmi, 0x0000) | (1 << 9));
+    WRITE_DCR(pSmi, 0x0050, dstBox->x1 | (dstBox->y1 << 16));
+    WRITE_DCR(pSmi, 0x0054, dstBox->x2 | (dstBox->y2 << 16));
+    WRITE_DCR(pSmi, 0x0044, offset);
 
-    WRITE_DCR(pSmi, DCR48, pitch | (pitch << 16));
-    WRITE_DCR(pSmi, DCR4C, offset + (pitch * height));
-    WRITE_DCR(pSmi, DCR58, (vstretch << 16) | hstretch);
-    WRITE_DCR(pSmi, DCR5C, 0x00000000);
-    WRITE_DCR(pSmi, DCR60, 0x00EDEDED);
+    WRITE_DCR(pSmi, 0x0048, pitch | (pitch << 16));
+    WRITE_DCR(pSmi, 0x004C, offset + (pitch * height));
+    WRITE_DCR(pSmi, 0x0058, (vstretch << 16) | hstretch);
+    WRITE_DCR(pSmi, 0x005C, 0x00000000);
+    WRITE_DCR(pSmi, 0x0060, 0x00EDEDED);
 
-    WRITE_DCR(pSmi, DCR40, dcr40 | (1 << 2));
+    WRITE_DCR(pSmi, 0x0040, dcr40 | (1 << 2));
 
     LEAVE();
 }
@@ -2153,11 +2151,10 @@ SMI_BlockHandler(
 		if (pSmi->Chipset == SMI_COUGAR3DR) {
 		    WRITE_FPR(pSmi, FPR00, READ_FPR(pSmi, 0x00) & ~(FPR00_VWIENABLE));
 		}
-		else if (IS_MSOC(pSmi)) {
-		    WRITE_DCR(pSmi, DCR40, READ_DCR(pSmi, DCR40) & ~0x00000004);
-		} else {
+		else if (IS_MSOC(pSmi))
+		    WRITE_DCR(pSmi, 0x0040, READ_DCR(pSmi, 0x0040) & ~0x00000004);
+		else
 		    WRITE_VPR(pSmi, 0x00, READ_VPR(pSmi, 0x00) & ~0x00000008);
-		}
                 pPort->videoStatus = FREE_TIMER;
                 pPort->freeTime = currentTime.milliseconds + FREE_DELAY;
 	    }
@@ -2591,19 +2588,17 @@ SMI_SetSurfaceAttribute(
 static void
 SetKeyReg(SMIPtr pSmi, int reg, int value)
 {
-    if (pSmi->Chipset == SMI_COUGAR3DR) {
+    if (pSmi->Chipset == SMI_COUGAR3DR)
 	WRITE_FPR(pSmi, reg, value);
-    }
     else if (IS_MSOC(pSmi)) {
 	/* We don't change the color mask, and we don't do brightness.  IF
 	 * they write to the colorkey register, we'll write the value to the
 	 * 501 colorkey register */
-	if (FPR04 == reg) {	/* Only act on colorkey value writes */
-	    WRITE_DCR (pSmi, DCR08, value);	/* ColorKey register is DCR08 */
-	}
-    } else {
-	WRITE_VPR(pSmi, reg, value);
+	if (FPR04 == reg)		   /* Only act on colorkey value writes */
+	    WRITE_DCR(pSmi, 0x0008, value);/* ColorKey register is DCR08 */
     }
+    else
+	WRITE_VPR(pSmi, reg, value);
 }
 
 #else /* SMI_USE_VIDEO */

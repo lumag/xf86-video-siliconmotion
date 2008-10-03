@@ -52,9 +52,9 @@ SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
     }
 
     if (IS_MSOC(pSmi)) {
-	iTempVal = READ_SCR(pSmi, SCR00) & ~0x00003000;
-	WRITE_SCR (pSmi, SCR00, iTempVal | 0x00003000);
-	WRITE_SCR (pSmi, SCR00, iTempVal);
+	iTempVal = READ_SCR(pSmi, 0x0000) & ~0x00003000;
+	WRITE_SCR(pSmi, 0x0000, iTempVal | 0x00003000);
+	WRITE_SCR(pSmi, 0x0000, iTempVal);
     }
     else {
 	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15);
