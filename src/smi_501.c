@@ -48,10 +48,9 @@ authorization from The XFree86 Project or Silicon Motion.
 static void SMI501_ModeSet(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 static char *format_integer_base2(int32_t word);
 
-static double SMI501_FindClock(double clock, int max_divider,
-				int32_t *x2_1xclck,
-				int32_t *x2_select,
-				int32_t *x2_divider, int32_t *x2_shift);
+static double SMI501_FindClock(double clock, int max_divider, Bool has1xclck,
+			       int32_t *x2_1xclck, int32_t *x2_select,
+			       int32_t *x2_divider, int32_t *x2_shift);
 static double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n,
 				  int32_t *xclck);
 static void SMI501_PrintRegs(ScrnInfoPtr pScrn);
@@ -316,8 +315,10 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 		       "Clock request %5.2f (max_divider %d)\n",
 		       (double)xf86mode->Clock, 5);
-	p2_diff = SMI501_FindClock(xf86mode->Clock, 5, &x2_1xclck,
-				   &x2_select, &x2_divider, &x2_shift);
+	p2_diff = SMI501_FindClock(xf86mode->Clock, 5,
+				   (uint32_t)mode->device_id.f.revision >= 0xc0,
+				   &x2_1xclck, &x2_select, &x2_divider,
+				   &x2_shift);
 	mode->clock.f.p2_select = x2_select;
 	mode->clock.f.p2_divider = x2_divider;
 	mode->clock.f.p2_shift = x2_shift;
@@ -409,8 +410,9 @@ SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr xf86mode)
 	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
 		       "Clock request %5.2f (max_divider %d)\n",
 		       (double)xf86mode->Clock, 3);
-	(void)SMI501_FindClock(xf86mode->Clock, 3, &x2_1xclck,
-			       &x2_select, &x2_divider, &x2_shift);
+	(void)SMI501_FindClock(xf86mode->Clock, 3,
+			       (uint32_t)mode->device_id.f.revision >= 0xc0,
+			       &x2_1xclck, &x2_select, &x2_divider, &x2_shift);
 	mode->clock.f.v2_select = x2_select;
 	mode->clock.f.v2_divider = x2_divider;
 	mode->clock.f.v2_shift = x2_shift;
@@ -611,7 +613,8 @@ format_integer_base2(int32_t word)
 }
 
 static double
-SMI501_FindClock(double clock, int32_t max_divider, int32_t *x2_1xclck,
+SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
+		 int32_t *x2_1xclck,
 		 int32_t *x2_select, int32_t *x2_divider, int32_t *x2_shift)
 {
     double	diff, best, mclk;
@@ -628,8 +631,8 @@ SMI501_FindClock(double clock, int32_t max_divider, int32_t *x2_1xclck,
 	 multiplier += 2, mclk  = multiplier * 24 * 1000.0) {
 	for (divider = 1; divider <= max_divider; divider += 2) {
 	    for (shift = 0; shift < 8; shift++) {
-		/* FIXME is divider 1 available for cards older then 502? */
-		for (xclck = 0; xclck <= 1; xclck++) {
+		/* Divider 1 not in specs form cards older then 502 */
+		for (xclck = has1xclck != FALSE; xclck <= 1; xclck++) {
 		    diff = (mclk / (divider << shift << xclck)) - clock;
 		    if (fabs(diff) < best) {
 			*x2_shift = shift;
@@ -669,7 +672,6 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      * those divisions. In this method, N can be any integer between 2
      * and 24, M can be any positive, 7 bits integer, and K is either 1
      * or 2.
-     *	FIXME Needs a better description for K?
      *   To calculate the programmable PLL, the following formula is
      * used:
      *
@@ -677,6 +679,9 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      *
      *   Input Frequency is the crystal input frequency value (24 MHz in
      * the SMI VGX Demo Board).
+     *
+     *   K is a divisor, used by setting bit 15 of the PLL_CTL
+     * (PLL Output Divided by 2).
      */
 
     best = 0x7fffffff;
