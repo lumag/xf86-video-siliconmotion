@@ -682,7 +682,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
     best = 0x7fffffff;
     for (N = 2; N <= 24; N++) {
 	for (K = 1; K <= 2; K++) {
-	    M = (clock * K) * N / 24 / 1000.0;
+	    M = clock * K * N / 24 / 1000.0;
 	    diff = (24 * 1000.0 * M / N) - (clock * K);
 	    /* Ensure M is larger then 0 and fits in 7 bits */
 	    if (M > 0 && M < 0x80 && fabs(diff) < best) {

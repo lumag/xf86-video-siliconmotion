@@ -1852,7 +1852,7 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
     }
 
     /* FIXME Don't actually set pSmi->MCLK */
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MCLK = %1.3f\n", mclk / 1000.3f);
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MCLK = %1.3f\n", mclk / 1000.0);
 }
 
 static Bool
