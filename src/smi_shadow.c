@@ -69,7 +69,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	return;
     }
 
-    WaitIdleEmpty();
+    WaitIdle();
     if(pSmi->useEXA)  /* Some other function may have set SMI_QUICK_START  */
        WRITE_DPR(pSmi, 0x0C, 0);
 
@@ -112,7 +112,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		destX = pSmi->ShadowHeight - srcY - 1;
 		destY = srcX;
 
-		WaitQueue(4);
+		WaitQueue();
 		WRITE_DPR(pSmi, 0x00, (srcX << 16)   + srcY);
 		WRITE_DPR(pSmi, 0x04, (destX << 16)  + destY);
 		WRITE_DPR(pSmi, 0x08, (width << 16)  + height);
@@ -133,7 +133,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		destX = srcY;
 		destY = pSmi->ShadowWidth - srcX - 1;
 
-		WaitQueue(4);
+		WaitQueue();
 		WRITE_DPR(pSmi, 0x00, (srcX << 16)   + srcY);
 		WRITE_DPR(pSmi, 0x04, (destX << 16)  + destY);
 		WRITE_DPR(pSmi, 0x08, (width << 16)  + height);
@@ -151,7 +151,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		    }
 		}
 
-		WaitQueue(4);
+		WaitQueue();
 		WRITE_DPR(pSmi, 0x00, (srcX << 16)  + srcY);
 		WRITE_DPR(pSmi, 0x04, (srcX << 16)  + srcY);
 		WRITE_DPR(pSmi, 0x08, (width << 16) + height);
@@ -163,7 +163,7 @@ void SMI_RefreshArea(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	pbox++;
     }
 
-    WaitIdleEmpty();
+    WaitIdle();
     WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x44, 0);
@@ -189,7 +189,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	return;
     }
 
-    WaitIdleEmpty();
+    WaitIdle();
     if(pSmi->useEXA)  /* Some other function may have set SMI_QUICK_START  */
        WRITE_DPR(pSmi, 0x0C, 0);
 
@@ -239,7 +239,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		for (tempWidth=width; tempWidth > 0;) {
 		    if (width>maxPixels)
 			width = maxPixels;
-		    WaitQueue(4);
+		    WaitQueue();
 		    WRITE_DPR(pSmi, 0x00, (srcX << 16)   + srcY);
 		    WRITE_DPR(pSmi, 0x04, (destX << 16)  + destY);
 		    WRITE_DPR(pSmi, 0x08, (width << 16)  + height);
@@ -269,7 +269,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		for (tempWidth=width; tempWidth > 0;) {
 		    if (width>maxPixels)
 			width = maxPixels;
-		    WaitQueue(4);
+		    WaitQueue();
 		    WRITE_DPR(pSmi, 0x00, (srcX << 16)   + srcY);
 		    WRITE_DPR(pSmi, 0x04, (destX << 16)  + destY);
 		    WRITE_DPR(pSmi, 0x08, (width << 16)  + height);
@@ -293,7 +293,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 		    }
 		}
 
-		WaitQueue(4);
+		WaitQueue();
 		WRITE_DPR(pSmi, 0x00, (srcX << 16)  + srcY);
 		WRITE_DPR(pSmi, 0x04, (srcX << 16)  + srcY);
 		WRITE_DPR(pSmi, 0x08, (width << 16) + height);
@@ -305,7 +305,7 @@ void SMI_RefreshArea730(ScrnInfoPtr pScrn, int num, BoxPtr pbox)
 	pbox++;
     }
 
-    WaitIdleEmpty();
+    WaitIdle();
     WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x44, 0);

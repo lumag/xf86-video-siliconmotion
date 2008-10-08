@@ -210,7 +210,7 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 	pSmi->AccelCmd |= SMI_RIGHT_TO_LEFT;
     }
 
-    WaitQueue(7);
+    WaitQueue();
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
@@ -273,7 +273,7 @@ SMI_Copy(PixmapPtr pDstPixmap, int srcX, int srcY, int dstX,
 	}
     }
 
-    WaitQueue(3);
+    WaitQueue();
     WRITE_DPR(pSmi, 0x00, (srcX  << 16) + (srcY & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (dstX  << 16) + (dstY & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (width << 16) + (height & 0xFFFF));
@@ -340,7 +340,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 		   | SMI_BITBLT
 		   | SMI_QUICK_START;
 
-    WaitQueue(10);
+    WaitQueue();
     /* Destination Window Width */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
@@ -395,7 +395,7 @@ SMI_Solid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 	}
     }
 
-    WaitQueue(2);
+    WaitQueue();
     WRITE_DPR(pSmi, 0x04, (x1 << 16) | (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w  << 16) | (h  & 0xFFFF));
 
@@ -471,7 +471,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     /* set clipping */
     SMI_SetClippingRectangle(pScrn, x, y, x+w, y+h);
 
-    WaitQueue(7);
+    WaitQueue();
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pixelpitch << 16) | (src_pixelpitch & 0xFFFF));
 
@@ -498,7 +498,6 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
 
     while (h--) {
-/* 	WaitQueue(aligned_pitch); */
 	memcpy(pSmi->DataPortBase, src, aligned_pitch);
 	src += src_pitch;
     }

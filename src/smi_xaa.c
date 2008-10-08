@@ -250,12 +250,12 @@ SMI_SetupForScreenToScreenCopy(ScrnInfoPtr pScrn, int xdir, int ydir, int rop,
 
     if (trans != -1) {
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x20, trans);
     }
 
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     }
@@ -295,7 +295,7 @@ SMI_SubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
 	}
     }
 
-    WaitQueue(4);
+    WaitIdle();
     CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, (x1 << 16) + (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (x2 << 16) + (y2 & 0xFFFF));
@@ -336,11 +336,11 @@ SMI_SetupForSolidFill(ScrnInfoPtr pScrn, int color, int rop,
     }
 #endif
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(4);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     } else {
-	WaitQueue(3);
+	WaitQueue();
     }
     WRITE_DPR(pSmi, 0x14, color);
     WRITE_DPR(pSmi, 0x34, 0xFFFFFFFF);
@@ -374,7 +374,7 @@ SMI_SubsequentSolidFillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h)
 	    y = 0;
     }
 
-    WaitQueue(3);
+    WaitQueue();
     CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
@@ -414,7 +414,7 @@ SMI_SubsequentSolidHorVertLine(ScrnInfoPtr pScrn, int x, int y, int len,
 	}
     }
 
-    WaitQueue(3);
+    WaitQueue();
     CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
@@ -454,7 +454,7 @@ SMI_SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg,
     if (bg == -1) {
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC;
 
-	WaitQueue(3);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, ~fg);
 	WRITE_DPR(pSmi, 0x20, fg);
@@ -463,7 +463,7 @@ SMI_SetupForCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int fg, int bg,
 	if (bg == 0xFFFFFF7F)
 	    bg = -1;
 #endif
-	WaitQueue(2);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, bg);
     }
@@ -491,17 +491,17 @@ SMI_SubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int x, int y, int w,
     }
 
     if (skipleft) {
-	WaitQueue(5);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, (pSmi->ScissorsLeft & 0xFFFF0000)
 			      | (x + skipleft) | 0x2000);
 	pSmi->ClipTurnedOn = TRUE;
     } else {
 	if (pSmi->ClipTurnedOn) {
-	    WaitQueue(5);
+	    WaitQueue();
 	    WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	    pSmi->ClipTurnedOn = FALSE;
 	} else {
-	    WaitQueue(4);
+	    WaitQueue();
 	}
     }
     CHECK_SECONDARY(pSmi);
@@ -540,14 +540,14 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 		   | SMI_START_ENGINE;
 
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     }
 
     CHECK_SECONDARY(pSmi);
     if (bg == -1) {
-	WaitQueue(5);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, ~fg);
 	WRITE_DPR(pSmi, 0x20, fg);
@@ -558,7 +558,7 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 	if (bg == 0xFFFFFF7F)
 	    bg = -1;
 #endif
-	WaitQueue(4);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x14, fg);
 	WRITE_DPR(pSmi, 0x18, bg);
 	WRITE_DPR(pSmi, 0x34, patx);
@@ -585,7 +585,7 @@ SMI_SubsequentMono8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
 	}
     }
 
-    WaitQueue(3);
+    WaitQueue();
     CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
@@ -621,7 +621,7 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 	/* PDR#950 */
 	CARD8* pattern = pSmi->FBBase + (patx + paty * pSmi->Stride) * pSmi->Bpp;
 
-	WaitIdleEmpty();
+	WaitIdle();
 	WRITE_DPR(pSmi, 0x0C, SMI_BITBLT | SMI_COLOR_PATTERN);
 	memcpy(pSmi->DataPortBase, pattern, 8 * pSmi->Bpp * 8);
     } else {
@@ -633,22 +633,22 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 	    }
 	}
 
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x00, (patx << 16) | (paty & 0xFFFF));
     }
 
-    WaitQueue(1);
+    WaitQueue();
     CHECK_SECONDARY(pSmi);
 
     if (trans_color == -1) {
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
 
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x20, trans_color);
     }
 
     if (pSmi->ClipTurnedOn) {
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	pSmi->ClipTurnedOn = FALSE;
     }
@@ -674,7 +674,7 @@ SMI_SubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
 	}
     }
 
-    WaitQueue(3);
+    WaitQueue();
     CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));	/* PDR#950 */
@@ -713,7 +713,7 @@ SMI_SetupForImageWrite(ScrnInfoPtr pScrn, int rop, unsigned int planemask,
 #endif
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
 
-	WaitQueue(1);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x20, trans_color);
     }
 
@@ -740,17 +740,17 @@ SMI_SubsequentImageWriteRect(ScrnInfoPtr pScrn, int x, int y, int w, int h,
     }
 
     if (skipleft) {
-	WaitQueue(5);
+	WaitQueue();
 	WRITE_DPR(pSmi, 0x2C, (pSmi->ScissorsLeft & 0xFFFF0000) |
 			      (x + skipleft) | 0x2000);
 	pSmi->ClipTurnedOn = TRUE;
     } else {
 	if (pSmi->ClipTurnedOn) {
-	    WaitQueue(5);
+	    WaitQueue();
 	    WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
 	    pSmi->ClipTurnedOn = FALSE;
 	} else {
-	    WaitQueue(4);
+	    WaitQueue();
 	}
     }
     CHECK_SECONDARY(pSmi);

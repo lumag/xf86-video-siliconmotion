@@ -37,31 +37,34 @@ authorization from the XFree86 Project and silicon Motion.
 void
 SMI_GEReset(ScrnInfoPtr pScrn, int from_timeout, int line, char *file)
 {
-    SMIPtr pSmi = SMIPTR(pScrn);
-    unsigned int	iTempVal;
-    CARD8 tmp;
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    int32_t	tmp;
 
     ENTER();
 
     if (from_timeout) {
-	if (pSmi->GEResetCnt++ < 10 || xf86GetVerbosity() > 1) {
-	    xf86DrvMsg(pScrn->scrnIndex,X_INFO,"\tSMI_GEReset called from %s line %d\n", file, line);
-	}
-    } else {
-	WaitIdleEmpty();
+	if (pSmi->GEResetCnt++ < 10 || xf86GetVerbosity() > 1)
+	    xf86DrvMsg(pScrn->scrnIndex,X_INFO,
+		       "\tSMI_GEReset called from %s line %d\n", file, line);
     }
+    else
+	WaitIdle();
 
     if (IS_MSOC(pSmi)) {
-	iTempVal = READ_SCR(pSmi, 0x0000) & ~0x00003000;
-	WRITE_SCR(pSmi, 0x0000, iTempVal | 0x00003000);
-	WRITE_SCR(pSmi, 0x0000, iTempVal);
+	/*	12:13	Drawing Engine Abort
+	 *		00:	Normal
+	 *		11:	Abort 2D Engine
+	 *	(0x3000 == bits 12 and 13 set)
+	 */
+	tmp = READ_SCR(pSmi, 0x0000) & ~0x00003000;
+	WRITE_SCR(pSmi, 0x0000, tmp | 0x00003000);
+	/* FIXME No need to wait here? */
+	WRITE_SCR(pSmi, 0x0000, tmp);
     }
     else {
 	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp | 0x30);
     }
-
-    WaitIdleEmpty();
 
     if (!IS_MSOC(pSmi))
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x15, tmp);
@@ -78,23 +81,7 @@ SMI_AccelSync(ScrnInfoPtr pScrn)
 
     ENTER();
 
-    WaitIdleEmpty(); /* #161 */
-    if (IS_MSOC(pSmi)) {
-	int	i, status;
-
-	for (i = 0x1000000; i > 0; i--) {
-	    status = READ_SCR(pSmi, CMD_STATUS);
-	    /* bit 0:	2d engine idle if *not set*
-	     * bit 1:	2d fifo empty if *set*
-	     * bit 2:	2d setup idle if if *not set*
-	     * bit 18:  color conversion idle if *not set*
-	     * bit 19:  command fifo empty if *set*
-	     * bit 20:  2d memory fifo empty idle if *set*
-	     */
-	    if ((status & 0x1C0007) == 0x180002)
-		break;
-	}
-    }
+    WaitIdle();
 
     LEAVE();
 }
@@ -128,7 +115,7 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 	}
     }
 
-    WaitIdleEmpty();
+    WaitIdle();
     WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
     WRITE_DPR(pSmi, 0x1C, DEDataFormat);
     WRITE_DPR(pSmi, 0x24, 0xFFFFFFFF);
@@ -188,7 +175,7 @@ SMI_SetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right,
 
     pSmi->ClipTurnedOn = FALSE;
 
-    WaitQueue(2);
+    WaitQueue();
     WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
     WRITE_DPR(pSmi, 0x30, pSmi->ScissorsRight);
 
@@ -215,7 +202,7 @@ SMI_DisableClipping(ScrnInfoPtr pScrn)
 
     pSmi->ClipTurnedOn = FALSE;
 
-    WaitQueue(2);
+    WaitQueue();
     WRITE_DPR(pSmi, 0x2C, pSmi->ScissorsLeft);
     WRITE_DPR(pSmi, 0x30, pSmi->ScissorsRight);
 

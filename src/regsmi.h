@@ -194,51 +194,66 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define SMI_QUICK_START		0x10000000
 #define SMI_START_ENGINE	0x80000000
 
-#define MAXLOOP 0x100000	/* timeout value for engine waits */
+/* timeout value for engine waits */
+#define MAXLOOP			0x100000
 
-#define ENGINE_IDLE()							\
-   (IS_MSOC(pSmi) ?							\
-	(READ_SCR(pSmi, 0x0000) & 0x00080000) == 0 :			\
-        (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x08) == 0)
-#define FIFO_EMPTY()							\
-   (IS_MSOC(pSmi) ?							\
-	READ_SCR(pSmi, 0x0000) & 0x00100000 :				\
-        VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x16) & 0x10)
-
-/* Wait until "v" queue entries are free */
-/**** FIXME
- **** This is completely ilogical. Argument "v" is ignored, and
- **** pSmi->PCIRetry defaults to false (but on smi sources this
- **** macro is a noop and will get stuck on engine reset timeouts if enabled...)
- ***/
-#define	WaitQueue(v)							\
+/* Wait until 2d engine queue is empty */
+#define	WaitQueue()							\
     do {								\
-	if (!IS_MSOC(pSmi)) {						\
-	    int loop = MAXLOOP;						\
+	int	loop = MAXLOOP;						\
 									\
-	    mem_barrier();						\
-	    while (!FIFO_EMPTY())					\
-		if (loop-- <= 0)					\
-		    break;						\
-	    if (loop <= 0) SMI_GEReset(pScrn, 1, __LINE__, __FILE__);	\
+	mem_barrier();							\
+	if (IS_MSOC(pSmi)) {						\
+	    /*	20:20	2D Engine FIFO Status. This bit is read-only.
+	     *		0:	FIFO not emtpy.
+	     *		1:	FIFO empty.
+	     */								\
+	    while (loop-- &&						\
+		   (READ_SCR(pSmi, 0x0000) & (1 << 20)) == 0)		\
+	        ;							\
 	}								\
+	else {								\
+	    while (loop-- &&						\
+		   (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,			\
+				 VGA_SEQ_DATA, 0x16) & 0x10))		\
+	        ;							\
+	}								\
+	if (loop <= 0)							\
+	    SMI_GEReset(pScrn, 1, __LINE__, __FILE__);			\
     } while (0)
 
 /* Wait until GP is idle */
-#define WaitIdle()  \
-    do {		  \
-	int loop = MAXLOOP; mem_barrier(); \
-	while (!ENGINE_IDLE())		   \
-	    if (loop-- == 0) break;	   \
-	if (loop <= 0) SMI_GEReset(pScrn, 1, __LINE__, __FILE__);   \
+#define WaitIdle()							\
+    do {								\
+	int	status;							\
+	int	loop = MAXLOOP;						\
+									\
+	mem_barrier();							\
+	if (IS_MSOC(pSmi)) {						\
+	    /* bit 0:	2d engine idle if *not set*
+	     * bit 1:	2d fifo empty if *set*
+	     * bit 2:	2d setup idle if if *not set*
+	     * bit 18:  color conversion idle if *not set*
+	     * bit 19:  command fifo empty if *set*
+	     * bit 20:  2d memory fifo empty idle if *set*
+	     */								\
+	    for (status = READ_SCR(pSmi, 0x0024);			\
+		 loop && (status & 0x1C0007) != 0x180002;		\
+		 status = READ_SCR(pSmi, 0x0024), loop--)		\
+		 ;							\
+	}								\
+	else {								\
+	    for (status = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,		\
+				       VGA_SEQ_DATA, 0x16);		\
+		 loop && (status & 0x18) != 0x10;			\
+		 status = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,		\
+				       VGA_SEQ_DATA, 0x16), loop--)	\
+		;				       			\
+	}								\
+	if (loop <= 0)							\
+	    SMI_GEReset(pScrn, 1, __LINE__, __FILE__);			\
     } while (0)
 
-/* Wait until GP is idle and queue is empty */
-#define	WaitIdleEmpty()	   \
-    do {		   \
-	WaitQueue(MAXFIFO);	   \
-	WaitIdle();		 \
-    } while (0)
 
 #define RGB8_PSEUDO      (-1)
 #define RGB16_565         0
