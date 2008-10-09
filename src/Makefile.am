@@ -44,4 +44,7 @@ siliconmotion_drv_la_SOURCES = \
 	 smi_pcirename.h \
          smi_shadow.c \
          smi_video.c \
-         smi_video.h
+         smi_video.h \
+if XMODES
+         xf86cvt.c
+endif

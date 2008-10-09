@@ -1047,6 +1047,16 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     clockRanges->interlaceAllowed = FALSE;
     clockRanges->doubleScanAllowed = FALSE;
 
+    /* FIXME Maybe this should be done only for the 501/502?
+     * as it doesn't have any method of detecting monitors, other then
+     * reading what is in the hardware, and hoping the kernel received
+     * the proper parameters, and correctly programmed the hardware. */
+    if (pSmi->lcdWidth && pSmi->lcdHeight)
+	pScrn->monitor->Modes =
+	    xf86ModesAdd(pScrn->monitor->Modes,
+			 xf86CVTMode(pSmi->lcdWidth, pSmi->lcdHeight, 60.0f,
+				     FALSE, FALSE));
+
     i = xf86ValidateModes(
 		pScrn,				/* Screen pointer			  */
 		pScrn->monitor->Modes,		/* Available monitor modes		  */

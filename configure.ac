@@ -63,6 +63,8 @@ CPPFLAGS="$CPPFLAGS $XORG_CFLAGS"
 AC_CHECK_DECL(XSERVER_LIBPCIACCESS,
               [XSERVER_LIBPCIACCESS=yes],[XSERVER_LIBPCIACCESS=no],
               [#include "xorg-server.h"])
+AC_CHECK_HEADER(xf86Modes.h,
+		[XMODES=yes], [XMODES=no], [#include "xorg-server.h"])
 CPPFLAGS="$SAVE_CPPFLAGS"
 
 # Checks for header files.
@@ -73,6 +75,7 @@ if test "x$XSERVER_LIBPCIACCESS" = xyes; then
     XORG_CFLAGS="$XORG_CFLAGS $PCIACCESS_CFLAGS"
 fi
 AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
+AM_CONDITIONAL(XMODES, test "x$XMODES" = xno)
 
 AC_SUBST([XORG_CFLAGS])
 AC_SUBST([moduledir])
