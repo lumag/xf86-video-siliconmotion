@@ -620,7 +620,7 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
     double	diff, best, mclk;
     int32_t	multiplier, divider, shift, xclck;
 
-    /* The Crystal input frequency is 24Mhz, and can have be multiplied
+    /* The Crystal input frequency is 24Mhz, and can be multiplied
      * by 12 or 14 (actually, there are other values, see TIMING_CTL,
      * MMIO 0x068) */
 
@@ -664,6 +664,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
 {
     int32_t	M, N, K;
     double	diff, best;
+    double	frequency;
 
     /*   This method, available only on the 502 is intended to cover the
      * disadvantage of the other method where certain modes cannot be
@@ -685,10 +686,18 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      */
 
     best = 0x7fffffff;
+    /* FIXME: The 12 multiplier was a wild guess (but it doesn't work with
+     * a 14 modifier, i.e. 288 works, but not 336), and actually it corrects
+     * the "flicker" on the panel, and will properly display output on a
+     * secondary panel/crt.
+     * So, should bug SMI about incorrect (non official) information, and
+     * also ask for better definition of K...
+     */
+    frequency = 12 * 24 * 1000.0;
     for (N = 2; N <= 24; N++) {
 	for (K = 1; K <= 2; K++) {
-	    M = clock * K * N / 24 / 1000.0;
-	    diff = (24 * 1000.0 * M / N) - (clock * K);
+	    M = (clock * K) / frequency * N;
+	    diff = (frequency * M / N) - (clock * K);
 	    /* Ensure M is larger then 0 and fits in 7 bits */
 	    if (M > 0 && M < 0x80 && fabs(diff) < best) {
 		*m = M;
@@ -703,7 +712,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
 
     xf86ErrorFVerb(VERBLEV,
 		   "\tMatching alternate clock %5.2f, diff %5.2f (%d/%d/%d)\n",
-		   24 * 1000.0 * *m / *n / (*xclck ? 1 : 2), best,
+		   frequency * *m / *n / (*xclck ? 1 : 2), best,
 		   *m, *n, *xclck);
 
     return (best);
