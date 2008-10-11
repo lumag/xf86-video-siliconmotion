@@ -71,19 +71,20 @@ SMI_EXAInit(ScreenPtr pScreen)
 	RETURN(FALSE);
     }
 
+    /* Require 2.1 semantics:
+       Don't uninitialize the memory manager when swapping out */
     pSmi->EXADriverPtr->exa_major = 2;
-    pSmi->EXADriverPtr->exa_minor = 0;
+    pSmi->EXADriverPtr->exa_minor = 1;
 
     SMI_EngineReset(pScrn);
 
     /* Memory Manager */
-    if(pSmi->shadowFB){
-       pSmi->EXADriverPtr->memoryBase = pSmi->FBBase; /* The shadow framebuffer is located at offset 0 */
-    }else{
-       pSmi->EXADriverPtr->memoryBase = pSmi->FBBase + pSmi->FBOffset;
-    }
+    pSmi->EXADriverPtr->memoryBase = pSmi->FBBase;
     pSmi->EXADriverPtr->memorySize = pSmi->FBReserved;
-    pSmi->EXADriverPtr->offScreenBase = pScrn->displayWidth * pSmi->height * pSmi->Bpp;
+
+    /* The framebuffer is allocated as an offscreen area with the
+       memory manager (It makes easier further resizing) */
+    pSmi->EXADriverPtr->offScreenBase = 0;
 
     /* Flags */
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
@@ -137,6 +138,7 @@ SMI_EXAInit(ScreenPtr pScreen)
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "exaDriverInit failed.\n");
 	RETURN(FALSE);
     }
+
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "EXA Acceleration enabled.\n");
 

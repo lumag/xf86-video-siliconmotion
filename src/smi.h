@@ -205,8 +205,8 @@ typedef struct
     /* DPMS */
     int			CurrentDPMS;	/* Current DPMS state */
     unsigned char	DPMS_SR20;	/* Saved DPMS SR20 register */
-    unsigned char	DPMS_SR21;	/* Saved DPMS SR21 register */
-    unsigned char	DPMS_SR31;	/* Saved DPMS SR31 register */
+/*     unsigned char	DPMS_SR21;	/\* Saved DPMS SR21 register *\/ */
+/*     unsigned char	DPMS_SR31;	/\* Saved DPMS SR31 register *\/ */
     unsigned char	DPMS_SR34;	/* Saved DPMS SR34 register */
 
     /* Panel information */
@@ -216,6 +216,7 @@ typedef struct
 
     I2CBusPtr		I2C;		/* Pointer into I2C module */
     xf86Int10InfoPtr	pInt10;		/* Pointer to INT10 module */
+    vbeInfoPtr          pVbe;           /* Pointer to VBE module */
 
     /* Shadow frame buffer (rotation) */
     Bool		shadowFB;	/* Flag if shadow buffer is
@@ -268,6 +269,9 @@ typedef struct
     Bool		IsSwitching; /* when switching modes */
     Bool		UseFBDev;
 
+    /* CRTCs */
+    ClockRanges clockRange;
+    ExaOffscreenArea* fbArea;
 } SMIRec, *SMIPtr;
 
 #define SMIPTR(p) ((SMIPtr)((p)->driverPrivate))
@@ -379,6 +383,8 @@ void SMI_AdjustFrame(int scrnIndex, int x, int y, int flags);
 Bool SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags);
 void SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
 		     LOCO *colors, VisualPtr pVisual);
+xf86MonPtr SMI_ddc1(ScrnInfoPtr pScrn);
+void SMI_PrintRegs(ScrnInfoPtr pScrn);
 
 /* smi_dga.c */
 Bool SMI_DGAInit(ScreenPtr pScrn);

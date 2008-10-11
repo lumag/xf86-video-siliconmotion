@@ -45,6 +45,16 @@ siliconmotion_drv_la_SOURCES = \
          smi_shadow.c \
          smi_video.c \
          smi_video.h \
+	 smi_crtc.h \
+	 smi_crtc.c \
+	 smilynx_crtc.c \
+	 smi_output.c \
+	 smilynx_output.c \
+	 smilynx_hw.c \
+	 smilynx.h \
+	 smi501_crtc.c \
+	 smi501_output.c
+
 if XMODES
-         xf86cvt.c
+         siliconmotion_drv_la_SOURCES += xf86cvt.c
 endif

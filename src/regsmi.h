@@ -214,7 +214,7 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 	}								\
 	else {								\
 	    while (loop-- &&						\
-		   (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,			\
+		   !(VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,			\
 				 VGA_SEQ_DATA, 0x16) & 0x10))		\
 	        ;							\
 	}								\

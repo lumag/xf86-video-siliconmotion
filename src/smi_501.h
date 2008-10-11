@@ -778,13 +778,27 @@ typedef struct _MSOCRegRec {
 #define FB_RESERVE4USB			512
 
 
-Bool SMI501_EnterVT(int scrnIndex, int flags);
-void SMI501_LeaveVT(int scrnIndex, int flags);
 void SMI501_Save(ScrnInfoPtr pScrn);
 void SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,
 				      int PowerManagementMode, int flags);
-Bool SMI501_ModeInit(ScrnInfoPtr pScrn, DisplayModePtr mode);
-void SMI501_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indices,
-			LOCO *colors, VisualPtr pVisual);
+void SMI501_PrintRegs(ScrnInfoPtr pScrn);
+double SMI501_FindClock(double clock, int max_divider, Bool has1xclck,
+			       int32_t *x2_1xclck, int32_t *x2_select,
+			       int32_t *x2_divider, int32_t *x2_shift);
+double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n,
+				  int32_t *xclck);
+
+/* Initialize the CRTC-independent hardware registers */
+Bool SMI501_HWInit(ScrnInfoPtr pScrn);
+/* Load to hardware the specified register set */
+void SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode);
+void SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode);
+void SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode);
+
+/* smi501_crtc.c */
+Bool SMI501_CrtcPreInit(ScrnInfoPtr pScrn);
+
+/* smi501_output.c */
+Bool SMI501_OutputPreInit(ScrnInfoPtr pScrn);
 
 #endif  /*_SMI_501_H*/
