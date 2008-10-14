@@ -49,6 +49,12 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
     ScrnInfoPtr pScrn = output->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
 
+    ENTER();
+
+    if (pSmi->lcd &&
+	(mode->HDisplay > pSmi->lcdWidth || mode->VDisplay > pSmi->lcdHeight))
+	RETURN(MODE_PANEL);
+
     if (!(((mode->HDisplay == 1280) && (mode->VDisplay == 1024)) ||
 	  ((mode->HDisplay == 1024) && (mode->VDisplay == 768)) ||
 	  ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||

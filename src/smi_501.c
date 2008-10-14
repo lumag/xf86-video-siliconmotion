@@ -266,50 +266,52 @@ SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
-	/* Alternate pll_select is only available for the SMI 502,
-	 * and the bit should be only set in that case. */
-	if (mode->clock.f.pll_select)
-	    WRITE_SCR(pSmi, PLL_CTL, mode->pll_ctl.value);
-	clock.f.p2_select = mode->clock.f.p2_select;
-	pll = clock.value;
-	clock.f.p2_divider = mode->clock.f.p2_divider;
-	clock.f.p2_shift = mode->clock.f.p2_shift;
-	clock.f.pll_select = mode->clock.f.pll_select;
-	clock.f.p2_1xclck = mode->clock.f.p2_1xclck;
-	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+    clock.value = READ_SCR(pSmi, mode->current_clock);
 
-	WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
-	WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
+    /* Alternate pll_select is only available for the SMI 502,
+     * and the bit should be only set in that case. */
+    if (mode->clock.f.pll_select)
+	WRITE_SCR(pSmi, PLL_CTL, mode->pll_ctl.value);
+    clock.f.p2_select = mode->clock.f.p2_select;
+    pll = clock.value;
+    clock.f.p2_divider = mode->clock.f.p2_divider;
+    clock.f.p2_shift = mode->clock.f.p2_shift;
+    clock.f.pll_select = mode->clock.f.pll_select;
+    clock.f.p2_1xclck = mode->clock.f.p2_1xclck;
+    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-	WRITE_SCR(pSmi, PANEL_WWIDTH, mode->panel_wwidth.value);
-	WRITE_SCR(pSmi, PANEL_WHEIGHT, mode->panel_wheight.value);
+    WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
+    WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
 
-	WRITE_SCR(pSmi, PANEL_PLANE_TL, mode->panel_plane_tl.value);
-	WRITE_SCR(pSmi, PANEL_PLANE_BR, mode->panel_plane_br.value);
+    WRITE_SCR(pSmi, PANEL_WWIDTH, mode->panel_wwidth.value);
+    WRITE_SCR(pSmi, PANEL_WHEIGHT, mode->panel_wheight.value);
 
-	WRITE_SCR(pSmi, PANEL_HTOTAL, mode->panel_htotal.value);
-	WRITE_SCR(pSmi, PANEL_HSYNC, mode->panel_hsync.value);
-	WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
-	WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
-	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    WRITE_SCR(pSmi, PANEL_PLANE_TL, mode->panel_plane_tl.value);
+    WRITE_SCR(pSmi, PANEL_PLANE_BR, mode->panel_plane_br.value);
 
-	/* Power up sequence for panel */
-	mode->panel_display_ctl.f.vdd = 1;
-	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-	SMI501_WaitVSync(pSmi, 4);
+    WRITE_SCR(pSmi, PANEL_HTOTAL, mode->panel_htotal.value);
+    WRITE_SCR(pSmi, PANEL_HSYNC, mode->panel_hsync.value);
+    WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
+    WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
+    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 
-	mode->panel_display_ctl.f.signal = 1;
-	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-	SMI501_WaitVSync(pSmi, 4);
+    /* Power up sequence for panel */
+    mode->panel_display_ctl.f.vdd = 1;
+    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    SMI501_WaitVSync(pSmi, 4);
 
-	mode->panel_display_ctl.f.bias = 1;
-	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-	SMI501_WaitVSync(pSmi, 4);
+    mode->panel_display_ctl.f.signal = 1;
+    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    SMI501_WaitVSync(pSmi, 4);
 
-	mode->panel_display_ctl.f.fp = 1;
-	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-	SMI501_WaitVSync(pSmi, 4);
-    }
+    mode->panel_display_ctl.f.bias = 1;
+    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    SMI501_WaitVSync(pSmi, 4);
+
+    mode->panel_display_ctl.f.fp = 1;
+    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    SMI501_WaitVSync(pSmi, 4);
+}
 
 void
 SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
@@ -318,6 +320,8 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
+    clock.value = READ_SCR(pSmi, mode->current_clock);
+
     clock.f.v2_select = mode->clock.f.v2_select;
     pll = clock.value;
     clock.f.v2_divider = mode->clock.f.v2_divider;
@@ -325,13 +329,13 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     clock.f.v2_1xclck = mode->clock.f.v2_1xclck;
     SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
-	WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
-	WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
-	WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
-	WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
-	WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
-	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+    WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
+    WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
+    WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
+    WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
+    WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
+    WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
+    WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 }
 
 static char *

@@ -839,7 +839,25 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     pSmi->Dualhead = FALSE;
 
-    if (!IS_MSOC(pSmi)){
+    if (IS_MSOC(pSmi)) {
+	pSmi->pEnt = xf86GetEntityInfo(pScrn->entityList[pScrn->numEntities - 1]);
+
+	/* FIXME this assumes the first head is always lcd and second
+	 * always crt */
+	pSmi->IsSecondary = FALSE;
+	pSmi->lcd = TRUE;
+
+	if (xf86IsEntityShared(pSmi->pEnt->index)) {
+	    pSmi->Dualhead = TRUE;
+	    if (xf86IsPrimInitDone(pSmi->pEnt->index)) {
+		pSmi->IsSecondary = TRUE;
+		pSmi->lcd = FALSE;
+	    }
+	    else
+		xf86SetPrimInitDone(pSmi->pEnt->index);
+	}
+    }
+    else {
 	if (SMI_LYNXM_SERIES(pSmi->Chipset) &&
 	    xf86ReturnOptValBool(pSmi->Options, OPTION_DUALHEAD, FALSE))
 	    pSmi->Dualhead = TRUE;
@@ -1243,9 +1261,9 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
 
 	    /* FIXME this should just read smi_501.h's bitfields... */
 	    clock = READ_SCR(pSmi, CURRENT_CLOCK);
-	    shift = (clock >> 8) & ((1 << 3) - 1);
-	    divider = (clock >> 11) & 1 ? 3 : 1;
-	    clock = clock & (1 << 12) ? 336 : 288;
+	    shift = clock & ((1 << 3) - 1);
+	    divider = (clock >> 3) & 1 ? 3 : 1;
+	    clock = clock & (1 << 4) ? 336 : 288;
 	    mclk = (clock / (divider << shift)) * 1000;
 	}
 	else {
