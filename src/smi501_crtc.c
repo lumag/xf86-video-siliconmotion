@@ -35,6 +35,10 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "smi_crtc.h"
 #include "smi_501.h"
 
+/* Want to see register dumps for now */
+#undef VERBLEV
+#define VERBLEV		1
+
 static void
 SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 {
@@ -55,9 +59,10 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
     int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
     pitch = (pitch + 15) & ~15;
 
+    /* >> 4 because of the "unused bits" that should be set to 0 */
+    /* FIXME this should be used for virtual size? */
     mode->panel_fb_width.f.offset = pitch >> 4;
-    mode->panel_fb_width.f.width = crtc->mode.HDisplay * pSmi->Bpp >> 4;
-
+    mode->panel_fb_width.f.width = pitch >> 4;
 
     WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
     WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
@@ -85,8 +90,10 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
     int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
     pitch = (pitch + 15) & ~15;
 
+    /* >> 4 because of the "unused bits" that should be set to 0 */
+    /* FIXME this should be used for virtual size? */
     mode->crt_fb_width.f.offset = pitch >> 4;
-    mode->crt_fb_width.f.width = crtc->mode.HDisplay * pSmi->Bpp >> 4;
+    mode->crt_fb_width.f.width = pitch >> 4;
 
 
     WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
@@ -137,6 +144,11 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     int32_t	x2_select, x2_divider, x2_shift, x2_1xclck;
 
     ENTER();
+
+    if (pSmi->UseFBDev) {
+	LEAVE();
+	return;
+    }
 
     /* Initialize the display controller */
 

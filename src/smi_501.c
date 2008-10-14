@@ -210,7 +210,7 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
     /* FIXME: No dual head setup, and in this case, crt may
      * just be another panel */
     /* crt clones panel */
-	mode->crt_display_ctl.f.enable = 1;
+    mode->crt_display_ctl.f.enable = 1;
     /* 0: select panel - 1: select crt */
     mode->crt_display_ctl.f.select = 0;
 
@@ -311,6 +311,9 @@ SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     mode->panel_display_ctl.f.fp = 1;
     WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
     SMI501_WaitVSync(pSmi, 4);
+
+    /* Turn CRT on */
+    SMI501_DisplayPowerManagementSet(pScrn, DPMSModeOn, 0);
 }
 
 void

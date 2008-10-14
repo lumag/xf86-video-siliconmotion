@@ -79,6 +79,14 @@ SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
     LEAVE();
 }
 
+static xf86OutputStatus
+SMI501_OutputDetect_crt(xf86OutputPtr output)
+{
+    ENTER();
+
+    RETURN(XF86OutputStatusDisconnected);
+}
+
 static xf86OutputFuncsRec SMI501_Output0Funcs;
 static xf86OutputFuncsRec SMI501_Output1Funcs;
 
@@ -94,6 +102,7 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
     SMI_OutputFuncsInit_base(&SMI501_Output0Funcs);
     SMI501_Output0Funcs.dpms=SMI501_OutputDPMS_lcd;
     SMI501_Output0Funcs.get_modes=SMI_OutputGetModes_native;
+    SMI501_Output0Funcs.detect = SMI_OutputDetect_lcd;
 
     output0=xf86OutputCreate(pScrn,&SMI501_Output0Funcs,"LVDS");
     if(!output0)
@@ -108,6 +117,7 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
     SMI_OutputFuncsInit_base(&SMI501_Output1Funcs);
     SMI501_Output1Funcs.dpms=SMI501_OutputDPMS_crt;
     SMI501_Output1Funcs.get_modes=SMI_OutputGetModes_native;
+    SMI501_Output1Funcs.detect = SMI501_OutputDetect_crt;
 
     output1=xf86OutputCreate(pScrn,&SMI501_Output1Funcs,"VGA");
     if(!output1)
