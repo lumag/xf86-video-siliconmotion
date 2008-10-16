@@ -1707,9 +1707,43 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if(!SMI_HWInit(pScrn))
 	RETURN(FALSE);
 
+    /* Unless using EXA, regardless or using XAA or not, needs offscreen
+     * management at least for video. */
+    if (pSmi->NoAccel || !pSmi->useEXA) {
+	int		numLines;
+	BoxRec		AvailFBArea;
+	RegionRec	AvailFBRegion;
+
+	pSmi->width  = pScrn->virtualX;
+	pSmi->height = pScrn->virtualY;
+	pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
+	numLines = pSmi->FBReserved / (pScrn->displayWidth * pSmi->Bpp);
+	AvailFBArea.x1 = 0;
+	if(pSmi->randrRotation) /* The rotated mode could need more memory */
+	    AvailFBArea.y1= max(((pScrn->virtualX * pSmi->Bpp + 15) & ~15) *
+				pScrn->virtualY,
+				((pScrn->virtualY * pSmi->Bpp + 15) & ~15) *
+				pScrn->virtualX) / (pScrn->virtualX * pSmi->Bpp);
+	else
+	    AvailFBArea.y1 = pScrn->virtualY;
+	AvailFBArea.x2 = pScrn->virtualX;
+	AvailFBArea.y2 = numLines;
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		   "FrameBuffer Box: %d,%d - %d,%d\n",
+		   AvailFBArea.x1, AvailFBArea.y1, AvailFBArea.x2,
+		   AvailFBArea.y2);
+	REGION_INIT(pScreen, &AvailFBRegion, &AvailFBArea, 1);
+	xf86InitFBManagerRegion(pScreen, &AvailFBRegion);
+	REGION_UNINIT(pScreen, &AvailFBRegion);
+    }
+
     /* Initialize acceleration layer */
-    if (!pSmi->NoAccel && pSmi->useEXA)
-	SMI_EXAInit(pScreen);
+    if (!pSmi->NoAccel) {
+	if (pSmi->useEXA && !SMI_EXAInit(pScreen))
+	    RETURN(FALSE);
+	else if (!pSmi->useEXA && !SMI_XAAInit(pScreen))
+	    RETURN(FALSE);
+    }
 
     /* Initialize the chosen modes */
     if (!xf86SetDesiredModes(pScrn))
