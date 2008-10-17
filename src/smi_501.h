@@ -208,11 +208,16 @@ typedef struct _MSOCRegRec {
      *	12:12	DAC Power Control.
      *		0: Enable.
      *		1: Disable.
+     *	24:24	Crystal Frequency Select.
+     *		0: 24MHz.
+     *		1: 12MHz
      */
     union {
 	struct {
 	    int32_t	u0		: bits( 0, 11);
 	    int32_t	dac		: bits(12, 12);
+	    int32_t	u1		: bits(13, 23);
+	    int32_t	frequency	: bits(24, 24);
 	} f;
 	int32_t	value;
     } misc_ctl;

@@ -428,14 +428,24 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      *
      *   K is a divisor, used by setting bit 15 of the PLL_CTL
      * (PLL Output Divided by 2).
+     *
+     *   So, it should be requested_clock = input_frequency * M / N / K
+     */
+
+    /* That said, use what actually works, that is:
+     * requested_clock = input_frequency * K * M / N
+     *
+     * where requested_clock is modeline pixel clock,
+     * input_frequency is 12, K is either 1 or 2 (and sets bit15 accordingly),
+     * M is a non zero 7 bits unsigned integer, and N is a value from 2 to 24.
      */
 
     best = 0x7fffffff;
-    frequency = 24 * 1000;
+    frequency = 12 * 1000.0;
     for (N = 2; N <= 24; N++) {
 	for (K = 1; K <= 2; K++) {
-	    M = (clock * K) / frequency * N;
-	    diff = ((int32_t)(frequency * M) / N) - (clock * K);
+	    M = clock / frequency * K * N;
+	    diff = ((int32_t)(frequency / K * M) / N) - clock;
 	    /* Ensure M is larger then 0 and fits in 7 bits */
 	    if (M > 0 && M < 0x80 && fabs(diff) < best) {
 		*m = M;
@@ -450,7 +460,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
 
     xf86ErrorFVerb(VERBLEV,
 		   "\tMatching alternate clock %5.2f, diff %5.2f (%d/%d/%d)\n",
-		   frequency * *m / *n / (*xclck ? 1 : 2), best,
+		   frequency / (*xclck ? 1 : 2) * *m / *n, best,
 		   *m, *n, *xclck);
 
     return (best);
@@ -463,7 +473,7 @@ SMI501_PrintRegs(ScrnInfoPtr pScrn)
     SMIPtr	pSmi = SMIPTR(pScrn);
 
     xf86ErrorFVerb(VERBLEV, "    SMI501 System Setup:\n");
-    for (i = 0x00; i < 0x6c; i += 4)
+    for (i = 0x00; i <= 0x74; i += 4)
 	xf86ErrorFVerb(VERBLEV, "\t%08x: %s\n", i,
 		       format_integer_base2(READ_SCR(pSmi, i)));
     xf86ErrorFVerb(VERBLEV, "    SMI501 Display Setup:\n");

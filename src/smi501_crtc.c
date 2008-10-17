@@ -177,10 +177,11 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 	pll_diff = SMI501_FindPLLClock(xf86mode->Clock, &m, &n, &xclck);
 	if (pll_diff < p2_diff) {
 
-	    /* FIXME Need to clarify. This is required for the GDIUM,
-	     * but based on the sample smi source code, it is not
-	     * always required to set this field to 1. */
-	    mode->clock.f.p2_1xclck = 1;
+	    /* Zero the pre 502 bitfield */
+	    mode->clock.f.p2_select  = 0;
+	    mode->clock.f.p2_divider = 0;
+	    mode->clock.f.p2_shift   = 0;
+	    mode->clock.f.p2_1xclck  = 0;
 
 	    mode->clock.f.pll_select = 1;
 	    mode->pll_ctl.f.m = m;
