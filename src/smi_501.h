@@ -123,32 +123,31 @@ authorization from the XFree86 Project and Silicon Motion.
  *	31:31	Disable 2X P2XCLK.
  *		0: Normal.
  *		1: 1X clock for P2CLK.
- *
- *	Remarks:
- *	Table 2-2: Programmable Clock Branches
- *	Clock Description
- *	P2XCLK  2X clock source for the Panel interface timing.
- *		The actual rate at which the pixels are shifted
- *		out is P2XCLK divided by two.
- *	V2XCLK	2X clock source for the CRT interface timing.
- *		The actual rate at which the pixels are shifted
- *		out is V2XCLK divided by two
  */
 typedef union _MSOCClockRec {
     struct {
+	/* Clock source for the local SDRAM controller. */
 	int32_t 	m1_shift	: bits( 0,  2);
 	int32_t 	m1_divider	: bits( 3,  3);
 	int32_t		m1_select	: bits( 4,  4);
 	int32_t 	u0		: bits( 5,  7);
+	/* Main clock source for all functional blocks,
+	 * such as the 2D engine, GPIO, Video Engine, DMA Engine. */
 	int32_t 	m_shift		: bits( 8, 10);
 	int32_t 	m_divider	: bits(11, 11);
 	int32_t 	m_select	: bits(12, 12);
 	int32_t 	u1		: bits(13, 15);
+	/* 2X clock source for the CRT interface timing.
+	 * The actual rate at which the pixels are shifted
+	 * out is V2XCLK divided by two. */
 	int32_t 	v2_shift	: bits(16, 18);
 	int32_t 	v2_divider	: bits(19, 19);
 	int32_t 	v2_select	: bits(20, 20);
 	int32_t 	v2_1xclck	: bits(21, 21);
 	int32_t 	u2		: bits(22, 23);
+	/* 2X clock source for the Panel interface timing.
+	 * The actual rate at which the pixels are shifted
+	 * out is P2XCLK divided by two. */
 	int32_t 	p2_shift	: bits(24, 26);
 	int32_t 	p2_divider	: bits(27, 28);
 	int32_t 	p2_select	: bits(29, 29);

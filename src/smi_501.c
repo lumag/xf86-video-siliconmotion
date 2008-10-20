@@ -178,10 +178,6 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
     mode->clock.f.m_divider = 1;
     mode->clock.f.m_shift = 0;
 
-    /* FIXME probably should not "touch" m1clk. A value other then 112Mhz
-     * will instant lock on my test prototype, "or" maybe it just means
-     * that m1clk value must be equal to mclk value? (and mclk must be
-     * set first!?) */
     switch (pSmi->MCLK) {
 	case 168000:	    /* 336/1/1 */
 	    mode->clock.f.m1_select = 1;
@@ -199,10 +195,14 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
 	    mode->clock.f.m1_shift = 1;
 	    break;
 	case 112000:	    /* 336/3/0 */
-	default:
 	    mode->clock.f.m1_select = 1;
 	    mode->clock.f.m1_divider = 1;
 	    mode->clock.f.m1_shift = 0;
+	    break;
+	default:
+	    /* Do nothing. Use what was configured by the kernel.
+	     * Accordingly to SMI, this should be 144Mhz for 6ns sdram,
+	     * or 112Mhz for other types of sdram. */
 	    break;
     }
 
