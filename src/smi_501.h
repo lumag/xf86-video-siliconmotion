@@ -634,6 +634,11 @@ typedef struct _MSOCRegRec {
      *	2:2	CRT Graphics Plane Enable.
      *		0: Disable CRT Graphics plane.
      *		1: Enable CRT Graphics plane.
+     *	3:3	Enable Gamma Control. Gamma control can be enabled
+     *		only in RGB 5:6:5 and RGB 8:8:8 modes.
+     *		0: Disable gamma control.
+     *		1: Enable gamma control.
+     *	4:7	Starting Pixel Number for Smooth Pixel Panning.
      *	8:8	Enable CRT Timing.
      *		0: Disable CRT timing.
      *		1: Enable CRT timing.
@@ -655,7 +660,8 @@ typedef struct _MSOCRegRec {
 	struct {
 	    int32_t	format		: bits( 0,  1);
 	    int32_t	enable		: bits( 2,  2);
-	    int32_t	u0		: bits( 3,  7);
+	    int32_t	gamma		: bits( 3,  3);
+	    int32_t	pixel		: bits( 4,  7);
 	    int32_t	timing		: bits( 8,  8);
 	    int32_t	select		: bits( 9,  9);
 	    int32_t	blank		: bits(10, 10);
@@ -807,6 +813,8 @@ Bool SMI501_HWInit(ScrnInfoPtr pScrn);
 void SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 void SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 void SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode);
+void SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore);
+void SMI501_PowerPanel(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool on);
 
 /* smi501_crtc.c */
 Bool SMI501_CrtcPreInit(ScrnInfoPtr pScrn);

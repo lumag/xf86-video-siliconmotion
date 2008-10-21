@@ -206,12 +206,13 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
 	    break;
     }
 
-    /* By default, crt clones panel */
-    mode->crt_display_ctl.f.enable = 1;
-    /* 0: select panel - 1: select crt */
-    mode->crt_display_ctl.f.select = 0;
-    /* FIXME correct? */
-    mode->crt_display_ctl.f.timing = 0;
+    if (!pSmi->Dualhead) {
+	/* By default, crt clones panel */
+	mode->crt_display_ctl.f.enable = 0;
+	/* 0: select panel - 1: select crt */
+	mode->crt_display_ctl.f.select = 0;
+	mode->crt_display_ctl.f.timing = 0;
+    }
 
     SMI501_WriteMode_common(pScrn, mode);
 
@@ -255,7 +256,8 @@ SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     mode->system_ctl.f.retry = pSmi->PCIRetry != FALSE;
     WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);
 
-    WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+    if (!pSmi->Dualhead)
+	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 }
 
 void
@@ -293,26 +295,6 @@ SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
     WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
     WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-
-    /* Power up sequence for panel */
-    mode->panel_display_ctl.f.vdd = 1;
-    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-    SMI501_WaitVSync(pSmi, 4);
-
-    mode->panel_display_ctl.f.signal = 1;
-    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-    SMI501_WaitVSync(pSmi, 4);
-
-    mode->panel_display_ctl.f.bias = 1;
-    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-    SMI501_WaitVSync(pSmi, 4);
-
-    mode->panel_display_ctl.f.fp = 1;
-    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
-    SMI501_WaitVSync(pSmi, 4);
-
-    /* Turn CRT on */
-    SMI501_DisplayPowerManagementSet(pScrn, DPMSModeOn, 0);
 }
 
 void
@@ -338,6 +320,64 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
     WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
     WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+}
+
+void
+SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
+{
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
+    SMI501_WriteMode_common(pScrn, restore);
+    SMI501_WriteMode_lcd(pScrn, restore);
+    if (pSmi->Dualhead)
+	SMI501_WriteMode_crt(pScrn, restore);
+}
+
+void
+SMI501_PowerPanel(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool on)
+{
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
+    if (on != FALSE) {
+	mode->panel_display_ctl.f.vdd = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.signal = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.bias = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.fp = 1;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+    }
+    else {
+	mode->panel_display_ctl.f.fp = 0;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.bias = 0;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.signal = 0;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+
+	mode->panel_display_ctl.f.vdd = 0;
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	SMI501_WaitVSync(pSmi, 4);
+    }
+}
+
+void
+SMI501_PowerCrt(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool onoff)
+{
+    SMI501_DisplayPowerManagementSet(pScrn, onoff ? DPMSModeOn : DPMSModeOff, 0);
 }
 
 static char *

@@ -47,6 +47,31 @@ SMI501_OutputDPMS_lcd(xf86OutputPtr output, int dpms)
 }
 
 static void
+SMI501_OutputDPMS_panel(xf86OutputPtr output, int dpms)
+{
+    ScrnInfoPtr		pScrn = output->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    MSOCRegPtr		mode = pSmi->mode;
+
+    ENTER();
+
+    mode->system_ctl.value = READ_SCR(pSmi, SYSTEM_CTL);
+    switch (dpms) {
+    case DPMSModeOn:
+	SMI501_PowerPanel(pScrn, mode, TRUE);
+    case DPMSModeStandby:
+	break;
+    case DPMSModeSuspend:
+	break;
+    case DPMSModeOff:
+	SMI501_PowerPanel(pScrn, mode, FALSE);
+	break;
+    }
+
+    LEAVE();
+}
+
+static void
 SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
 {
     ScrnInfoPtr pScrn = output->scrn;
@@ -93,19 +118,19 @@ static xf86OutputFuncsRec SMI501_Output1Funcs;
 Bool
 SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 {
-    xf86OutputPtr output0=NULL;
-    xf86OutputPtr output1=NULL;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86OutputPtr	output0, output1;
 
     ENTER();
 
     /* CRTC0 is LCD */
     SMI_OutputFuncsInit_base(&SMI501_Output0Funcs);
-    SMI501_Output0Funcs.dpms=SMI501_OutputDPMS_lcd;
-    SMI501_Output0Funcs.get_modes=SMI_OutputGetModes_native;
-    SMI501_Output0Funcs.detect = SMI_OutputDetect_lcd;
+    SMI501_Output0Funcs.dpms		= SMI501_OutputDPMS_lcd;
+    SMI501_Output0Funcs.get_modes	= SMI_OutputGetModes_native;
+    SMI501_Output0Funcs.detect		= SMI_OutputDetect_lcd;
 
-    output0=xf86OutputCreate(pScrn,&SMI501_Output0Funcs,"LVDS");
-    if(!output0)
+    output0 = xf86OutputCreate(pScrn, &SMI501_Output0Funcs, "LVDS");
+    if (!output0)
 	RETURN(FALSE);
 
     output0->possible_crtcs = 1 << 0;
@@ -114,20 +139,20 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
     output0->doubleScanAllowed = FALSE;
 
     /* CRTC1 is CRT */
-    SMI_OutputFuncsInit_base(&SMI501_Output1Funcs);
-    SMI501_Output1Funcs.dpms=SMI501_OutputDPMS_crt;
-    SMI501_Output1Funcs.get_modes=SMI_OutputGetModes_native;
-    SMI501_Output1Funcs.detect = SMI501_OutputDetect_crt;
+    if (pSmi->Dualhead) {
+	SMI_OutputFuncsInit_base(&SMI501_Output1Funcs);
+	SMI501_Output1Funcs.dpms	= SMI501_OutputDPMS_crt;
+	SMI501_Output1Funcs.get_modes	= SMI_OutputGetModes_native;
 
-    output1=xf86OutputCreate(pScrn,&SMI501_Output1Funcs,"VGA");
-    if(!output1)
-	RETURN(FALSE);
+	output1 = xf86OutputCreate(pScrn, &SMI501_Output1Funcs, "VGA");
+	if (!output1)
+	    RETURN(FALSE);
 
-    output1->possible_crtcs = 1 << 1;
-    output1->possible_clones = 0;
-    output1->interlaceAllowed = FALSE;
-    output1->doubleScanAllowed = FALSE;
-
+	output1->possible_crtcs = 1 << 1;
+	output1->possible_clones = 0;
+	output1->interlaceAllowed = FALSE;
+	output1->doubleScanAllowed = FALSE;
+    }
 
     RETURN(TRUE);
 }

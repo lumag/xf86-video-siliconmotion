@@ -190,7 +190,7 @@ static const OptionInfoRec SMIOptions[] =
     /* end CZ */
     { OPTION_USEBIOS,	     "UseBIOS",		  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ZOOMONLCD,	     "ZoomOnLCD",	  OPTV_BOOLEAN,	{0}, FALSE },
-    { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, FALSE },
+    { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, TRUE },
     { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
     { OPTION_PANEL_SIZE,     "PanelSize",	  OPTV_ANYSTR,	{0}, FALSE },
     { OPTION_USE_FBDEV,	     "UseFBDev",	  OPTV_BOOLEAN,	{0}, FALSE },
@@ -839,29 +839,15 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     pSmi->Dualhead = FALSE;
 
+    from = X_DEFAULT;
+    if (xf86GetOptValBool(pSmi->Options, OPTION_DUALHEAD, &pSmi->Dualhead))
+	from = X_CONFIG;
+
     if (IS_MSOC(pSmi)) {
-	pSmi->pEnt = xf86GetEntityInfo(pScrn->entityList[pScrn->numEntities - 1]);
-
-	/* FIXME this assumes the first head is always lcd and second
-	 * always crt */
-	pSmi->IsSecondary = FALSE;
 	pSmi->lcd = TRUE;
-
-	if (xf86IsEntityShared(pSmi->pEnt->index)) {
-	    pSmi->Dualhead = TRUE;
-	    if (xf86IsPrimInitDone(pSmi->pEnt->index)) {
-		pSmi->IsSecondary = TRUE;
-		pSmi->lcd = FALSE;
-	    }
-	    else
-		xf86SetPrimInitDone(pSmi->pEnt->index);
-	}
+	pSmi->IsSecondary = FALSE;
     }
-    else {
-	if (SMI_LYNXM_SERIES(pSmi->Chipset) &&
-	    xf86ReturnOptValBool(pSmi->Options, OPTION_DUALHEAD, FALSE))
-	    pSmi->Dualhead = TRUE;
-
+    else if (SMI_LYNXM_SERIES(pSmi->Chipset)) {
 	/* tweak options for dualhead */
 	if (pSmi->Dualhead) {
 	    pSmi->useBIOS = FALSE;
@@ -883,6 +869,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	xf86ErrorFVerb(VERBLEV, "\tSMI_PreInit vgaCRIndex=%x, vgaIOBase=%x, "
 		       "MMIOBase=%p\n", vgaCRIndex, vgaIOBase, hwp->MMIOBase);
     }
+    xf86DrvMsg(pScrn->scrnIndex, from, "Dual head %sabled\n",
+	       pSmi->PCIBurst ? "en" : "dis");
 
     SMI_MapMmio(pScrn);
     SMI_DetectMem(pScrn);
@@ -1097,8 +1085,11 @@ SMI_LeaveVT(int scrnIndex, int flags)
 
     if (!IS_MSOC(pSmi)) {
 	vgaHWPtr	hwp = VGAHWPTR(pScrn);
+
 	SMILynx_WriteMode(pScrn, &hwp->SavedReg, pSmi->save);
-	    }
+    }
+    else
+	SMI501_WriteMode(pScrn, pSmi->save);
 
     SMI_UnmapMem(pScrn);
 
@@ -1831,6 +1822,8 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
 	    SMILynx_WriteMode(pScrn, &hwp->SavedReg, pSmi->save);
 	    vgaHWLock(hwp);
 	}
+	else
+	    SMI501_WriteMode(pScrn, pSmi->save);
 	SMI_UnmapMem(pScrn);
     }
 

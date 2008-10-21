@@ -122,11 +122,14 @@ SMI501_CrtcAdjustFrame(xf86CrtcPtr crtc, int x, int y)
 
     Base = (Base + 15) & ~15;
 
-    if(crtc == crtcConf->crtc[0]){
+    if (crtc == crtcConf->crtc[0]) {
 	mode->panel_fb_address.f.address = Base >> 4;
 	mode->panel_fb_address.f.pending = 1;
 	WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
-    }else{
+    }
+    else {
+	mode->crt_display_ctl.f.pixel = ((x * pSmi->Bpp) & 15) / pSmi->Bpp;
+	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 	mode->crt_fb_address.f.address = Base >> 4;
 	mode->crt_fb_address.f.pending = 1;
 	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
@@ -277,10 +280,11 @@ SMI501_CrtcModeSet_crt(xf86CrtcPtr crtc,
     /* 0: select panel - 1: select crt */
     mode->crt_display_ctl.f.select = 1;
     mode->crt_display_ctl.f.enable = 1;
+    mode->crt_display_ctl.f.timing = 1;
+    /* 0: show pixels - 1: blank */
+    mode->crt_display_ctl.f.blank = 0;
 
     mode->crt_fb_address.f.mextern = 0;	/* local memory */
-    mode->crt_fb_address.f.timing = 1;
-    mode->crt_display_ctl.f.blank = 0;
 
     /* 0 means pulse high */
     mode->crt_display_ctl.f.hsync = !(xf86mode->Flags & V_PHSYNC);
@@ -335,34 +339,36 @@ static SMICrtcPrivateRec SMI501_Crtc1Priv;
 Bool
 SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 {
-    xf86CrtcPtr crtc0=NULL;
-    xf86CrtcPtr crtc1=NULL;
+    SMIPtr	pSmi = SMIPTR(pScrn);
+    xf86CrtcPtr crtc0, crtc1;
 
     ENTER();
 
     /* CRTC0 is LCD */
     SMI_CrtcFuncsInit_base(&SMI501_Crtc0Funcs, &SMI501_Crtc0Priv);
-    SMI501_Crtc0Funcs.mode_set = SMI501_CrtcModeSet_lcd;
-    SMI501_Crtc0Priv.adjust_frame = SMI501_CrtcAdjustFrame;
-    SMI501_Crtc0Priv.video_init = SMI501_CrtcVideoInit_lcd;
-    SMI501_Crtc0Priv.load_lut = SMI501_CrtcLoadLUT;
+    SMI501_Crtc0Funcs.mode_set		= SMI501_CrtcModeSet_lcd;
+    SMI501_Crtc0Priv.adjust_frame	= SMI501_CrtcAdjustFrame;
+    SMI501_Crtc0Priv.video_init		= SMI501_CrtcVideoInit_lcd;
+    SMI501_Crtc0Priv.load_lut		= SMI501_CrtcLoadLUT;
 
-    crtc0=xf86CrtcCreate(pScrn,&SMI501_Crtc0Funcs);
-    if(!crtc0)
+    crtc0 = xf86CrtcCreate(pScrn, &SMI501_Crtc0Funcs);
+    if (!crtc0)
 	RETURN(FALSE);
     crtc0->driver_private = &SMI501_Crtc0Priv;
 
     /* CRTC1 is CRT */
-    SMI_CrtcFuncsInit_base(&SMI501_Crtc1Funcs, &SMI501_Crtc1Priv);
-    SMI501_Crtc1Funcs.mode_set = SMI501_CrtcModeSet_crt;
-    SMI501_Crtc1Priv.adjust_frame = SMI501_CrtcAdjustFrame;
-    SMI501_Crtc1Priv.video_init = SMI501_CrtcVideoInit_crt;
-    SMI501_Crtc1Priv.load_lut = SMI501_CrtcLoadLUT;
+    if (pSmi->Dualhead) {
+	SMI_CrtcFuncsInit_base(&SMI501_Crtc1Funcs, &SMI501_Crtc1Priv);
+	SMI501_Crtc1Funcs.mode_set	= SMI501_CrtcModeSet_crt;
+	SMI501_Crtc1Priv.adjust_frame	= SMI501_CrtcAdjustFrame;
+	SMI501_Crtc1Priv.video_init	= SMI501_CrtcVideoInit_crt;
+	SMI501_Crtc1Priv.load_lut	= SMI501_CrtcLoadLUT;
 
-    crtc1=xf86CrtcCreate(pScrn,&SMI501_Crtc1Funcs);
-    if(!crtc1)
-	RETURN(FALSE);
-    crtc1->driver_private = &SMI501_Crtc1Priv;
+	crtc1 = xf86CrtcCreate(pScrn, &SMI501_Crtc1Funcs);
+	if (!crtc1)
+	    RETURN(FALSE);
+	crtc1->driver_private = &SMI501_Crtc1Priv;
+    }
 
     RETURN(TRUE);
 }
