@@ -634,9 +634,16 @@ typedef struct _MSOCRegRec {
      *	2:2	CRT Graphics Plane Enable.
      *		0: Disable CRT Graphics plane.
      *		1: Enable CRT Graphics plane.
+     *	8:8	Enable CRT Timing.
+     *		0: Disable CRT timing.
+     *		1: Enable CRT timing.
      *	9:9:	CRT Data Select.
      *		0: CRT will display panel data.
      *		1: CRT will display CRT data.
+     *	10:10	CRT Data Blanking.
+     *		0: CRT will show pixels.
+     *		1: CRT will be blank.
+     *	11:11	Vertical Sync. This bit is read only.
      *	12:12	Horizontal Sync Pulse Phase Select.
      *		0: Horizontal sync pulse active high.
      *		1: Horizontal sync pulse active low.
@@ -648,9 +655,11 @@ typedef struct _MSOCRegRec {
 	struct {
 	    int32_t	format		: bits( 0,  1);
 	    int32_t	enable		: bits( 2,  2);
-	    int32_t	u0		: bits( 3,  8);
+	    int32_t	u0		: bits( 3,  7);
+	    int32_t	timing		: bits( 8,  8);
 	    int32_t	select		: bits( 9,  9);
-	    int32_t	u1		: bits(10, 11);
+	    int32_t	blank		: bits(10, 10);
+	    int32_t	sync		: bits(11, 11);
 	    int32_t	hsync		: bits(12, 12);
 	    int32_t	vsync		: bits(13, 13);
 	} f;

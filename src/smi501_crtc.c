@@ -45,6 +45,7 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
     MSOCRegPtr mode = pSmi->mode;
+    int		pitch, width;
 
     ENTER();
 
@@ -56,13 +57,13 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 	pScrn->bitsPerPixel == 8 ? 0 :
 	pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-    int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
-    pitch = (pitch + 15) & ~15;
+    pitch = (((crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) *
+	      pSmi->Bpp) + 15) & ~15;
+    width = crtc->mode.HDisplay * pSmi->Bpp;
 
     /* >> 4 because of the "unused bits" that should be set to 0 */
-    /* FIXME this should be used for virtual size? */
     mode->panel_fb_width.f.offset = pitch >> 4;
-    mode->panel_fb_width.f.width = pitch >> 4;
+    mode->panel_fb_width.f.width = width >> 4;
 
     WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
     WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
@@ -76,6 +77,7 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
     MSOCRegPtr mode = pSmi->mode;
+    int		pitch, width;
 
     ENTER();
 
@@ -87,13 +89,13 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
 	pScrn->bitsPerPixel == 8 ? 0 :
 	pScrn->bitsPerPixel == 16 ? 1 : 2;
 
-    int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
-    pitch = (pitch + 15) & ~15;
+    pitch = (((crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) *
+	      pSmi->Bpp) + 15) & ~15;
+    width = crtc->mode.HDisplay * pSmi->Bpp;
 
     /* >> 4 because of the "unused bits" that should be set to 0 */
-    /* FIXME this should be used for virtual size? */
     mode->crt_fb_width.f.offset = pitch >> 4;
-    mode->crt_fb_width.f.width = pitch >> 4;
+    mode->crt_fb_width.f.width = width >> 4;
 
 
     WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
@@ -122,9 +124,11 @@ SMI501_CrtcAdjustFrame(xf86CrtcPtr crtc, int x, int y)
 
     if(crtc == crtcConf->crtc[0]){
 	mode->panel_fb_address.f.address = Base >> 4;
+	mode->panel_fb_address.f.pending = 1;
 	WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
     }else{
 	mode->crt_fb_address.f.address = Base >> 4;
+	mode->crt_fb_address.f.pending = 1;
 	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
     }
 
@@ -153,7 +157,6 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     /* Initialize the display controller */
 
     SMI501_CrtcVideoInit_lcd(crtc);
-    SMI501_CrtcAdjustFrame(crtc, x,y);
 
     /* P2CLK have dividers 1, 3 and 5 */
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
@@ -237,6 +240,7 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 
 
     SMI501_WriteMode_lcd(pScrn,mode);
+    SMI501_CrtcAdjustFrame(crtc, x, y);
 
     LEAVE();
 }
@@ -257,7 +261,6 @@ SMI501_CrtcModeSet_crt(xf86CrtcPtr crtc,
     /* Initialize the display controller */
 
     SMI501_CrtcVideoInit_crt(crtc);
-    SMI501_CrtcAdjustFrame(crtc, x,y);
 
     /* V2CLK have dividers 1 and 3 */
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
@@ -275,11 +278,9 @@ SMI501_CrtcModeSet_crt(xf86CrtcPtr crtc,
     mode->crt_display_ctl.f.select = 1;
     mode->crt_display_ctl.f.enable = 1;
 
-    /* FIXME if non clone dual head, and secondary, need to
-     * properly set crt fb address ... */
-    mode->crt_fb_address.f.address = 0;
     mode->crt_fb_address.f.mextern = 0;	/* local memory */
-    mode->crt_fb_address.f.pending = 0;	/* FIXME required? */
+    mode->crt_fb_address.f.timing = 1;
+    mode->crt_display_ctl.f.blank = 0;
 
     /* 0 means pulse high */
     mode->crt_display_ctl.f.hsync = !(xf86mode->Flags & V_PHSYNC);
@@ -300,6 +301,7 @@ SMI501_CrtcModeSet_crt(xf86CrtcPtr crtc,
 	xf86mode->HSyncStart;
 
     SMI501_WriteMode_crt(pScrn,mode);
+    SMI501_CrtcAdjustFrame(crtc, x, y);
 
     LEAVE();
 }

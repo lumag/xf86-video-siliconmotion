@@ -206,13 +206,12 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
 	    break;
     }
 
-
-    /* FIXME: No dual head setup, and in this case, crt may
-     * just be another panel */
-    /* crt clones panel */
+    /* By default, crt clones panel */
     mode->crt_display_ctl.f.enable = 1;
     /* 0: select panel - 1: select crt */
     mode->crt_display_ctl.f.select = 0;
+    /* FIXME correct? */
+    mode->crt_display_ctl.f.timing = 0;
 
     SMI501_WriteMode_common(pScrn, mode);
 
@@ -382,6 +381,7 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
 		    if (fabs(diff) < best) {
 			*x2_shift = shift;
 			*x2_divider = divider == 1 ? 0 : divider == 3 ? 1 : 2;
+			*x2_select = mclk == 12 * 24 * 1000.0 ? 0 : 1;
 			*x2_1xclck = xclck == 0;
 
 			/* Remember best diff */
@@ -391,8 +391,6 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
 	    }
 	}
     }
-
-    *x2_select = mclk == 12 * 24 * 1000.0 ? 0 : 1;
 
     xf86ErrorFVerb(VERBLEV,
 		   "\tMatching clock %5.2f, diff %5.2f (%d/%d/%d/%d)\n",
