@@ -207,7 +207,7 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
     }
 
     if (!pSmi->Dualhead) {
-	/* By default, crt clones panel */
+	/* crt clones panel */
 	mode->crt_display_ctl.f.enable = 0;
 	/* 0: select panel - 1: select crt */
 	mode->crt_display_ctl.f.select = 0;
@@ -226,26 +226,28 @@ SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
-    /* Update gate first */
-    WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
+    if (!pSmi->UseFBDev) {
+	/* Update gate first */
+	WRITE_SCR(pSmi, mode->current_gate, mode->gate.value);
 
-    clock.value = READ_SCR(pSmi, mode->current_clock);
+	clock.value = READ_SCR(pSmi, mode->current_clock);
 
-    clock.f.m_select = mode->clock.f.m_select;
-    pll = clock.value;
-    clock.f.m_divider = mode->clock.f.m_divider;
-    clock.f.m_shift = mode->clock.f.m_shift;
-    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	clock.f.m_select = mode->clock.f.m_select;
+	pll = clock.value;
+	clock.f.m_divider = mode->clock.f.m_divider;
+	clock.f.m_shift = mode->clock.f.m_shift;
+	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    clock.f.m1_select = mode->clock.f.m1_select;
-    pll = clock.value;
-    clock.f.m1_divider = mode->clock.f.m1_divider;
-    clock.f.m1_shift = mode->clock.f.m1_shift;
-    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	clock.f.m1_select = mode->clock.f.m1_select;
+	pll = clock.value;
+	clock.f.m1_divider = mode->clock.f.m1_divider;
+	clock.f.m1_shift = mode->clock.f.m1_shift;
+	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
+	WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
 
-    WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
+	WRITE_SCR(pSmi, POWER_CTL, mode->power_ctl.value);
+    }
 
     /* Match configuration */
     /* FIXME some other fields should also be set, otherwise, since
@@ -267,34 +269,36 @@ SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
-    clock.value = READ_SCR(pSmi, mode->current_clock);
+    if (!pSmi->UseFBDev) {
+	clock.value = READ_SCR(pSmi, mode->current_clock);
 
-    /* Alternate pll_select is only available for the SMI 502,
-     * and the bit should be only set in that case. */
-    if (mode->clock.f.pll_select)
-	WRITE_SCR(pSmi, PLL_CTL, mode->pll_ctl.value);
-    clock.f.p2_select = mode->clock.f.p2_select;
-    pll = clock.value;
-    clock.f.p2_divider = mode->clock.f.p2_divider;
-    clock.f.p2_shift = mode->clock.f.p2_shift;
-    clock.f.pll_select = mode->clock.f.pll_select;
-    clock.f.p2_1xclck = mode->clock.f.p2_1xclck;
-    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	/* Alternate pll_select is only available for the SMI 502,
+	 * and the bit should be only set in that case. */
+	if (mode->clock.f.pll_select)
+	    WRITE_SCR(pSmi, PLL_CTL, mode->pll_ctl.value);
+	clock.f.p2_select = mode->clock.f.p2_select;
+	pll = clock.value;
+	clock.f.p2_divider = mode->clock.f.p2_divider;
+	clock.f.p2_shift = mode->clock.f.p2_shift;
+	clock.f.pll_select = mode->clock.f.pll_select;
+	clock.f.p2_1xclck = mode->clock.f.p2_1xclck;
+	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
-    WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
+	WRITE_SCR(pSmi, PANEL_FB_ADDRESS, mode->panel_fb_address.value);
+	WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
 
-    WRITE_SCR(pSmi, PANEL_WWIDTH, mode->panel_wwidth.value);
-    WRITE_SCR(pSmi, PANEL_WHEIGHT, mode->panel_wheight.value);
+	WRITE_SCR(pSmi, PANEL_WWIDTH, mode->panel_wwidth.value);
+	WRITE_SCR(pSmi, PANEL_WHEIGHT, mode->panel_wheight.value);
 
-    WRITE_SCR(pSmi, PANEL_PLANE_TL, mode->panel_plane_tl.value);
-    WRITE_SCR(pSmi, PANEL_PLANE_BR, mode->panel_plane_br.value);
+	WRITE_SCR(pSmi, PANEL_PLANE_TL, mode->panel_plane_tl.value);
+	WRITE_SCR(pSmi, PANEL_PLANE_BR, mode->panel_plane_br.value);
 
-    WRITE_SCR(pSmi, PANEL_HTOTAL, mode->panel_htotal.value);
-    WRITE_SCR(pSmi, PANEL_HSYNC, mode->panel_hsync.value);
-    WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
-    WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
-    WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+	WRITE_SCR(pSmi, PANEL_HTOTAL, mode->panel_htotal.value);
+	WRITE_SCR(pSmi, PANEL_HSYNC, mode->panel_hsync.value);
+	WRITE_SCR(pSmi, PANEL_VTOTAL, mode->panel_vtotal.value);
+	WRITE_SCR(pSmi, PANEL_VSYNC, mode->panel_vsync.value);
+	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
+    }
 }
 
 void
@@ -304,33 +308,42 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
     MSOCClockRec	clock;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
-    clock.value = READ_SCR(pSmi, mode->current_clock);
+    if (!pSmi->UseFBDev) {
+	clock.value = READ_SCR(pSmi, mode->current_clock);
 
-    clock.f.v2_select = mode->clock.f.v2_select;
-    pll = clock.value;
-    clock.f.v2_divider = mode->clock.f.v2_divider;
-    clock.f.v2_shift = mode->clock.f.v2_shift;
-    clock.f.v2_1xclck = mode->clock.f.v2_1xclck;
-    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	clock.f.v2_select = mode->clock.f.v2_select;
+	pll = clock.value;
+	clock.f.v2_divider = mode->clock.f.v2_divider;
+	clock.f.v2_shift = mode->clock.f.v2_shift;
+	clock.f.v2_1xclck = mode->clock.f.v2_1xclck;
+	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
 
-    WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
-    WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
-    WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
-    WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
-    WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
-    WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
-    WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
+	WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
+	WRITE_SCR(pSmi, CRT_HTOTAL, mode->crt_htotal.value);
+	WRITE_SCR(pSmi, CRT_HSYNC, mode->crt_hsync.value);
+	WRITE_SCR(pSmi, CRT_VTOTAL, mode->crt_vtotal.value);
+	WRITE_SCR(pSmi, CRT_VSYNC, mode->crt_vsync.value);
+	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
+    }
 }
 
 void
 SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
 {
+    /* FIXME There is a problem here:
+     *   The kernel may not have modified some values, like clocks,
+     * but when "restoring" them, it will actually change from a
+     * a valid value, to a random value.
+     */
+#if 0
     SMIPtr	pSmi = SMIPTR(pScrn);
 
     SMI501_WriteMode_common(pScrn, restore);
     SMI501_WriteMode_lcd(pScrn, restore);
     if (pSmi->Dualhead)
 	SMI501_WriteMode_crt(pScrn, restore);
+#endif
 }
 
 void
@@ -372,12 +385,6 @@ SMI501_PowerPanel(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool on)
 	WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
 	SMI501_WaitVSync(pSmi, 4);
     }
-}
-
-void
-SMI501_PowerCrt(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool onoff)
-{
-    SMI501_DisplayPowerManagementSet(pScrn, onoff ? DPMSModeOn : DPMSModeOff, 0);
 }
 
 static char *
@@ -454,7 +461,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      * displayed correctly due to the big difference on the requested
      * pixel clock, with the actual pixel clock that can be achieved by
      * those divisions. In this method, N can be any integer between 2
-     * and 24, M can be any positive, 7 bits integer, and K is either 1
+     * and 24, M can be any positive, 8 bits integer, and K is either 1
      * or 2.
      *   To calculate the programmable PLL, the following formula is
      * used:
@@ -475,7 +482,7 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
      *
      * where requested_clock is modeline pixel clock,
      * input_frequency is 12, K is either 1 or 2 (and sets bit15 accordingly),
-     * M is a non zero 7 bits unsigned integer, and N is a value from 2 to 24.
+     * M is a non zero 8 bits unsigned integer, and N is a value from 2 to 24.
      */
 
     best = 0x7fffffff;
@@ -484,8 +491,8 @@ SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)
 	for (K = 1; K <= 2; K++) {
 	    M = clock / frequency * K * N;
 	    diff = ((int32_t)(frequency / K * M) / N) - clock;
-	    /* Ensure M is larger then 0 and fits in 7 bits */
-	    if (M > 0 && M < 0x80 && fabs(diff) < best) {
+	    /* Ensure M is larger then 0 and fits in 8 bits */
+	    if (M > 0 && M < 0x100 && fabs(diff) < best) {
 		*m = M;
 		*n = N;
 		*xclck = K == 1;

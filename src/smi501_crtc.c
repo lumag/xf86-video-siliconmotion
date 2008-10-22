@@ -152,11 +152,6 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 
     ENTER();
 
-    if (pSmi->UseFBDev) {
-	LEAVE();
-	return;
-    }
-
     /* Initialize the display controller */
 
     SMI501_CrtcVideoInit_lcd(crtc);

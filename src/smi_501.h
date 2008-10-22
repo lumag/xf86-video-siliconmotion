@@ -369,7 +369,7 @@ typedef struct _MSOCRegRec {
      *		Requested Pixel Clock = Input Frequency * M / N
      *	Input Frequency is the input crystal frequency value (24 MHz in
      *	the SMI VGX Demo Board). N must be a value between 2 and 24.
-     *	M can be any (7 bits) value, and a loop testing all possible N
+     *	M can be any (8 bits) value, and a loop testing all possible N
      *	values should be the best approach to calculate it's value.
      */
     union {

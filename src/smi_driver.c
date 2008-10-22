@@ -846,6 +846,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (IS_MSOC(pSmi)) {
 	pSmi->lcd = TRUE;
 	pSmi->IsSecondary = FALSE;
+	if (pSmi->Dualhead && pSmi->UseFBDev) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		       "Dual head disabled when using fbdev mode\n");
+	    pSmi->Dualhead = FALSE;
+	}
     }
     else if (SMI_LYNXM_SERIES(pSmi->Chipset)) {
 	/* tweak options for dualhead */
@@ -870,7 +875,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		       "MMIOBase=%p\n", vgaCRIndex, vgaIOBase, hwp->MMIOBase);
     }
     xf86DrvMsg(pScrn->scrnIndex, from, "Dual head %sabled\n",
-	       pSmi->PCIBurst ? "en" : "dis");
+	       pSmi->Dualhead ? "en" : "dis");
 
     SMI_MapMmio(pScrn);
     SMI_DetectMem(pScrn);
