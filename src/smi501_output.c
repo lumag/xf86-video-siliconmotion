@@ -39,16 +39,6 @@ authorization from The XFree86 Project or Silicon Motion.
 static void
 SMI501_OutputDPMS_lcd(xf86OutputPtr output, int dpms)
 {
-    ENTER();
-
-    /* Nothing - FIXME */
-
-    LEAVE();
-}
-
-static void
-SMI501_OutputDPMS_panel(xf86OutputPtr output, int dpms)
-{
     ScrnInfoPtr		pScrn = output->scrn;
     SMIPtr		pSmi = SMIPTR(pScrn);
     MSOCRegPtr		mode = pSmi->mode;
@@ -71,7 +61,7 @@ SMI501_OutputDPMS_panel(xf86OutputPtr output, int dpms)
     LEAVE();
 }
 
-static void
+void
 SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
 {
     ScrnInfoPtr pScrn = output->scrn;
@@ -83,20 +73,20 @@ SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
     mode->system_ctl.value = READ_SCR(pSmi, SYSTEM_CTL);
     switch (dpms) {
     case DPMSModeOn:
-	mode->system_ctl.f.dpmsh = 1;
-	mode->system_ctl.f.dpmsv = 1;
+	mode->system_ctl.f.dpmsh = 0;
+	mode->system_ctl.f.dpmsv = 0;
 	break;
     case DPMSModeStandby:
-	mode->system_ctl.f.dpmsh = 0;
-	mode->system_ctl.f.dpmsv = 1;
-	break;
-    case DPMSModeSuspend:
 	mode->system_ctl.f.dpmsh = 1;
 	mode->system_ctl.f.dpmsv = 0;
 	break;
-    case DPMSModeOff:
+    case DPMSModeSuspend:
 	mode->system_ctl.f.dpmsh = 0;
-	mode->system_ctl.f.dpmsv = 0;
+	mode->system_ctl.f.dpmsv = 1;
+	break;
+    case DPMSModeOff:
+	mode->system_ctl.f.dpmsh = 1;
+	mode->system_ctl.f.dpmsv = 1;
 	break;
     }
     WRITE_SCR(pSmi, SYSTEM_CTL, mode->system_ctl.value);

@@ -331,19 +331,9 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 void
 SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
 {
-    /* FIXME There is a problem here:
-     *   The kernel may not have modified some values, like clocks,
-     * but when "restoring" them, it will actually change from a
-     * a valid value, to a random value.
-     */
-#if 0
-    SMIPtr	pSmi = SMIPTR(pScrn);
-
     SMI501_WriteMode_common(pScrn, restore);
     SMI501_WriteMode_lcd(pScrn, restore);
-    if (pSmi->Dualhead)
-	SMI501_WriteMode_crt(pScrn, restore);
-#endif
+    SMI501_WriteMode_crt(pScrn, restore);
 }
 
 void
@@ -423,7 +413,7 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
 	for (divider = 1; divider <= max_divider; divider += 2) {
 	    for (shift = 0; shift < 8; shift++) {
 		/* Divider 1 not in specs form cards older then 502 */
-		for (xclck = has1xclck != FALSE; xclck <= 1; xclck++) {
+		for (xclck = 1; xclck >= !has1xclck; xclck--) {
 		    diff = (mclk / (divider << shift << xclck)) - clock;
 		    if (fabs(diff) < best) {
 			*x2_shift = shift;

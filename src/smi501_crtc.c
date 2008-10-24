@@ -59,7 +59,7 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 
     pitch = (((crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) *
 	      pSmi->Bpp) + 15) & ~15;
-    width = crtc->mode.HDisplay * pSmi->Bpp;
+    width = ((crtc->mode.HDisplay * pSmi->Bpp) + 15) & ~ 15;
 
     /* >> 4 because of the "unused bits" that should be set to 0 */
     mode->panel_fb_width.f.offset = pitch >> 4;
@@ -91,7 +91,7 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
 
     pitch = (((crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) *
 	      pSmi->Bpp) + 15) & ~15;
-    width = crtc->mode.HDisplay * pSmi->Bpp;
+    width = ((crtc->mode.HDisplay * pSmi->Bpp) + 15) & ~ 15;
 
     /* >> 4 because of the "unused bits" that should be set to 0 */
     mode->crt_fb_width.f.offset = pitch >> 4;
@@ -131,6 +131,7 @@ SMI501_CrtcAdjustFrame(xf86CrtcPtr crtc, int x, int y)
 	mode->crt_display_ctl.f.pixel = ((x * pSmi->Bpp) & 15) / pSmi->Bpp;
 	WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
 	mode->crt_fb_address.f.address = Base >> 4;
+	mode->crt_fb_address.f.mselect = 0;
 	mode->crt_fb_address.f.pending = 1;
 	WRITE_SCR(pSmi, CRT_FB_ADDRESS, mode->crt_fb_address.value);
     }
@@ -225,7 +226,7 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     mode->panel_htotal.f.total = xf86mode->HTotal - 1;
     mode->panel_htotal.f.end = xf86mode->HDisplay - 1;
 
-    mode->panel_hsync.f.start = xf86mode->HSyncStart;
+    mode->panel_hsync.f.start = xf86mode->HSyncStart - 1;
     mode->panel_hsync.f.width = xf86mode->HSyncEnd -
 	xf86mode->HSyncStart;
 
@@ -288,16 +289,16 @@ SMI501_CrtcModeSet_crt(xf86CrtcPtr crtc,
     mode->crt_htotal.f.total = xf86mode->HTotal - 1;
     mode->crt_htotal.f.end = xf86mode->HDisplay - 1;
 
-    mode->crt_hsync.f.start = xf86mode->HSyncStart;
+    mode->crt_hsync.f.start = xf86mode->HSyncStart - 1;
     mode->crt_hsync.f.width = xf86mode->HSyncEnd -
 	xf86mode->HSyncStart;
 
     mode->crt_vtotal.f.total = xf86mode->VTotal - 1;
     mode->crt_vtotal.f.end = xf86mode->VDisplay - 1;
 
-    mode->crt_vsync.f.start = xf86mode->HSyncStart;
-    mode->crt_vsync.f.height = xf86mode->HSyncEnd -
-	xf86mode->HSyncStart;
+    mode->crt_vsync.f.start = xf86mode->VSyncStart;
+    mode->crt_vsync.f.height = xf86mode->VSyncEnd -
+	xf86mode->VSyncStart;
 
     SMI501_WriteMode_crt(pScrn,mode);
     SMI501_CrtcAdjustFrame(crtc, x, y);
