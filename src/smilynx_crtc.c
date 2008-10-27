@@ -493,6 +493,187 @@ SMILynx_CrtcLoadLUT_lcd(xf86CrtcPtr crtc)
     LEAVE();
 }
 
+static void
+SMILynx_CrtcSetCursorColors_crt (xf86CrtcPtr crtc, int bg, int fg)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    CARD8 packedFG,packedBG;
+
+    ENTER();
+
+    /* Pack the true color into 8 bit */
+    packedFG = (fg & 0xE00000) >> 16 |
+	(fg & 0x00E000) >> 11 |
+	(fg & 0x0000C0) >> 6;
+    packedBG = (bg & 0xE00000) >> 16 |
+	(bg & 0x00E000) >> 11 |
+	(bg & 0x0000C0) >> 6;
+
+    /* Program the colors */
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8C, packedFG);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8D, packedBG);
+
+    /* Program FPR copy when on the 730 */
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD32 fpr15c;
+
+	fpr15c  = READ_FPR(pSmi, FPR15C) & FPR15C_MASK_HWCADDREN;
+	fpr15c |= packedFG;
+	fpr15c |= packedBG << 8;
+	WRITE_FPR(pSmi, FPR15C, fpr15c);
+    }
+
+    LEAVE();
+}
+
+static void
+SMILynx_CrtcSetCursorPosition_crt (xf86CrtcPtr crtc, int x, int y)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER();
+
+    if (x >= 0) {
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x88,
+		      x & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x89,
+		      (x >> 8) & 0x07);
+    }
+    else {
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x88,
+		      (-x) & (SMILYNX_MAX_CURSOR - 1));
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x89,
+		      0x08);
+    }
+
+    if (y >= 0) {
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8A,
+		      y & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8B,
+		      (y >> 8) & 0x07);
+    }
+    else {
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x8A,
+			  (-y) & (SMILYNX_MAX_CURSOR - 1));
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
+		      0x8B, 0x08);
+    }
+
+    /* Program FPR copy when on the 730 */
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD32 fpr158;
+
+	if (x >= 0)
+	    fpr158 = (x & FPR158_MASK_MAXBITS) << 16;
+	else
+	    fpr158 = ((-x & FPR158_MASK_MAXBITS) |
+		      FPR158_MASK_BOUNDARY) << 16;
+
+	if (y >= 0)
+	    fpr158 |= y & FPR158_MASK_MAXBITS;
+	else
+	    fpr158 |= (-y & FPR158_MASK_MAXBITS) | FPR158_MASK_BOUNDARY;
+
+	/* Program combined coordinates */
+	WRITE_FPR(pSmi, FPR158, fpr158);
+    }
+
+    LEAVE();
+}
+
+static void
+SMILynx_CrtcShowCursor_crt (xf86CrtcPtr crtc)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    char tmp;
+
+    ENTER();
+
+    /* Show cursor */
+    tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, tmp | 0x80);
+
+    /* Program FPR copy when on the 730 */
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD32 fpr15c;
+
+	/* turn on the top bit */
+	fpr15c  = READ_FPR(pSmi, FPR15C);
+	fpr15c |= FPR15C_MASK_HWCENABLE;
+	WRITE_FPR(pSmi, FPR15C, fpr15c);
+    }
+
+    LEAVE();
+}
+
+static void
+SMILynx_CrtcHideCursor_crt (xf86CrtcPtr crtc)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    char tmp;
+
+    ENTER();
+
+    /* Hide cursor */
+    tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, tmp & ~0x80);
+
+    /* Program FPR copy when on the 730 */
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD32 fpr15c;
+
+	/* turn off the top bit */
+	fpr15c  = READ_FPR(pSmi, FPR15C);
+	fpr15c &= ~FPR15C_MASK_HWCENABLE;
+	WRITE_FPR(pSmi, FPR15C, fpr15c);
+    }
+
+
+    LEAVE();
+}
+
+static void
+SMILynx_CrtcLoadCursorImage_crt (xf86CrtcPtr crtc, CARD8 *image)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    CARD8 tmp;
+    int i;
+    CARD8* dst;
+
+    ENTER();
+
+    /* Load storage location. */
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x80,
+		  pSmi->FBCursorOffset / 2048);
+    tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81) & 0x80;
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81,
+		  tmp | ((pSmi->FBCursorOffset / 2048) >> 8));
+
+    /* Program FPR copy when on the 730 */
+    if (pSmi->Chipset == SMI_COUGAR3DR) {
+	CARD32 fpr15c;
+
+	/* put address in upper word, and disable the cursor */
+	fpr15c  = READ_FPR(pSmi, FPR15C) & FPR15C_MASK_HWCCOLORS;
+	fpr15c |= (pSmi->FBCursorOffset / 2048) << 16;
+	WRITE_FPR(pSmi, FPR15C, fpr15c);
+    }
+
+    /* Copy cursor image to framebuffer storage */
+    dst = pSmi->FBBase + pSmi->FBCursorOffset;
+    for(i=0; i < (SMILYNX_MAX_CURSOR * SMILYNX_MAX_CURSOR >> 2); i++){
+	*(dst++) = image[i];
+	if((i & 0x3) == 0x3) dst+=4;
+    }
+
+    LEAVE();
+}
+
 static xf86CrtcFuncsRec SMILynx_Crtc0Funcs;
 static SMICrtcPrivateRec SMILynx_Crtc0Priv;
 static xf86CrtcFuncsRec SMILynx_Crtc1Funcs;
@@ -518,6 +699,14 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	SMILynx_Crtc0Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
 	SMILynx_Crtc0Priv.video_init = SMI730_CrtcVideoInit;
 	SMILynx_Crtc0Priv.load_lut = SMILynx_CrtcLoadLUT_crt;
+
+	if(pSmi->HwCursor){
+	    SMILynx_Crtc0Funcs.set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
+	    SMILynx_Crtc0Funcs.set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
+	    SMILynx_Crtc0Funcs.show_cursor = SMILynx_CrtcShowCursor_crt;
+	    SMILynx_Crtc0Funcs.hide_cursor = SMILynx_CrtcHideCursor_crt;
+	    SMILynx_Crtc0Funcs.load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
+	}
 
 	crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
 	if(!crtc0)
@@ -557,6 +746,14 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	    SMILynx_Crtc0Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
 	    SMILynx_Crtc0Priv.video_init = SMILynx_CrtcVideoInit_crt;
 	    SMILynx_Crtc0Priv.load_lut = SMILynx_CrtcLoadLUT_crt;
+
+	    if(pSmi->HwCursor){
+		SMILynx_Crtc0Funcs.set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
+		SMILynx_Crtc0Funcs.set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
+		SMILynx_Crtc0Funcs.show_cursor = SMILynx_CrtcShowCursor_crt;
+		SMILynx_Crtc0Funcs.hide_cursor = SMILynx_CrtcHideCursor_crt;
+		SMILynx_Crtc0Funcs.load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
+	    }
 
 	    crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
 	    if(!crtc0)

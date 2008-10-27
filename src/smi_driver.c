@@ -1061,6 +1061,11 @@ SMI_EnterVT(int scrnIndex, int flags)
     if (!xf86SetDesiredModes(pScrn))
 	RETURN(FALSE);
 
+    /* Initialize the hardware cursor */
+    if(!IS_MSOC(pSmi) && pSmi->HwCursor){
+	xf86_show_cursors(pScrn);
+    }
+
     /* Reset the grapics engine */
     if (!pSmi->NoAccel)
 	SMI_EngineReset(pScrn);
@@ -1771,10 +1776,24 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      * initialization.
      */
     if (pSmi->HwCursor) {
-	if (!SMI_HWCursorInit(pScreen)) {
-	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
-		       "initialization failed\n");
+	if(IS_MSOC(pSmi)){
+	    if (!SMI_HWCursorInit(pScreen)) {
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
+			   "initialization failed\n");
+	    }
+	}else{
+	    if(!xf86_cursors_init(pScreen, SMILYNX_MAX_CURSOR, SMILYNX_MAX_CURSOR,
+				  HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_8 |
+				  HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK |
+				  HARDWARE_CURSOR_AND_SOURCE_WITH_MASK |
+				  HARDWARE_CURSOR_BIT_ORDER_MSBFIRST |
+				  HARDWARE_CURSOR_TRUECOLOR_AT_8BPP |
+				  HARDWARE_CURSOR_INVERT_MASK)){
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
+			   "initialization failed\n");
+	    }
 	}
+
     }
 
     /* Initialise default colormap */
@@ -1827,6 +1846,10 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
     Bool	ret;
 	
     ENTER();
+
+    if(!IS_MSOC(pSmi) && pSmi->HwCursor){
+	xf86_cursors_fini(pScreen);
+    }
 
     if (pScrn->vtSema) {
 	if (!IS_MSOC(pSmi)) {

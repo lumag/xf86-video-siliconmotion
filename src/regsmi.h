@@ -311,6 +311,12 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define FPR15C_MASK_HWCADDREN       0xFFFF0000
 #define FPR15C_MASK_HWCENABLE       0x80000000
 
+/* Maximum hardware cursor dimensions */
+#define SMILYNX_MAX_CURSOR	32
+#define SMI501_MAX_CURSOR	64
+#define SMILYNX_CURSOR_SIZE	1024
+#define SMI501_CURSOR_SIZE	2048
+
 /* HWCursor definitons for Panel AND CRT */
 #define SMI501_MASK_HWCENABLE			0x80000000
 #define SMI501_MASK_MAXBITS			0x000007FF

@@ -84,9 +84,13 @@ SMI_CrtcPrepare(xf86CrtcPtr crtc)
 static void
 SMI_CrtcCommit(xf86CrtcPtr crtc)
 {
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
     ENTER();
 
-    /* Nothing */
+    if(pSmi->HwCursor)
+	xf86_reload_cursors(pScrn->pScreen);
 
     LEAVE();
 }
@@ -167,51 +171,12 @@ SMI_CrtcShadowDestroy (xf86CrtcPtr crtc, PixmapPtr pPixmap, void *data)
 }
 
 static void
-SMI_CrtcSetCursorColors (xf86CrtcPtr crtc, int bg, int fg)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
-SMI_CrtcSetCursorPosition (xf86CrtcPtr crtc, int x, int y)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
-SMI_CrtcShowCursor (xf86CrtcPtr crtc)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
-SMI_CrtcHideCursor (xf86CrtcPtr crtc)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
-SMI_CrtcLoadCursorImage (xf86CrtcPtr crtc, CARD8 *image)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
-SMI_CrtcLoadCursorArgb (xf86CrtcPtr crtc, CARD32 *image)
-{
-    ENTER();
-    LEAVE();
-}
-
-static void
 SMI_CrtcDestroy (xf86CrtcPtr	crtc)
 {
     ENTER();
+
+    /* Nothing */
+
     LEAVE();
 }
 
@@ -290,12 +255,6 @@ SMI_CrtcFuncsInit_base(xf86CrtcFuncsPtr crtcFuncs, SMICrtcPrivatePtr crtcPriv){
     crtcFuncs->shadow_allocate = SMI_CrtcShadowAllocate;
     crtcFuncs->shadow_create = SMI_CrtcShadowCreate;
     crtcFuncs->shadow_destroy = SMI_CrtcShadowDestroy;
-    crtcFuncs->set_cursor_colors = SMI_CrtcSetCursorColors;
-    crtcFuncs->set_cursor_position = SMI_CrtcSetCursorPosition;
-    crtcFuncs->show_cursor = SMI_CrtcShowCursor;
-    crtcFuncs->hide_cursor = SMI_CrtcHideCursor;
-    crtcFuncs->load_cursor_image = SMI_CrtcLoadCursorImage;
-    crtcFuncs->load_cursor_argb = SMI_CrtcLoadCursorArgb;
     crtcFuncs->destroy = SMI_CrtcDestroy;
 }
 
