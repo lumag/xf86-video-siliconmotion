@@ -1799,10 +1799,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	 !xf86DPMSInit(pScreen, SMILynx_DisplayPowerManagementSet, 0)))
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "DPMS initialization failed!\n");
 
-    if (!pSmi->Dualhead)
-  	SMI_InitVideo(pScreen);
-    else 
-	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "No overlay in dualhead mode\n");
+    SMI_InitVideo(pScreen);
 
     if(!xf86CrtcScreenInit(pScreen))
 	RETURN(FALSE);

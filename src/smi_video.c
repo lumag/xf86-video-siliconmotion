@@ -49,6 +49,7 @@ Date:   2.11.2001
 #include "smi.h"
 #include "smi_video.h"
 
+#include "xf86Crtc.h"
 
 /*
 
@@ -888,7 +889,6 @@ SMI_SetupVideo(ScreenPtr pScreen)
 
     ptrAdaptor->flags = VIDEO_OVERLAID_IMAGES;
     if (IS_MSOC(pSmi)) {
-	ptrAdaptor->flags |= VIDEO_CLIP_TO_VIEWPORT;
 	ptrAdaptor->name = "Silicon Motion MSOC Series Video Engine";
     }
     else
@@ -1070,6 +1070,8 @@ SMI_PutVideo(
     int norm;
     int size, width, height, fbPitch;
     int top, left;
+    xf86CrtcConfigPtr crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CrtcPtr crtc;
 
     ENTER();
 
@@ -1104,19 +1106,19 @@ SMI_PutVideo(
     dstBox.x2 = drw_x + drw_w;
     dstBox.y2 = drw_y + drw_h;
 
-#if 1
-    if (!SMI_ClipVideo(pScrn, &dstBox, &x1, &y1, &x2, &y2, clipBoxes, width, height))
-#else
-    if (!xf86XVClipVideoHelper(&dstBox, &x1, &y1, &x2, &y2, clipBoxes, width, height))
-#endif
+    if(!xf86_crtc_clip_video_helper(pScrn, &crtc, NULL, &dstBox, &x1, &x2, &y1, &y2, clipBoxes, width, height))
 	RETURN(Success);
 
-    DEBUG("Clip: x1=%d y1=%d x2=%d y2=%d\n",  x1 >> 16, y1 >> 16, x2 >> 16, y2 >> 16);
+    if(pSmi->Dualhead && crtc == crtcConf->crtc[0])
+	RETURN(Success);
 
-    dstBox.x1 -= pScrn->frameX0;
-    dstBox.y1 -= pScrn->frameY0;
-    dstBox.x2 -= pScrn->frameX0;
-    dstBox.y2 -= pScrn->frameY0;
+    /* Transform dstBox to the CRTC coordinates */
+    dstBox.x1 -= crtc->x;
+    dstBox.y1 -= crtc->y;
+    dstBox.x2 -= crtc->x;
+    dstBox.y2 -= crtc->y;
+
+    DEBUG("Clip: x1=%d y1=%d x2=%d y2=%d\n",  x1 >> 16, y1 >> 16, x2 >> 16, y2 >> 16);
 
     vid_pitch = (vid_w * 2 + 7) & ~7;
 
@@ -1548,16 +1550,10 @@ SMI_PutImage(
     CARD32 offset, offset2 = 0, offset3 = 0, tmp;
     int left, top, nPixels, nLines;
     unsigned char *dstStart;
+    xf86CrtcConfigPtr crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CrtcPtr crtc;
 
     ENTER();
-
-    if(pSmi->rotate){
-       /* As we cannot display it rotated, we pretend it has */
-       /* the rotated dimensions to do the clipping... */
-       ROTATE_DIMS(src_x,src_y);
-       ROTATE_DIMS(src_w,src_h);
-       ROTATE_DIMS(width,height);
-    }
 
     x1 = src_x;
     y1 = src_y;
@@ -1569,24 +1565,14 @@ SMI_PutImage(
     dstBox.x2 = drw_x + drw_w;
     dstBox.y2 = drw_y + drw_h;
 
-    if (!SMI_ClipVideo(pScrn, &dstBox, &x1, &y1, &x2, &y2, clipBoxes, width, height))
+    if(!xf86_crtc_clip_video_helper(pScrn, &crtc, NULL, &dstBox, &x1, &x2, &y1, &y2, clipBoxes, width, height))
 	RETURN(Success);
 
-    if(pSmi->rotate){
-       /* Now, transform the coordinates back */
-       /* to the physical (unrotated) frame */
-       UNROTATE_DIMS(x1,y1);
-       UNROTATE_DIMS(x2,y2);
-       UNROTATE_BOX(dstBox);
-       UNROTATE_DIMS(src_w,src_h);
-       UNROTATE_DIMS(drw_w,drw_h);
-       UNROTATE_DIMS(width,height);
-    }
-
-    dstBox.x1 -= pScrn->frameX0;
-    dstBox.y1 -= pScrn->frameY0;
-    dstBox.x2 -= pScrn->frameX0;
-    dstBox.y2 -= pScrn->frameY0;
+    /* Transform dstBox to the CRTC coordinates */
+    dstBox.x1 -= crtc->x;
+    dstBox.y1 -= crtc->y;
+    dstBox.x2 -= crtc->x;
+    dstBox.y2 -= crtc->y;
 
 
     switch (id) {
@@ -1626,7 +1612,7 @@ SMI_PutImage(
 
     size = dstPitch * height;
     pPort->video_offset = SMI_AllocateMemory(pScrn, &pPort->video_memory, size);
-    if (pPort->video_offset == 0)
+    if (pPort->video_memory == NULL)
 	RETURN(BadAlloc);
 
     top = y1 >> 16;
@@ -1672,10 +1658,11 @@ SMI_PutImage(
 	SMI_DisplayVideo0501(pScrn, id, offset, width, height, dstPitch,
 			     x1, y1, x2, y2, &dstBox, src_w, src_h, drw_w,
 			     drw_h);
-    else
-	SMI_DisplayVideo(pScrn, id, offset, width, height, dstPitch, x1, y1, x2, y2,
-			 &dstBox, src_w, src_h, drw_w, drw_h);
-
+    else{
+	if(!pSmi->Dualhead || crtc == crtcConf->crtc[1])
+	    SMI_DisplayVideo(pScrn, id, offset, width, height, dstPitch, x1, y1, x2, y2,
+			     &dstBox, src_w, src_h, drw_w, drw_h);
+    }
     pPort->videoStatus = CLIENT_VIDEO_ON;
 
     RETURN(Success);
@@ -2485,6 +2472,8 @@ SMI_DisplaySurface(
     SMI_PortPtr pPort = pSmi->ptrAdaptor->pPortPrivates[0].ptr;
     INT32 x1, y1, x2, y2;
     BoxRec dstBox;
+    xf86CrtcConfigPtr crtcConf = XF86_CRTC_CONFIG_PTR(surface->pScrn);
+    xf86CrtcPtr crtc;
 
     ENTER();
 
@@ -2498,14 +2487,15 @@ SMI_DisplaySurface(
     dstBox.y1 = drw_y;
     dstBox.y2 = drw_y + drw_h;
 
-    if (!SMI_ClipVideo(surface->pScrn, &dstBox, &x1, &y1, &x2, &y2, clipBoxes,
-			surface->width, surface->height))
+    if(!xf86_crtc_clip_video_helper(surface->pScrn, &crtc, NULL, &dstBox,
+				    &x1, &x2, &y1, &y2, clipBoxes, surface->width, surface->height))
 	RETURN(Success);
 
-    dstBox.x1 -= surface->pScrn->frameX0;
-    dstBox.y1 -= surface->pScrn->frameY0;
-    dstBox.x2 -= surface->pScrn->frameX0;
-    dstBox.y2 -= surface->pScrn->frameY0;
+    /* Transform dstBox to the CRTC coordinates */
+    dstBox.x1 -= crtc->x;
+    dstBox.y1 -= crtc->y;
+    dstBox.x2 -= crtc->x;
+    dstBox.y2 -= crtc->y;
 
     xf86XVFillKeyHelper(surface->pScrn->pScreen,
 			pPort->Attribute[XV_COLORKEY], clipBoxes);
@@ -2520,10 +2510,12 @@ SMI_DisplaySurface(
 			     surface->offsets[0], surface->width,
 			     surface->height, surface->pitches[0], x1, y1,
 			     x2, y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
-    else
-	SMI_DisplayVideo(surface->pScrn, surface->id, surface->offsets[0],
-			 surface->width, surface->height, surface->pitches[0], x1, y1, x2,
-			 y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
+    else{
+	if(!pSmi->Dualhead || crtc == crtcConf->crtc[1])
+	    SMI_DisplayVideo(surface->pScrn, surface->id, surface->offsets[0],
+			     surface->width, surface->height, surface->pitches[0], x1, y1, x2,
+			     y2, &dstBox, vid_w, vid_h, drw_w, drw_h);
+    }
 
     ptrOffscreen->isOn = TRUE;
     if (pPort->videoStatus & CLIENT_VIDEO_ON) {
