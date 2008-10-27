@@ -877,6 +877,25 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     xf86DrvMsg(pScrn->scrnIndex, from, "Dual head %sabled\n",
 	       pSmi->Dualhead ? "en" : "dis");
 
+    if (!pSmi->NoAccel) {
+	char *strptr;
+
+	from = X_DEFAULT;
+	if ((strptr = (char *)xf86GetOptValString(pSmi->Options,
+						  OPTION_ACCELMETHOD))) {
+	    if (!xf86NameCmp(strptr,"XAA")) {
+		from = X_CONFIG;
+		pSmi->useEXA = FALSE;
+	    } else if(!xf86NameCmp(strptr,"EXA")) {
+		from = X_CONFIG;
+		pSmi->useEXA = TRUE;
+	    }
+	}
+
+	xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
+		pSmi->useEXA ? "EXA" : "XAA");
+    }
+
     SMI_MapMmio(pScrn);
     SMI_DetectMem(pScrn);
     SMI_MapMem(pScrn);
@@ -938,7 +957,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if(!SMI_OutputPreInit(pScrn))
 	RETURN(FALSE);
 
-    if (!xf86InitialConfiguration (pScrn, TRUE)){
+    /* Only allow growing the screen dimensions if EXA is being used */
+    if (!xf86InitialConfiguration (pScrn, !pSmi->NoAccel && pSmi->useEXA)){
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes found\n");
 	RETURN(FALSE);
     }
@@ -960,25 +980,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (xf86LoadSubModule(pScrn, "fb") == NULL) {
 	SMI_FreeRec(pScrn);
 	RETURN(FALSE);
-    }
-
-    if (!pSmi->NoAccel) {
-	char *strptr;
-
-	from = X_DEFAULT;
-	if ((strptr = (char *)xf86GetOptValString(pSmi->Options,
-						  OPTION_ACCELMETHOD))) {
-	    if (!xf86NameCmp(strptr,"XAA")) {
-		from = X_CONFIG;
-		pSmi->useEXA = FALSE;
-	    } else if(!xf86NameCmp(strptr,"EXA")) {
-		from = X_CONFIG;
-		pSmi->useEXA = TRUE;
-	    }
-	}
-	
-	xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
-        	pSmi->useEXA ? "EXA" : "XAA");
     }
 
     xf86LoaderReqSymLists(fbSymbols, NULL);
@@ -1499,7 +1500,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	void	**result = (void**)&pSmi->FBBase;
 	int	  err = pci_device_map_range(pSmi->PciInfo,
 					     pScrn->memPhysBase +
-						 pSmi->fbMapOffset,
+					     pSmi->fbMapOffset,
 					     pSmi->videoRAMBytes,
 					     PCI_DEV_MAP_FLAG_WRITABLE |
 					     PCI_DEV_MAP_FLAG_WRITE_COMBINE,
@@ -1590,14 +1591,24 @@ SMI_UnmapMem(ScrnInfoPtr pScrn)
     SMI_DisableMmio(pScrn);
 
     if (pSmi->MapBase) {
+#ifndef XSERVER_LIBPCIACCESS
 	xf86UnMapVidMem(pScrn->scrnIndex, (pointer)pSmi->MapBase,
 			pSmi->MapSize);
+#else
+	pci_device_unmap_range(pSmi->PciInfo, (pointer)pSmi->MapBase,
+			       pSmi->MapSize);
+#endif
 	pSmi->MapBase = NULL;
     }
 
     if (pSmi->FBBase) {
+#ifndef XSERVER_LIBPCIACCESS
 	xf86UnMapVidMem(pScrn->scrnIndex, (pointer) pSmi->FBBase,
 			pSmi->videoRAMBytes);
+#else
+	pci_device_unmap_range(pSmi->PciInfo, (pointer)pSmi->FBBase,
+			       pSmi->videoRAMBytes);
+#endif
 	pSmi->FBBase = NULL;
     }
 

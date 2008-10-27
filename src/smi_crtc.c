@@ -120,12 +120,14 @@ SMI_CrtcShadowAllocate (xf86CrtcPtr crtc, int width, int height)
 
     ENTER();
 
-    int aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
+    if(!pSmi->NoAccel && pSmi->useEXA){
+	int aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
 
-    crtcPriv->shadowArea = exaOffscreenAlloc(pScrn->pScreen, aligned_pitch * height, 16, TRUE, NULL, NULL);
+	crtcPriv->shadowArea = exaOffscreenAlloc(pScrn->pScreen, aligned_pitch * height, 16, TRUE, NULL, NULL);
 
-    if(crtcPriv->shadowArea)
-	RETURN(pSmi->FBBase + crtcPriv->shadowArea->offset);
+	if(crtcPriv->shadowArea)
+	    RETURN(pSmi->FBBase + crtcPriv->shadowArea->offset);
+    }
 
     RETURN(NULL);
 }
@@ -135,10 +137,11 @@ SMI_CrtcShadowCreate (xf86CrtcPtr crtc, void *data, int width, int height)
 {
     ScrnInfoPtr pScrn = crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
+    int aligned_pitch;
 
     ENTER();
 
-    int aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
+    aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
 
     RETURN(GetScratchPixmapHeader(pScrn->pScreen,width,height,pScrn->depth,
 				  pScrn->bitsPerPixel,aligned_pitch,data));
@@ -224,11 +227,11 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 
     ENTER();
 
-    int aligned_pitch = (width*pSmi->Bpp + 15) & ~15;
-
     /* Allocate another offscreen area and use it as screen, if it really has to be resized */
     if(!pSmi->NoAccel && pSmi->useEXA &&
        ( !pSmi->fbArea || width != pScrn->virtualX || height != pScrn->virtualY )){
+	int aligned_pitch = (width*pSmi->Bpp + 15) & ~15;
+
 	ExaOffscreenArea* fbArea = exaOffscreenAlloc(pScrn->pScreen, aligned_pitch*height, 16, TRUE, NULL, NULL);
 	if(!fbArea){
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
@@ -243,19 +246,24 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 	pSmi->FBOffset = fbArea->offset;
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
 
-	if(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen)->devPrivate.ptr)
-	    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
-					       -1,-1,-1,-1,-1, pSmi->FBBase + pSmi->FBOffset);
-	else
+	if(pScrn->pixmapPrivate.ptr)
 	    /* Framebuffer access is disabled */
 	    pScrn->pixmapPrivate.ptr = pSmi->FBBase + pSmi->FBOffset;
+	else
+	    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
+					       -1,-1,-1,-1,-1, pSmi->FBBase + pSmi->FBOffset);
+
+	/* Modify the screen pitch */
+	pScrn->displayWidth = aligned_pitch / pSmi->Bpp;
+	pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
+					   -1, -1, -1, -1, aligned_pitch, NULL);
     }
 
+    /* Modify the screen dimensions */
     pScrn->virtualX = width;
     pScrn->virtualY = height;
-    pScrn->displayWidth = aligned_pitch / pSmi->Bpp;
     pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
-				       width, height, -1, -1, aligned_pitch, NULL);
+				       width, height, -1, -1, 0, NULL);
 
     /* Setup each crtc video processor */
     for(i=0;i<crtcConf->num_crtc;i++){

@@ -39,6 +39,7 @@ SMILynx_CrtcVideoInit_crt(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
+    int pitch;
 
     ENTER();
 
@@ -57,7 +58,7 @@ SMILynx_CrtcVideoInit_crt(xf86CrtcPtr crtc)
 	break;
     }
 
-    int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
+    pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
     pitch = (pitch + 15) & ~15;
 
     WRITE_VPR(pSmi, 0x10, (crtc->mode.HDisplay * pSmi->Bpp) >> 3 << 16 | pitch >> 3);
@@ -70,18 +71,21 @@ SMILynx_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
+    CARD8 SR31;
+    CARD16 fifo_readoffset,fifo_writeoffset;
 
     ENTER();
 
     /* Set display depth */
-    CARD8 SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
+    SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
     if (pScrn->bitsPerPixel > 8)
 	SR31 |= 0x40; /* 16 bpp */
     else
 	SR31 &= ~0x40; /* 8 bpp */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31,SR31);
 
-    CARD16 fifo_readoffset = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
+    /* FIFO1/2 Read Offset*/
+    fifo_readoffset = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
     fifo_readoffset = ((fifo_readoffset + 15) & ~15) >> 3;
 
     /* FIFO1 Read Offset */
@@ -93,7 +97,7 @@ SMILynx_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 		  (((fifo_readoffset & 0x00000300) >> 8) << 6));
 
     /* FIFO Write Offset */
-    CARD16 fifo_writeoffset = crtc->mode.HDisplay * pSmi->Bpp >> 3;
+    fifo_writeoffset = crtc->mode.HDisplay * pSmi->Bpp >> 3;
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x48, fifo_writeoffset & 0x000000FF);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x49, (fifo_writeoffset & 0x00000300) >> 8);
 
@@ -108,6 +112,7 @@ SMI730_CrtcVideoInit(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
+    int pitch;
 
     ENTER();
 
@@ -130,7 +135,7 @@ SMI730_CrtcVideoInit(xf86CrtcPtr crtc)
 	break;
     }
 
-    int pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
+    pitch = (crtc->rotatedData? crtc->mode.HDisplay : pScrn->displayWidth) * pSmi->Bpp;
     pitch = (pitch + 15) & ~15;
 
     WRITE_VPR(pSmi, 0x10, (crtc->mode.HDisplay * pSmi->Bpp) >> 3 << 16 | pitch >> 3);
@@ -317,51 +322,54 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
     VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E,
 		  VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E) & ~0x20);
 
-    unsigned long HTotal=(mode->CrtcHTotal>>3)-5;
-    unsigned long HDisplay=(mode->CrtcHDisplay>>3)-1;
-    unsigned long HBlankStart=(mode->CrtcHBlankStart>>3)-1;
-    unsigned long HBlankEnd=(mode->CrtcHBlankEnd>>3)-1;
-    unsigned long HSyncStart=mode->CrtcHSyncStart>>3;
-    unsigned long HSyncEnd=mode->CrtcHSyncEnd>>3;
-    unsigned long VTotal=mode->CrtcVTotal-2;
-    unsigned long VDisplay=mode->CrtcVDisplay-1;
-    unsigned long VBlankStart=mode->CrtcVBlankStart-1;
-    unsigned long VBlankEnd=mode->CrtcVBlankEnd-1;
-    unsigned long VSyncStart=mode->CrtcVSyncStart;
-    unsigned long VSyncEnd=mode->CrtcVSyncEnd;
+    {
+	unsigned long HTotal=(mode->CrtcHTotal>>3)-5;
+	unsigned long HDisplay=(mode->CrtcHDisplay>>3)-1;
+	unsigned long HBlankStart=(mode->CrtcHBlankStart>>3)-1;
+	unsigned long HBlankEnd=(mode->CrtcHBlankEnd>>3)-1;
+	unsigned long HSyncStart=mode->CrtcHSyncStart>>3;
+	unsigned long HSyncEnd=mode->CrtcHSyncEnd>>3;
+	unsigned long VTotal=mode->CrtcVTotal-2;
+	unsigned long VDisplay=mode->CrtcVDisplay-1;
+	unsigned long VBlankStart=mode->CrtcVBlankStart-1;
+	unsigned long VBlankEnd=mode->CrtcVBlankEnd-1;
+	unsigned long VSyncStart=mode->CrtcVSyncStart;
+	unsigned long VSyncEnd=mode->CrtcVSyncEnd;
 
-    if((mode->CrtcHBlankEnd >> 3) == (mode->CrtcHTotal >> 3)) HBlankEnd=0;
-    if(mode->CrtcVBlankEnd == mode->CrtcVTotal) VBlankEnd=0;
+	if((mode->CrtcHBlankEnd >> 3) == (mode->CrtcHTotal >> 3)) HBlankEnd=0;
+	if(mode->CrtcVBlankEnd == mode->CrtcVTotal) VBlankEnd=0;
 
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x40, HTotal & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x41, HBlankStart & 0xFF);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x42, HBlankEnd & 0x1F);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x43, HSyncStart & 0xFF);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x44,
-		  (HBlankEnd & 0x20) >> 5 << 7 |
-		  (HSyncEnd & 0x1F) );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x45, VTotal & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x46, VBlankStart & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x47, VBlankEnd & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x48, VSyncStart & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x49, VSyncEnd & 0x0F );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4A,
-		  (VSyncStart & 0x200) >> 9 << 7 |
-		  (VDisplay & 0x200) >> 9 << 6 |
-		  (VTotal & 0x200) >> 9 << 5 |
-		  (VBlankStart & 0x100) >> 8 << 3 |
-		  (VSyncStart & 0x100) >> 8 << 2 |
-		  (VDisplay & 0x100) >> 8 << 1 |
-		  (VTotal & 0x100) >> 8 << 0 );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4B,
-		  ((mode->Flags & V_NVSYNC)?1:0) << 7 |
-		  ((mode->Flags & V_NHSYNC)?1:0) << 6 |
-		  (VBlankStart & 0x200) >> 9 << 5 );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4C, HDisplay & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4D, VDisplay & 0xFF );
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33,
-		  (HBlankEnd & 0xC0) >> 6 << 5 |
-		  (VBlankEnd & 0x300) >> 8 << 3);
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x40, HTotal & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x41, HBlankStart & 0xFF);
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x42, HBlankEnd & 0x1F);
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x43, HSyncStart & 0xFF);
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x44,
+		      (HBlankEnd & 0x20) >> 5 << 7 |
+		      (HSyncEnd & 0x1F) );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x45, VTotal & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x46, VBlankStart & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x47, VBlankEnd & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x48, VSyncStart & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x49, VSyncEnd & 0x0F );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4A,
+		      (VSyncStart & 0x200) >> 9 << 7 |
+		      (VDisplay & 0x200) >> 9 << 6 |
+		      (VTotal & 0x200) >> 9 << 5 |
+		      (VBlankStart & 0x100) >> 8 << 3 |
+		      (VSyncStart & 0x100) >> 8 << 2 |
+		      (VDisplay & 0x100) >> 8 << 1 |
+		      (VTotal & 0x100) >> 8 << 0 );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4B,
+		      ((mode->Flags & V_NVSYNC)?1:0) << 7 |
+		      ((mode->Flags & V_NHSYNC)?1:0) << 6 |
+		      (VBlankStart & 0x200) >> 9 << 5 );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4C, HDisplay & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4D, VDisplay & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33,
+		      (HBlankEnd & 0xC0) >> 6 << 5 |
+		      (VBlankEnd & 0x300) >> 8 << 3);
+
+    }
 
     LEAVE();
 }
@@ -374,7 +382,7 @@ SMILynx_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 {
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
-    CARD8 SR6E, SR6F;
+    CARD8 SR32, SR6E, SR6F;
 
     ENTER();
 
@@ -405,41 +413,45 @@ SMILynx_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 
 
     /* Adjust mode timings */
+    {
+	unsigned long HTotal=(mode->CrtcHTotal>>3)-1;
+	unsigned long HDisplay=(mode->CrtcHDisplay>>3)-1;
+	unsigned long HSyncStart=(mode->CrtcHSyncStart>>3);
+	unsigned long HSyncWidth=((mode->CrtcHSyncEnd - mode->CrtcHSyncStart) >> 3) - 1;
+	unsigned long VTotal=mode->CrtcVTotal-1;
+	unsigned long VDisplay=mode->CrtcVDisplay-1;
+	unsigned long VSyncStart=mode->CrtcVSyncStart-1;
+	unsigned long VSyncWidth=mode->CrtcVSyncEnd - mode->CrtcVSyncStart - 1;
 
-    unsigned long HTotal=(mode->CrtcHTotal>>3)-1;
-    unsigned long HDisplay=(mode->CrtcHDisplay>>3)-1;
-    unsigned long HSyncStart=(mode->CrtcHSyncStart>>3);
-    unsigned long VTotal=mode->CrtcVTotal-1;
-    unsigned long VDisplay=mode->CrtcVDisplay-1;
-    unsigned long VSyncStart=mode->CrtcVSyncStart-1;
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x50,
+		      (VTotal & 0x700) >> 8 << 1 |
+		      (HSyncStart & 0x100) >> 8 << 0);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x51,
+		      (VSyncStart & 0x700) >> 8 << 5 |
+		      (VDisplay & 0x700) >> 8 << 2 |
+		      (HDisplay & 0x100) >> 8 << 1 |
+		      (HTotal & 0x100) >> 8 << 0);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x52, HTotal & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x53, HDisplay & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x54, HSyncStart & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x55, VTotal & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x56, VDisplay & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x57, VSyncStart & 0xFF);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x5A,
+		      (HSyncWidth & 0x1F) << 3 |
+		      (VSyncWidth & 0x07) << 0);
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x50,
-		  (VTotal & 0x700) >> 8 << 1 |
-		  (HSyncStart & 0x100) >> 8 << 0);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x51,
-		  (VSyncStart & 0x700) >> 8 << 5 |
-		  (VDisplay & 0x700) >> 8 << 2 |
-		  (HDisplay & 0x100) >> 8 << 1 |
-		  (HTotal & 0x100) >> 8 << 0);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x52, HTotal & 0xFF);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x53, HDisplay & 0xFF);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x54, HSyncStart & 0xFF);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x55, VTotal & 0xFF);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x56, VDisplay & 0xFF);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x57, VSyncStart & 0xFF);
-
-    /* XXX - Why is the polarity hardcoded here? */
-    CARD8 SR32=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32);
-    SR32 &= ~0x18;
-    if (mode->HDisplay == 800) {
-	SR32 |= 0x18;
+	/* XXX - Why is the polarity hardcoded here? */
+	SR32=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32);
+	SR32 &= ~0x18;
+	if (mode->HDisplay == 800) {
+	    SR32 |= 0x18;
+	}
+	if ((mode->HDisplay == 1024) && SMI_LYNXM_SERIES(pSmi->Chipset)) {
+	    SR32 |= 0x18;
+	}
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32,SR32);
     }
-    if ((mode->HDisplay == 1024) && SMI_LYNXM_SERIES(pSmi->Chipset)) {
-	SR32 |= 0x18;
-    }
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32,SR32);
-
-    /* XXX - sync pulse width? FPR5A */
 
     LEAVE();
 }
@@ -450,11 +462,12 @@ SMILynx_CrtcLoadLUT_crt(xf86CrtcPtr crtc)
     ScrnInfoPtr pScrn = crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
     SMICrtcPrivatePtr crtcPriv = SMICRTC(crtc);
+    CARD8 SR66;
     int i;
 
     ENTER();
 
-    CARD8 SR66 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x66);
+    SR66 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x66);
 
     /* Write CRT RAM only */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x66,(SR66 & ~0x30) | 0x20);

@@ -40,12 +40,13 @@ SMILynx_OutputDPMS_crt(xf86OutputPtr output, int mode)
     ScrnInfoPtr pScrn = output->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
     vgaHWPtr	hwp = VGAHWPTR(pScrn);
+    CARD8 SR21, SR22, SR31;
 
     ENTER();
 
-    CARD8 SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
-    CARD8 SR22=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x22);
-    CARD8 SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
+    SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
+    SR22=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x22);
+    SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
 
     switch (mode) {
     case DPMSModeOn:
@@ -90,11 +91,12 @@ SMILynx_OutputDPMS_lcd(xf86OutputPtr output, int mode)
 {
     ScrnInfoPtr pScrn = output->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
+    CARD8 SR21, SR31;
 
     ENTER();
 
-    CARD8 SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
-    CARD8 SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
+    SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
+    SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
 
     switch (mode) {
     case DPMSModeOn:
@@ -177,11 +179,13 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
 {
     SMIPtr pSmi = SMIPTR(output->scrn);
     vgaHWPtr	hwp = VGAHWPTR(output->scrn);
+    CARD8 SR21, SR7D;
+    Bool status;
 
     ENTER();
 
-    CARD8 SR21 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
-    CARD8 SR7D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D);
+    SR21 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
+    SR7D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D);
 
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21 & ~0x80); /* Enable DAC */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7B, 0x40); /* "TV and RAMDAC Testing Power", Green component */
@@ -191,7 +195,7 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
     while (hwp->readST01(hwp) & 0x8) ;
     while (!(hwp->readST01(hwp) & 0x8)) ;
 
-    Bool status = MMIO_IN8(pSmi->IOBase, 0x3C2) & 0x10;
+    status = MMIO_IN8(pSmi->IOBase, 0x3C2) & 0x10;
 
     /* Restore previous state */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21);
