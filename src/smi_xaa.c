@@ -60,10 +60,11 @@ static void SMI_SetupForImageWrite(ScrnInfoPtr, int, unsigned int, int, int,
 				   int);
 static void SMI_SubsequentImageWriteRect(ScrnInfoPtr, int, int, int, int, int);
 #endif
+#if 0
 /* #671 */
 static void SMI_ValidatePolylines(GCPtr, unsigned long, DrawablePtr);
 static void SMI_Polylines(DrawablePtr, GCPtr, int, int, DDXPointPtr);
-
+#endif
 
 Bool
 SMI_XAAInit(ScreenPtr pScreen)
@@ -215,10 +216,12 @@ SMI_XAAInit(ScreenPtr pScreen)
 #endif
 
     ret = XAAInit(pScreen, infoPtr);
+#if 0
     if (ret && pSmi->shadowFB)	/* #671 */ {
 	pSmi->ValidatePolylines = infoPtr->ValidatePolylines;
 	infoPtr->ValidatePolylines = SMI_ValidatePolylines;
     }
+#endif
 
     RETURN(ret);
 }
@@ -763,6 +766,7 @@ SMI_SubsequentImageWriteRect(ScrnInfoPtr pScrn, int x, int y, int w, int h,
 }
 #endif
 
+#if 0
 /******************************************************************************/
 /*  Polylines							         #671 */
 /******************************************************************************/
@@ -915,3 +919,4 @@ SMI_Polylines(DrawablePtr pDraw, GCPtr pGC, int mode, int npt,
     LEAVE();
 }
 
+#endif

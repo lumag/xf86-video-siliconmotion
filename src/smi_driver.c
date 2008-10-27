@@ -36,7 +36,6 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "xf86DDC.h"
 #include "xf86int10.h"
 #include "vbe.h"
-#include "shadowfb.h"
 
 #include "smi.h"
 #include "smi_501.h"
@@ -154,7 +153,6 @@ typedef enum
     OPTION_PCI_RETRY,
     OPTION_NOACCEL,
     OPTION_MCLK,
-    OPTION_SHOWCACHE,
     OPTION_SWCURSOR,
     OPTION_HWCURSOR,
     OPTION_VIDEOKEY,
@@ -180,13 +178,12 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_PCI_RETRY,	     "pci_retry",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_NOACCEL,	     "NoAccel",		  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_MCLK,	     "set_mclk",	  OPTV_FREQ,	{0}, FALSE },
-    { OPTION_SHOWCACHE,	     "show_cache",	  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_HWCURSOR,	     "HWCursor",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_SWCURSOR,	     "SWCursor",	  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_VIDEOKEY,	     "VideoKey",	  OPTV_INTEGER, {0}, FALSE },
     { OPTION_BYTESWAP,	     "ByteSwap",	  OPTV_BOOLEAN, {0}, FALSE },
     /* CZ 26.10.2001: interlaced video */
-    { OPTION_INTERLACED,	     "Interlaced",        OPTV_BOOLEAN, {0}, FALSE },
+    { OPTION_INTERLACED,     "Interlaced",        OPTV_BOOLEAN, {0}, FALSE },
     /* end CZ */
     { OPTION_USEBIOS,	     "UseBIOS",		  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_ZOOMONLCD,	     "ZoomOnLCD",	  OPTV_BOOLEAN,	{0}, FALSE },
@@ -280,12 +277,6 @@ static const char *i2cSymbols[] =
     NULL
 };
 
-static const char *shadowSymbols[] =
-{
-    "ShadowFBInit",
-    NULL
-};
-
 static const char *int10Symbols[] =
 {
     "xf86ExecX86int10",
@@ -361,7 +352,7 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 	 */
 	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, exaSymbols, ramdacSymbols,
 					  ddcSymbols, i2cSymbols, int10Symbols, vbeSymbols,
-					  shadowSymbols, NULL);
+					  NULL);
 
 	/*
 	 * The return value must be non-NULL on success even though there
@@ -549,7 +540,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	SMI_FreeRec(pScrn);
 	RETURN(FALSE);
     }
-    pSmi->pEnt = pEnt;
     pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
 
     /* Set pScrn->monitor */
@@ -693,13 +683,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		   "disabled\n");
     } else {
 	pSmi->NoAccel = FALSE;
-    }
-
-    if (xf86ReturnOptValBool(pSmi->Options, OPTION_SHOWCACHE, FALSE)) {
-	pSmi->ShowCache = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: show_cache set\n");
-    } else {
-	pSmi->ShowCache = FALSE;
     }
 
     if (IS_MSOC(pSmi)) {
@@ -931,8 +914,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     SMI_DetectMCLK(pScrn);
 
-    pSmi->IsSwitching = FALSE;
-
     /*
      * Setup the ClockRanges, which describe what clock ranges are available,
      * and what sort of modes they can be used for.
@@ -1017,14 +998,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    RETURN(FALSE);
 	}
 	xf86LoaderReqSymLists(ramdacSymbols, NULL);
-    }
-
-    if (pSmi->shadowFB) {
-	if (!xf86LoadSubModule(pScrn, "shadowfb")) {
-	    SMI_FreeRec(pScrn);
-	    RETURN(FALSE);
-	}
-	xf86LoaderReqSymLists(shadowSymbols, NULL);
     }
 
     RETURN(TRUE);
@@ -1724,29 +1697,19 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (pSmi->NoAccel || !pSmi->useEXA) {
 	int		numLines;
 	BoxRec		AvailFBArea;
-	RegionRec	AvailFBRegion;
 
-	pSmi->width  = pScrn->virtualX;
-	pSmi->height = pScrn->virtualY;
-	pSmi->Stride = (pSmi->width * pSmi->Bpp + 15) & ~15;
 	numLines = pSmi->FBReserved / (pScrn->displayWidth * pSmi->Bpp);
 	AvailFBArea.x1 = 0;
-	if(pSmi->randrRotation) /* The rotated mode could need more memory */
-	    AvailFBArea.y1= max(((pScrn->virtualX * pSmi->Bpp + 15) & ~15) *
-				pScrn->virtualY,
-				((pScrn->virtualY * pSmi->Bpp + 15) & ~15) *
-				pScrn->virtualX) / (pScrn->virtualX * pSmi->Bpp);
-	else
-	    AvailFBArea.y1 = pScrn->virtualY;
+	AvailFBArea.y1 = 0;
 	AvailFBArea.x2 = pScrn->virtualX;
 	AvailFBArea.y2 = numLines;
+
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		   "FrameBuffer Box: %d,%d - %d,%d\n",
 		   AvailFBArea.x1, AvailFBArea.y1, AvailFBArea.x2,
 		   AvailFBArea.y2);
-	REGION_INIT(pScreen, &AvailFBRegion, &AvailFBArea, 1);
-	xf86InitFBManagerRegion(pScreen, &AvailFBRegion);
-	REGION_UNINIT(pScreen, &AvailFBRegion);
+
+	xf86InitFBManager(pScreen, &AvailFBArea);
     }
 
     /* Initialize acceleration layer */
@@ -1889,14 +1852,6 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
     }
     if (pSmi->BlockHandler != NULL) {
 	pScreen->BlockHandler = pSmi->BlockHandler;
-    }
-    /* #670 */
-    if (pSmi->pSaveBuffer) {
-	xfree(pSmi->pSaveBuffer);
-    }
-/* #920 */
-    if (pSmi->paletteBuffer) {
-	xfree(pSmi->paletteBuffer);
     }
 
     pScrn->vtSema = FALSE;

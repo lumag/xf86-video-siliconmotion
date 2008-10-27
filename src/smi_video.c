@@ -81,37 +81,6 @@ The default value can be set with the driver option Interlaced
 
 #define MAKE_ATOM(a)	MakeAtom(a, sizeof(a) - 1, TRUE)
 
-#define ROTATE_COORDS(x,y) do{			\
-      long x0=x;				\
-      if(pSmi->rotate==SMI_ROTATE_CCW){		\
-	 x = pScrn->virtualY - y; y = x0;	\
-      }else{					\
-	 x = y; y = pScrn->virtualX - x0;	\
-      }						\
-   }while(0)
-
-#define UNROTATE_COORDS(x,y) do{		\
-      long x0=x;				\
-      if(pSmi->rotate==SMI_ROTATE_CW){		\
-	 x = pScrn->virtualX - y; y = x0;	\
-      }else{					\
-	 x = y; y = pScrn->virtualY - x0;	\
-      }						\
-   }while(0)
-
-#define ROTATE_DIMS(w,h) do{ long w0=w; w=h; h=w0; } while(0)
-#define UNROTATE_DIMS(w,h) ROTATE_DIMS(w,h)
-
-#define ROTATE_BOX(b) do{						\
-      if(pSmi->rotate==SMI_ROTATE_CCW) ROTATE_DIMS(b.y1,b.y2);		\
-      else ROTATE_DIMS(b.x1,b.x2);					\
-      ROTATE_COORDS(b.x1,b.y1); ROTATE_COORDS(b.x2,b.y2); } while(0)
-#define UNROTATE_BOX(b) do{						\
-      if(pSmi->rotate==SMI_ROTATE_CW) ROTATE_DIMS(b.y1,b.y2);		\
-      else ROTATE_DIMS(b.x1,b.x2);					\
-      UNROTATE_COORDS(b.x1,b.y1); UNROTATE_COORDS(b.x2,b.y2); } while(0)
-
-
 #if SMI_USE_VIDEO
 #include "dixstruct.h"
 
@@ -146,9 +115,6 @@ static int SMI_QueryImageAttributes(ScrnInfoPtr pScrn,
 		int id, unsigned short *width, unsigned short *height,
 		int *picthes, int *offsets);
 
-static Bool SMI_ClipVideo(ScrnInfoPtr pScrn, BoxPtr dst,
-		INT32 *x1, INT32 *y1, INT32 *x2, INT32 *y2,
-		RegionPtr reg, INT32 width, INT32 height);
 static void SMI_DisplayVideo(ScrnInfoPtr pScrn, int id, int offset,
 		short width, short height, int pitch, int x1, int y1, int x2, int y2,
 		BoxPtr dstBox, short vid_w, short vid_h, short drw_w, short drw_h);
@@ -669,12 +635,9 @@ SMI_InitVideo(ScreenPtr pScreen)
 
     DEBUG("numAdaptors=%d\n", numAdaptors);
 
-/*     if (psmi->rotate == 0) */
-/*     { */
-        newAdaptor = SMI_SetupVideo(pScreen);
-        DEBUG("newAdaptor=%p\n", newAdaptor);
-        SMI_InitOffscreenImages(pScreen);
-/*     } */
+    newAdaptor = SMI_SetupVideo(pScreen);
+    DEBUG("newAdaptor=%p\n", newAdaptor);
+    SMI_InitOffscreenImages(pScreen);
 
     if (newAdaptor != NULL) {
         if (numAdaptors == 0) {
@@ -1755,140 +1718,6 @@ SMI_QueryImageAttributes(
 **	S U P P O R T   F U N C T I O N S				      **
 **									      **
 \******************************************************************************/
-#if 0
-static void
-SMI_WaitForSync(
-	ScrnInfoPtr	pScrn
-)
-{
-	SMIPtr pSmi = SMIPTR(pScrn);
-	vgaHWPtr hwp = VGAHWPTR(pScrn);
-	int vgaIOBase  = hwp->IOBase;
-	int vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
-	int vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
-
-	VerticalRetraceWait();
-}
-#endif
-
-static Bool
-SMI_ClipVideo(
-	ScrnInfoPtr	pScrn,
-	BoxPtr		dst,
-	INT32		*x1,
-	INT32		*y1,
-	INT32		*x2,
-	INT32		*y2,
-	RegionPtr	reg,
-	INT32		width,
-	INT32		height
-)
-{
-    SMIPtr pSmi = SMIPTR(pScrn);
-    INT32 vscale, hscale;
-    int diff;
-    RegionRec  VPReg;
-    BoxRec     VPBox = { pScrn->frameX0 , pScrn->frameY0,
-			 pScrn->frameX1 + 1 , pScrn->frameY1 + 1};
-    BoxPtr extents = REGION_EXTENTS(pScreen, reg);
-
-    ENTER();
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-    /* Rotate the viewport before clipping  */
-    if (pSmi->rotate)
-	ROTATE_BOX(VPBox);
-    REGION_INIT(pScrn->pScreen, &VPReg, &VPBox, 1);
-    REGION_INTERSECT(pScrn->pScreen, reg, reg, &VPReg);
-    REGION_UNINIT(pScrn->pScreen, &VPReg);
-
-    /* PDR#941 */
-    extents->x1 = max(extents->x1, VPBox.x1);
-    extents->y1 = max(extents->y1, VPBox.y1);
-
-    hscale = ((*x2 - *x1) << 16) / (dst->x2 - dst->x1);
-    vscale = ((*y2 - *y1) << 16) / (dst->y2 - dst->y1);
-
-    *x1 <<= 16; *y1 <<= 16;
-    *x2 <<= 16; *y2 <<= 16;
-
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-    diff = extents->x1 - dst->x1;
-    if (diff > 0) {
-	dst->x1 = extents->x1;
-	*x1 += diff * hscale;
-    }
-
-    diff = extents->y1 - dst->y1;
-    if (diff > 0) {
-	dst->y1 = extents->y1;
-	*y1 += diff * vscale;
-    }
-
-    diff = dst->x2 - extents->x2;
-    if (diff > 0) {
-	dst->x2 = extents->x2; /* PDR#687 */
-	*x2 -= diff * hscale;
-    }
-
-    diff = dst->y2 - extents->y2;
-    if (diff > 0) {
-	dst->y2 = extents->y2;
-	*y2 -= diff * vscale;
-    }
-
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-    if (*x1 < 0) {
-	diff = (-*x1 + hscale - 1) / hscale;
-	dst->x1 += diff;
-	*x1 += diff * hscale;
-    }
-
-    if (*y1 < 0) {
-	diff = (-*y1 + vscale - 1) / vscale;
-	dst->y1 += diff;
-	*y1 += diff * vscale;
-    }
-
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-#if 0 /* aaa was macht dieser code? */
-	delta = *x2 - (width << 16);
-	if (delta > 0)
-	{
-		diff = (delta + hscale - 1) / hscale;
-		dst->x2 -= diff;
-		*x2 -= diff * hscale;
-	}
-
-	delta = *y2 - (height << 16);
-	if (delta > 0)
-	{
-		diff = (delta + vscale - 1) / vscale;
-		dst->y2 -= diff;
-		*y2 -= diff * vscale;
-	}
-#endif
-
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-    if ((*x1 >= *x2) || (*y1 >= *y2))
-	RETURN(FALSE);
-
-    if ((dst->x1 != extents->x1) || (dst->y1 != extents->y1) ||
-	(dst->x2 != extents->x2) || (dst->y2 != extents->y2)) {
-	RegionRec clipReg;
-	REGION_INIT(pScrn->pScreen, &clipReg, dst, 1);
-	REGION_INTERSECT(pScrn->pScreen, reg, reg, &clipReg);
-	REGION_UNINIT(pScrn->pScreen, &clipReg);
-    }
-
-    DEBUG("ClipVideo(%d): x1=%d y1=%d x2=%d y2=%d\n",  __LINE__, *x1 >> 16, *y1 >> 16, *x2 >> 16, *y2 >> 16);
-
-    RETURN(TRUE);
-}
 
 static void
 SMI_DisplayVideo(

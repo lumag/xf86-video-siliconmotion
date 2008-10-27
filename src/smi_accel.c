@@ -96,22 +96,15 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 
     ENTER();
 
-    pSmi->Stride = ((pSmi->width * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
+    pSmi->Stride = ((pScrn->virtualX * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
     if(pScrn->bitsPerPixel==24)
        pSmi->Stride *= 3;
-    DEDataFormat = SMI_DEDataFormat(pScrn->bitsPerPixel);
 
+    DEDataFormat = SMI_DEDataFormat(pScrn->bitsPerPixel);
     for (i = 0; i < sizeof(xyAddress) / sizeof(xyAddress[0]); i++) {
-	if (pSmi->rotate) {
-	    if (xyAddress[i] == pSmi->height) {
-		DEDataFormat |= i << 16;
-		break;
-	    }
-	} else {
-	    if (xyAddress[i] == pSmi->width) {
-		DEDataFormat |= i << 16;
-		break;
-	    }
+	if (xyAddress[i] == pScrn->virtualX) {
+	    DEDataFormat |= i << 16;
+	    break;
 	}
     }
 
@@ -121,13 +114,9 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
     WRITE_DPR(pSmi, 0x24, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
-    if(pSmi->shadowFB){
-       WRITE_DPR(pSmi, 0x40, 0);
-       WRITE_DPR(pSmi, 0x44, 0);  /* The shadow framebuffer is located at offset 0 */
-    }else{
-       WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
-       WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
-    }
+    WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
+    WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
+
     CHECK_SECONDARY(pSmi);
 
     SMI_DisableClipping(pScrn);
@@ -192,12 +181,12 @@ SMI_DisableClipping(ScrnInfoPtr pScrn)
     pSmi->ScissorsLeft = 0;
     if (pScrn->bitsPerPixel == 24) {
 	if (pSmi->Chipset == SMI_LYNX) {
-	    pSmi->ScissorsRight = ((pSmi->height * 3) << 16) | (pSmi->width * 3);
+	    pSmi->ScissorsRight = ((pScrn->virtualY * 3) << 16) | (pScrn->virtualX * 3);
 	} else {
-	    pSmi->ScissorsRight = (pSmi->height << 16) | (pSmi->width * 3);
+	    pSmi->ScissorsRight = (pScrn->virtualY << 16) | (pScrn->virtualX * 3);
 	}
     } else {
-	pSmi->ScissorsRight = (pSmi->height << 16) | pSmi->width;
+	pSmi->ScissorsRight = (pScrn->virtualY << 16) | pScrn->virtualX;
     }
 
     pSmi->ClipTurnedOn = FALSE;

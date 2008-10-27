@@ -325,9 +325,6 @@ void
 SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 {
     SMIPtr	pSmi = SMIPTR(pScrn);
-
-    ENTER();
-
     int		i;
     CARD8		tmp;
     CARD32		offset;
@@ -336,9 +333,7 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
     int		vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
     int		vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
 
-    /* Wait for engine to become idle */
-    if (pSmi->IsSwitching)
-	WaitIdle();
+    ENTER();
 
     if (pSmi->useBIOS && pSmi->pInt10 != NULL && restore->mode != 0) {
 	pSmi->pInt10->num = 0x10;
