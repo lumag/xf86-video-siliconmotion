@@ -56,6 +56,21 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h, char *src, int sr
 Bool
 SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h, char *dst, int dst_pitch);
 
+static Bool
+SMI_CheckComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, PicturePtr pDstPicture);
+static Bool
+SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, PicturePtr pDstPicture,
+                     PixmapPtr pSrc, PixmapPtr pMask, PixmapPtr pDst);
+static void
+SMI_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+              int dstX, int dstY, int width, int height);
+static void
+SMI730_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+              int dstX, int dstY, int width, int height);
+static void
+SMI_DoneComposite(PixmapPtr pDst);
+
+
 #define PIXMAP_FORMAT(pixmap) SMI_DEDataFormat(pixmap->drawable.bitsPerPixel)
 
 Bool
@@ -134,6 +149,16 @@ SMI_EXAInit(ScreenPtr pScreen)
     pSmi->EXADriverPtr->DownloadFromScreen = SMI_DownloadFromScreen;
 #endif
 
+    /* Composite */
+    pSmi->EXADriverPtr->CheckComposite = SMI_CheckComposite;
+    pSmi->EXADriverPtr->PrepareComposite = SMI_PrepareComposite;
+
+    if (pSmi->Chipset == SMI_COUGAR3DR)
+	pSmi->EXADriverPtr->Composite = SMI730_Composite;
+    else
+	pSmi->EXADriverPtr->Composite = SMI_Composite;
+    pSmi->EXADriverPtr->DoneComposite = SMI_DoneComposite;
+
     if(!exaDriverInit(pScreen, pSmi->EXADriverPtr)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "exaDriverInit failed.\n");
 	RETURN(FALSE);
@@ -149,7 +174,6 @@ static void
 SMI_EXASync(ScreenPtr pScreen, int marker)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-    SMIPtr pSmi = SMIPTR(xf86Screens[pScreen->myNum]);
 
     ENTER();
 
@@ -213,13 +237,16 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     }
 
     WaitQueue();
-    /* Destination and Source Window Widths */
-    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
     if (pDstPixmap->drawable.bitsPerPixel == 24) {
 	src_pitch *= 3;
 	dst_pitch *= 3;
     }
+
+    /* Destination and Source Window Widths */
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
+    /* Destination and Source Row Pitch */
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
 
     /* Bit Mask (planemask) - 16 bit only */
     if (pSrcPixmap->drawable.bitsPerPixel == 16) {
@@ -227,9 +254,6 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     } else {
 	WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
     }
-
-    /* Destination and Source Row Pitch */
-    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
     /* Drawing engine data format */
     WRITE_DPR(pSmi, 0x1C, PIXMAP_FORMAT(pDstPixmap));
     /* Destination and Source Base Address (offset) */
@@ -343,12 +367,15 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 		   | SMI_QUICK_START;
 
     WaitQueue();
-    /* Destination Window Width */
-    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
     if (pPixmap->drawable.bitsPerPixel == 24) {
 	dst_pitch *= 3;
     }
+
+    /* Destination Window Width */
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
+    /* Destination Row Pitch */
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
 
     /* Bit Mask (planemask) - 16 bit only */
     if (pPixmap->drawable.bitsPerPixel == 16) {
@@ -357,8 +384,6 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 	WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
     }
 
-    /* Destination Row Pitch */
-    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
     /* Drawing engine data format */
     WRITE_DPR(pSmi, 0x1C, PIXMAP_FORMAT(pPixmap));
     /* Source and Destination Base Address (offset) */
@@ -512,3 +537,139 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     RETURN(TRUE);
 }
 
+/* --------------------------------------- EXA Composite ---------------------------------------- */
+/* This is a very incomplete Composite implementation that only
+   accelerates PictOpSrc with source coordinates transformation by
+   using 2D Engine rotate-BITBLTs */
+
+#define SMI_ISROTATION_90(t)                                    \
+    (t->matrix[0][0] == 0 && t->matrix[0][1] == xFixed1 &&      \
+     t->matrix[1][0] == -xFixed1 && t->matrix[1][1] == 0)
+
+#define SMI_ISROTATION_270(t)                                   \
+    (t->matrix[0][0] == 0 && t->matrix[0][1] == -xFixed1 &&     \
+     t->matrix[1][0] == xFixed1 && t->matrix[1][1] == 0)
+
+static Bool
+SMI_CheckComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, PicturePtr pDstPicture)
+{
+    ENTER();
+
+    if(op!=PictOpSrc || pMaskPicture ||
+       pSrcPicture->repeatType || !pSrcPicture->transform)
+	RETURN(FALSE);
+
+    if(!SMI_ISROTATION_90(pSrcPicture->transform) &&
+       !SMI_ISROTATION_270(pSrcPicture->transform))
+        RETURN(FALSE);
+
+    if(PICT_FORMAT_BPP(pSrcPicture->format) == 24)
+	RETURN(FALSE);
+
+    RETURN(TRUE);
+}
+
+static Bool
+SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, PicturePtr pDstPicture,
+		       PixmapPtr pSrc, PixmapPtr pMask, PixmapPtr pDst)
+{
+    ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
+    SMIPtr pSmi = SMIPTR(pScrn);
+    int src_pitch = exaGetPixmapPitch(pSrc) / (pSrc->drawable.bitsPerPixel >> 3);
+    int dst_pitch = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
+
+    ENTER();
+
+    WaitQueue();
+
+    /* Destination and Source Window Widths */
+    WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
+
+    /* Destination and Source Row Pitch */
+    WRITE_DPR(pSmi, 0x10, (dst_pitch << 16) | (src_pitch & 0xFFFF));
+
+    /* Drawing engine data format */
+    WRITE_DPR(pSmi, 0x1C, PIXMAP_FORMAT(pDst));
+
+    /* DE Bit Mask */
+    WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
+
+    /* Destination and Source Base Address (offset) */
+    WRITE_DPR(pSmi, 0x40, exaGetPixmapOffset(pSrc) >> 3);
+    WRITE_DPR(pSmi, 0x44, exaGetPixmapOffset(pDst) >> 3);
+
+    /* DE command*/
+    if(SMI_ISROTATION_90(pSrcPicture->transform))
+        WRITE_DPR(pSmi, 0x0C, 0xCC /*GXCopy*/ | SMI_ROTATE_BLT |
+		    SMI_ROTATE_CW | SMI_QUICK_START);
+    else
+        WRITE_DPR(pSmi, 0x0C, 0xCC /*GXCopy*/ | SMI_ROTATE_BLT |
+		    SMI_ROTATE_CCW | SMI_QUICK_START);
+
+    pSmi->renderTransform = pSrcPicture->transform;
+
+    RETURN(TRUE);
+}
+
+static void
+SMI_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+		int dstX, int dstY, int width, int height)
+{
+    ScrnInfoPtr pScrn = xf86Screens[pDst->drawable.pScreen->myNum];
+    SMIPtr pSmi = SMIPTR(pScrn);
+    PictTransformPtr t = pSmi->renderTransform;
+    PictVector v;
+
+    ENTER();
+
+    if(SMI_ISROTATION_90(t)){
+        srcX=srcX+width;
+        dstX=dstX+width-1;
+    }else{
+        srcY=srcY+height;
+        dstY=dstY+height-1;
+    }
+
+    v.vector[0] = IntToxFixed(srcX);
+    v.vector[1] = IntToxFixed(srcY);
+    v.vector[2] = xFixed1;
+    PictureTransformPoint(t, &v);
+
+    WaitQueue();
+
+    WRITE_DPR(pSmi, 0x00, (xFixedToInt(v.vector[0]) << 16) + (xFixedToInt(v.vector[1]) & 0xFFFF));
+    WRITE_DPR(pSmi, 0x04, (dstX << 16) + (dstY & 0xFFFF));
+    WRITE_DPR(pSmi, 0x08, (height << 16) + (width & 0xFFFF));
+
+    LEAVE();
+}
+
+static void
+SMI730_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+		int dstX, int dstY, int width, int height)
+{
+    int maxPixels;
+
+    ENTER();
+
+    /* SM731 cannot rotate-blt more than a certain number of pixels
+       (based on a calculation from the Windows driver source */
+    maxPixels = 1280 / pDst->drawable.bitsPerPixel;
+
+    while(height>0){
+	SMI_Composite(pDst, srcX, srcY, maskX, maskY, dstX, dstY, width, min(height, maxPixels));
+
+	srcY += maxPixels;
+	dstY += maxPixels;
+	height -= maxPixels;
+    }
+
+    LEAVE();
+}
+
+static void
+SMI_DoneComposite(PixmapPtr pDst)
+{
+    ENTER();
+    LEAVE();
+}

@@ -187,6 +187,7 @@ typedef struct
     /* EXA */
     ExaDriverPtr	EXADriverPtr;
     Bool		useEXA;	/* enable exa acceleration */
+    PictTransformPtr	renderTransform;
 
     pciVideoPtr		PciInfo;	/* PCI info vars */
 #ifndef XSERVER_LIBPCIACCESS
