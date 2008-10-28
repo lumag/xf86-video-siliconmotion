@@ -74,9 +74,13 @@ SMI_CrtcModeFixup(xf86CrtcPtr crtc,
 static void
 SMI_CrtcPrepare(xf86CrtcPtr crtc)
 {
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
     ENTER();
 
-    /* Nothing */
+    if (pSmi->HwCursor)
+	xf86_hide_cursors(pScrn);
 
     LEAVE();
 }

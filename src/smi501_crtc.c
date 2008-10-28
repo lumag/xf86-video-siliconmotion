@@ -327,6 +327,126 @@ SMI501_CrtcLoadLUT(xf86CrtcPtr crtc)
     LEAVE();
 }
 
+static void
+SMI501_CrtcSetCursorColors(xf86CrtcPtr crtc, int bg, int fg)
+{
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    int32_t		port, value;
+
+    ENTER();
+
+    /* for the SMI501 HWCursor, there are 4 possible colors, one of which
+     * is transparent:	M,S:  0,0 = Transparent
+     *						      0,1 = color 1
+     *						      1,0 = color 2
+     *						      1,1 = color 3
+     *	To simplify implementation, we use color2 == bg and
+     *					   color3 == fg
+     *	Color 1 is don't care, so we set it to color 2's value
+     */
+
+    /* Pack the true color components into 16 bit RGB -- 5:6:5 */
+    value = ((bg & 0xF80000) >> 8 |
+	     (bg & 0x00FC00) >> 5 |
+	     (bg & 0x0000F8) >> 3);
+
+    value |= ((bg & 0xF80000) <<  8 |
+	      (bg & 0x00FC00) << 11 |
+	      (bg & 0x0000F8) << 13);
+    port = crtc == crtcConf->crtc[0] ? 0x00f8 : 0x0238;
+    WRITE_DCR(pSmi, port, value);
+
+    value = ((fg & 0xF80000) >> 8 |
+	     (fg & 0x00FC00) >> 5 |
+	     (fg & 0x0000F8) >> 3);
+    port = crtc == crtcConf->crtc[0] ? 0x00fc : 0x023c;
+    WRITE_DCR(pSmi, port, value);
+
+    LEAVE();
+}
+
+static void
+SMI501_CrtcSetCursorPosition(xf86CrtcPtr crtc, int x, int y)
+{
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    int32_t		port, offset;
+
+    ENTER();
+
+    if (x >= 0)
+	offset = x & SMI501_MASK_MAXBITS;
+    else
+	offset = (-x & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY;
+
+    if (y >= 0)
+	offset |= (y & SMI501_MASK_MAXBITS) << 16;
+    else
+	offset |= ((-y & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY) << 16;
+
+    port = crtc == crtcConf->crtc[0] ? 0x00f4 : 0x0234;
+    WRITE_DCR(pSmi, port, offset);
+
+    LEAVE();
+}
+
+static void
+SMI501_CrtcShowCursor(xf86CrtcPtr crtc)
+{
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    int32_t		port, value;
+
+    ENTER();
+
+    port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
+    value = READ_DCR(pSmi, port);
+    value |= SMI501_MASK_HWCENABLE;
+    WRITE_DCR(pSmi, port, value);
+
+    LEAVE();
+}
+
+static void
+SMI501_CrtcHideCursor(xf86CrtcPtr crtc)
+{
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    int32_t		port, value;
+
+    ENTER();
+
+    port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
+    value = READ_DCR(pSmi, port);
+    value &= ~SMI501_MASK_HWCENABLE;
+    WRITE_DCR(pSmi, port, value);
+
+    LEAVE();
+}
+
+static void
+SMI501_CrtcLoadCursorImage(xf86CrtcPtr crtc, CARD8 *image)
+{
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    int32_t		port, value;
+
+    ENTER();
+
+    port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
+    value = pSmi->FBCursorOffset + (port == 0x00f0 ? 0 : 1024);
+    WRITE_DCR(pSmi, port, value);
+    memcpy(pSmi->FBBase + value, image, 1024);
+
+    LEAVE();
+}
+
 static xf86CrtcFuncsRec SMI501_Crtc0Funcs;
 static SMICrtcPrivateRec SMI501_Crtc0Priv;
 static xf86CrtcFuncsRec SMI501_Crtc1Funcs;
@@ -347,6 +467,14 @@ SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
     SMI501_Crtc0Priv.video_init		= SMI501_CrtcVideoInit_lcd;
     SMI501_Crtc0Priv.load_lut		= SMI501_CrtcLoadLUT;
 
+    if (pSmi->HwCursor) {
+	SMI501_Crtc0Funcs.set_cursor_colors = SMI501_CrtcSetCursorColors;
+	SMI501_Crtc0Funcs.set_cursor_position = SMI501_CrtcSetCursorPosition;
+	SMI501_Crtc0Funcs.show_cursor = SMI501_CrtcShowCursor;
+	SMI501_Crtc0Funcs.hide_cursor = SMI501_CrtcHideCursor;
+	SMI501_Crtc0Funcs.load_cursor_image = SMI501_CrtcLoadCursorImage;
+    }
+
     crtc0 = xf86CrtcCreate(pScrn, &SMI501_Crtc0Funcs);
     if (!crtc0)
 	RETURN(FALSE);
@@ -359,6 +487,14 @@ SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 	SMI501_Crtc1Priv.adjust_frame	= SMI501_CrtcAdjustFrame;
 	SMI501_Crtc1Priv.video_init	= SMI501_CrtcVideoInit_crt;
 	SMI501_Crtc1Priv.load_lut	= SMI501_CrtcLoadLUT;
+
+	if (pSmi->HwCursor) {
+	    SMI501_Crtc1Funcs.set_cursor_colors	= SMI501_CrtcSetCursorColors;
+	    SMI501_Crtc1Funcs.set_cursor_position = SMI501_CrtcSetCursorPosition;
+	    SMI501_Crtc1Funcs.show_cursor = SMI501_CrtcShowCursor;
+	    SMI501_Crtc1Funcs.hide_cursor = SMI501_CrtcHideCursor;
+	    SMI501_Crtc1Funcs.load_cursor_image = SMI501_CrtcLoadCursorImage;
+	}
 
 	crtc1 = xf86CrtcCreate(pScrn, &SMI501_Crtc1Funcs);
 	if (!crtc1)

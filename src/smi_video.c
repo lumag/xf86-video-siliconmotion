@@ -128,9 +128,6 @@ static void SMI_DisplayVideo0730(ScrnInfoPtr pScrn, int id, int offset,
 		BoxPtr dstBox, short vid_w, short vid_h, short drw_w, short drw_h);
 static void SMI_BlockHandler(int i, pointer blockData, pointer pTimeout,
 		pointer pReadMask);
-#if 0
-static void SMI_WaitForSync(ScrnInfoPtr pScrn);
-#endif
 /*static int SMI_SendI2C(ScrnInfoPtr pScrn, CARD8 device, char *devName,
         SMI_I2CDataPtr i2cData);*/
 
@@ -625,11 +622,6 @@ SMI_InitVideo(ScreenPtr pScreen)
     int numAdaptors;
 
     ENTER();
-
-    if (IS_MSOC(psmi) && psmi->IsSecondary) {
-	LEAVE();
-	return;
-    }
 
     numAdaptors = xf86XVListGenericAdaptors(pScrn, &ptrAdaptors);
 
@@ -1259,9 +1251,6 @@ SMI_PutVideo(
 		      VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
 				   0x21) & ~0x04);
     WRITE_VPR(pSmi, 0x54, READ_VPR(pSmi, 0x54) | 0x00200000);
-#if 0
-	SMI_WaitForSync(pScrn);
-#endif
     /* Video Window I Left and Top Boundaries */
     WRITE_VPR(pSmi, 0x14, dstBox.x1 + (dstBox.y1 << 16));
     /* Video Window I Right and Bottom Boundaries */
@@ -1778,9 +1767,7 @@ SMI_DisplayVideo(
     } else {
 	vstretch = 0;
     }
-#if 0
-    SMI_WaitForSync(pScrn);
-#endif
+
     WRITE_VPR(pSmi, 0x00, vpr00 | (1 << 3) | (1 << 20));
     WRITE_VPR(pSmi, 0x14, (dstBox->x1) | (dstBox->y1 << 16));
     WRITE_VPR(pSmi, 0x18, (dstBox->x2) | (dstBox->y2 << 16));
@@ -1849,10 +1836,6 @@ SMI_DisplayVideo0501(ScrnInfoPtr pScrn,
 	vstretch = (4096 * drw_h / vid_h) | 0x8000;
     }
     
-#if 0
-    SMI_WaitForSync(pScrn);
-#endif
-
     /* Set Color Key Enable bit */
 
     WRITE_DCR(pSmi, 0x0000, READ_DCR(pSmi, 0x0000) | (1 << 9));

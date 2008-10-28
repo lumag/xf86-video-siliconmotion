@@ -188,40 +188,7 @@ SMI_XAAInit(ScreenPtr pScreen)
 
     SMI_EngineReset(pScrn);
 
-
-    /* CZ 18.06.2001: moved to smi_driver.c before the NoAccel question
-       to have offscreen framebuffer in NoAccel mode */
-#if 0
-    maxLines = pSmi->FBReserved / (pSmi->width * pSmi->Bpp);
-    if (pSmi->rotate) {
-	numLines = maxLines;
-    } else {
-#if SMI_USE_VIDEO
-	numLines = ((pSmi->FBReserved - pSmi->width * pSmi->Bpp * pSmi->height)
-		   * 25 / 100 + pSmi->width * pSmi->Bpp - 1)
-		   / (pSmi->width * pSmi->Bpp);
-	numLines += pSmi->height;
-#else
-	numLines = maxLines;
-#endif
-    }
-
-    AvailFBArea.x1 = 0;
-    AvailFBArea.y1 = 0;
-    AvailFBArea.x2 = pSmi->width;
-    AvailFBArea.y2 = numLines;
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "FrameBuffer Box: %d,%d - %d,%d\n",
-		AvailFBArea.x1, AvailFBArea.y1, AvailFBArea.x2, AvailFBArea.y2);
-    xf86InitFBManager(pScreen, &AvailFBArea);
-#endif
-
     ret = XAAInit(pScreen, infoPtr);
-#if 0
-    if (ret && pSmi->shadowFB)	/* #671 */ {
-	pSmi->ValidatePolylines = infoPtr->ValidatePolylines;
-	infoPtr->ValidatePolylines = SMI_ValidatePolylines;
-    }
-#endif
 
     RETURN(ret);
 }
@@ -299,7 +266,6 @@ SMI_SubsequentScreenToScreenCopy(ScrnInfoPtr pScrn, int x1, int y1, int x2,
     }
 
     WaitIdle();
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, (x1 << 16) + (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (x2 << 16) + (y2 & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w  << 16) + (h  & 0xFFFF));
@@ -378,7 +344,6 @@ SMI_SubsequentSolidFillRect(ScrnInfoPtr pScrn, int x, int y, int w, int h)
     }
 
     WaitQueue();
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -418,7 +383,6 @@ SMI_SubsequentSolidHorVertLine(ScrnInfoPtr pScrn, int x, int y, int len,
     }
 
     WaitQueue();
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -507,7 +471,6 @@ SMI_SubsequentCPUToScreenColorExpandFill(ScrnInfoPtr pScrn, int x, int y, int w,
 	    WaitQueue();
 	}
     }
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
@@ -548,7 +511,6 @@ SMI_SetupForMono8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int fg,
 	pSmi->ClipTurnedOn = FALSE;
     }
 
-    CHECK_SECONDARY(pSmi);
     if (bg == -1) {
 	WaitQueue();
 	WRITE_DPR(pSmi, 0x14, fg);
@@ -589,7 +551,6 @@ SMI_SubsequentMono8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
     }
 
     WaitQueue();
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -641,7 +602,6 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
     }
 
     WaitQueue();
-    CHECK_SECONDARY(pSmi);
 
     if (trans_color == -1) {
 	pSmi->AccelCmd |= SMI_TRANSPARENT_SRC | SMI_TRANSPARENT_PXL;
@@ -678,7 +638,6 @@ SMI_SubsequentColor8x8PatternFillRect(ScrnInfoPtr pScrn, int patx, int paty,
     }
 
     WaitQueue();
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));	/* PDR#950 */
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
@@ -756,7 +715,6 @@ SMI_SubsequentImageWriteRect(ScrnInfoPtr pScrn, int x, int y, int w, int h,
 	    WaitQueue();
 	}
     }
-    CHECK_SECONDARY(pSmi);
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y * 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));

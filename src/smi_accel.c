@@ -117,8 +117,6 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
     WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
     WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
 
-    CHECK_SECONDARY(pSmi);
-
     SMI_DisableClipping(pScrn);
 
     LEAVE();
@@ -136,13 +134,6 @@ SMI_SetClippingRectangle(ScrnInfoPtr pScrn, int left, int top, int right,
 
     ENTER();
     DEBUG("left=%d top=%d right=%d bottom=%d\n", left, top, right, bottom);
-
-    /* CZ 26.10.2001: this code prevents offscreen pixmaps being drawn ???
-	left   = max(left, 0);
-	top    = max(top, 0);
-	right  = min(right, pSmi->width);
-	bottom = min(bottom, pSmi->height);
-    */
 
     if (pScrn->bitsPerPixel == 24) {
 	left  *= 3;

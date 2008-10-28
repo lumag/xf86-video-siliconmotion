@@ -828,7 +828,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     if (IS_MSOC(pSmi)) {
 	pSmi->lcd = TRUE;
-	pSmi->IsSecondary = FALSE;
 	if (pSmi->Dualhead && pSmi->UseFBDev) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		       "Dual head disabled when using fbdev mode\n");
@@ -1035,9 +1034,8 @@ SMI_EnterVT(int scrnIndex, int flags)
 	RETURN(FALSE);
 
     /* Initialize the hardware cursor */
-    if(!IS_MSOC(pSmi) && pSmi->HwCursor){
+    if (pSmi->HwCursor)
 	xf86_show_cursors(pScrn);
-    }
 
     /* Reset the grapics engine */
     if (!pSmi->NoAccel)
@@ -1739,24 +1737,26 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
      * initialization.
      */
     if (pSmi->HwCursor) {
-	if(IS_MSOC(pSmi)){
-	    if (!SMI_HWCursorInit(pScreen)) {
-		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
-			   "initialization failed\n");
-	    }
-	}else{
-	    if(!xf86_cursors_init(pScreen, SMILYNX_MAX_CURSOR, SMILYNX_MAX_CURSOR,
-				  HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_8 |
-				  HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK |
-				  HARDWARE_CURSOR_AND_SOURCE_WITH_MASK |
-				  HARDWARE_CURSOR_BIT_ORDER_MSBFIRST |
-				  HARDWARE_CURSOR_TRUECOLOR_AT_8BPP |
-				  HARDWARE_CURSOR_INVERT_MASK)){
-		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Hardware cursor "
-			   "initialization failed\n");
-	    }
+	int	size, flags;
+
+	if (IS_MSOC(pSmi)) {
+	    size = SMI501_MAX_CURSOR;
+	    flags = (HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_1 |
+		     HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK);
+	}
+	else {
+	    size = SMILYNX_MAX_CURSOR;
+	    flags = (HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_8 |
+		     HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK |
+		     HARDWARE_CURSOR_AND_SOURCE_WITH_MASK |
+		     HARDWARE_CURSOR_BIT_ORDER_MSBFIRST |
+		     HARDWARE_CURSOR_TRUECOLOR_AT_8BPP |
+		     HARDWARE_CURSOR_INVERT_MASK);
 	}
 
+	if (!xf86_cursors_init(pScreen, size, size, flags))
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		       "Hardware cursor initialization failed\n");
     }
 
     /* Initialise default colormap */
@@ -1781,7 +1781,11 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	 !xf86DPMSInit(pScreen, SMILynx_DisplayPowerManagementSet, 0)))
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "DPMS initialization failed!\n");
 
-    SMI_InitVideo(pScreen);
+    /* FIXME This could be an option.
+     * When not scaling doesn't seem to make much of a difference
+     * on MSOC, and this way, one can watch video on both screens... */
+    if (!IS_MSOC(pSmi) || !pSmi->Dualhead)
+	SMI_InitVideo(pScreen);
 
     if(!xf86CrtcScreenInit(pScreen))
 	RETURN(FALSE);
@@ -1810,9 +1814,8 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
 	
     ENTER();
 
-    if(!IS_MSOC(pSmi) && pSmi->HwCursor){
+    if (pSmi->HwCursor)
 	xf86_cursors_fini(pScreen);
-    }
 
     if (pScrn->vtSema) {
 	if (!IS_MSOC(pSmi)) {

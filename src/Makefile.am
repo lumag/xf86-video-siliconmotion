@@ -39,7 +39,6 @@ siliconmotion_drv_la_SOURCES = \
          smi_dga.c \
          smi_driver.c \
          smi.h \
-         smi_hwcurs.c \
          smi_i2c.c \
 	 smi_pcirename.h \
          smi_video.c \

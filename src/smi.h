@@ -124,7 +124,6 @@ typedef struct
     int			Chipset;	/* Chip info, set using PCI
 					   above */
     int			ChipRev;
-    Bool		IsSecondary;
 
     OptionInfoPtr	Options;
     Bool		Dualhead;
