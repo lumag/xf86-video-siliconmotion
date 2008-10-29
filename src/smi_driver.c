@@ -247,14 +247,6 @@ static const char *exaSymbols[] =
     NULL
 };
 
-static const char *ramdacSymbols[] =
-{
-    "xf86CreateCursorInfoRec",
-    "xf86DestroyCursorInfoRec",
-    "xf86InitCursor",
-    NULL
-};
-
 static const char *ddcSymbols[] =
 {
     "xf86PrintEDID",
@@ -350,7 +342,7 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
 	 * Tell the loader about symbols from other modules that this module
 	 * might refer to.
 	 */
-	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, exaSymbols, ramdacSymbols,
+	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, exaSymbols,
 					  ddcSymbols, i2cSymbols, int10Symbols, vbeSymbols,
 					  NULL);
 
@@ -996,7 +988,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    SMI_FreeRec(pScrn);
 	    RETURN(FALSE);
 	}
-	xf86LoaderReqSymLists(ramdacSymbols, NULL);
     }
 
     RETURN(TRUE);
@@ -1063,7 +1054,8 @@ SMI_LeaveVT(int scrnIndex, int flags)
        unmapped.  */
     xf86RotateCloseScreen(pScrn->pScreen);
 
-    memset(pSmi->FBBase, 0, 256 * 1024);	/* #689 */
+    /* Clear frame buffer */
+    memset(pSmi->FBBase, 0, pSmi->videoRAMBytes);
 
     if (!IS_MSOC(pSmi)) {
 	vgaHWPtr	hwp = VGAHWPTR(pScrn);
@@ -1503,16 +1495,16 @@ SMI_MapMem(ScrnInfoPtr pScrn)
     xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 	       "Cursor Offset: %08lX\n", (unsigned long)pSmi->FBCursorOffset);
 
-    /* set up the fifo reserved space */
-    if (IS_MSOC(pSmi)) {
-	pSmi->FBCursorOffset = pSmi->videoRAMBytes - 2048;
-	pSmi->FBReserved = pSmi->videoRAMBytes - 4096;
-    }
+    if (IS_MSOC(pSmi))
+	/* Reserve space for panel cursr, and crt if in dual head mode */
+	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
+	    (pSmi->Dualhead ? SMI501_CURSOR_SIZE << 1 : SMI501_CURSOR_SIZE);
     else {
-	/* Set up offset to hwcursor memory area.  It's a 1K chunk at the end of
+	/* Set up offset to hwcursor memory area, at the end of
 	 * the frame buffer.
 	 */
-	pSmi->FBCursorOffset = pSmi->videoRAMBytes - 1024;
+	pSmi->FBCursorOffset = pSmi->videoRAMBytes - SMILYNX_CURSOR_SIZE;
+	/* set up the fifo reserved space */
 	if (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x30) & 0x01)/* #1074 */ {
 	    CARD32 fifoOffset = 0;
 	    fifoOffset |= VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA,
@@ -1618,9 +1610,6 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Save the chip/graphics state */
     pSmi->Save(pScrn);
 
-    /* Zero the frame buffer, #258 */
-    memset(pSmi->FBBase, 0, pSmi->videoRAMBytes);
-
     /* Fill in some needed pScrn fields */
     pScrn->vtSema = TRUE;
     pScrn->pScreen = pScreen;
@@ -1631,6 +1620,9 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     pSmi->fbArea = NULL;
     pSmi->FBOffset = 0;
     pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
+
+    /* Clear frame buffer */
+    memset(pSmi->FBBase, 0, pSmi->videoRAMBytes);
 
     /*
      * The next step is to setup the screen's visuals, and initialise the
@@ -1781,11 +1773,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	 !xf86DPMSInit(pScreen, SMILynx_DisplayPowerManagementSet, 0)))
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "DPMS initialization failed!\n");
 
-    /* FIXME This could be an option.
-     * When not scaling doesn't seem to make much of a difference
-     * on MSOC, and this way, one can watch video on both screens... */
-    if (!IS_MSOC(pSmi) || !pSmi->Dualhead)
-	SMI_InitVideo(pScreen);
+    SMI_InitVideo(pScreen);
 
     if(!xf86CrtcScreenInit(pScreen))
 	RETURN(FALSE);
@@ -1835,9 +1823,6 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
     if (pSmi->EXADriverPtr) {
 	exaDriverFini(pScreen);
 	pSmi->EXADriverPtr = NULL;
-    }
-    if (pSmi->CursorInfoRec != NULL) {
-	xf86DestroyCursorInfoRec(pSmi->CursorInfoRec);
     }
     if (pSmi->DGAModes != NULL) {
 	xfree(pSmi->DGAModes);

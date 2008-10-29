@@ -112,7 +112,6 @@ typedef struct
     CloseScreenProcPtr	CloseScreen;	/* Pointer used to save wrapped
 					   CloseScreen function */
 
-    xf86CursorInfoPtr	CursorInfoRec;	/* HW Cursor info */
     I2CBusPtr		I2C;		/* Pointer into I2C module */
     xf86Int10InfoPtr	pInt10;		/* Pointer to INT10 module */
     vbeInfoPtr          pVbe;           /* Pointer to VBE module */
