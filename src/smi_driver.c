@@ -822,8 +822,22 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	pSmi->lcd = TRUE;
 	if (pSmi->Dualhead && pSmi->UseFBDev) {
 	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		       "Dual head disabled when using fbdev mode\n");
+		       "Dual head disabled in fbdev mode\n");
 	    pSmi->Dualhead = FALSE;
+	}
+	/* FIXME Randr cursor code only works properly when argb cursors
+	 * are also supported.
+	 * FIXME This probably is a randr cursor bug, and since access to
+	 * hw/xfree86/ramdac/xf86CursorPriv.h:xf86CursorScreenRec.SWCursor
+	 * field is not available, one cannot easily workaround the problem,
+	 * so, just disable it...
+	 * TODO Check with a X Server newer then 1.4.0.90 (that is being
+	 * used in the 502 OEM image).
+	 * */
+	if (pSmi->Dualhead && pSmi->HwCursor) {
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		       "HW Cursor disabled in dual head mode\n");
+	    pSmi->HwCursor = FALSE;
 	}
     }
     else if (SMI_LYNXM_SERIES(pSmi->Chipset)) {
@@ -1492,9 +1506,6 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 		   "Logical frame buffer at %p - %p\n", pSmi->FBBase,
 		   pSmi->FBBase + pSmi->videoRAMBytes - 1);
 
-    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-	       "Cursor Offset: %08lX\n", (unsigned long)pSmi->FBCursorOffset);
-
     if (IS_MSOC(pSmi))
 	/* Reserve space for panel cursr, and crt if in dual head mode */
 	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
@@ -1517,6 +1528,9 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	}
 	else
 	    pSmi->FBReserved = pSmi->videoRAMBytes - 2048;
+
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Cursor Offset: %08lX\n",
+		   (unsigned long)pSmi->FBCursorOffset);
 
 	/* Assign hwp->MemBase & IOBase here */
 	hwp = VGAHWPTR(pScrn);

@@ -82,7 +82,7 @@ SMI_CrtcPrepare(xf86CrtcPtr crtc)
 
     ENTER();
 
-    if (!pSmi->Dualhead && pSmi->HwCursor)
+    if (pSmi->HwCursor)
 	crtc->funcs->hide_cursor(crtc);
 
     LEAVE();
@@ -110,7 +110,7 @@ SMI_CrtcCommit(xf86CrtcPtr crtc)
      *	It should not be a problem if argb cursors were supported,
      *	or only one output is available...
      */
-    if (!pSmi->Dualhead && pSmi->HwCursor)
+    if (pSmi->HwCursor)
 	xf86_reload_cursors(pScrn->pScreen);
 
     LEAVE();
