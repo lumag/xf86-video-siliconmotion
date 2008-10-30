@@ -1408,11 +1408,11 @@ SMI_DetectMem(ScrnInfoPtr pScrn)
 	unsigned char	 config;
 	static int	 lynx3d_table[4]  = {  0, 2, 4, 6 };
 	static int	 lynx3dm_table[4] = { 16, 2, 4, 8 };
-	static int	 msoc_table[8]    = { 2, 4, 0, 0, 64, 32, 16, 8 };
+	static int	 msoc_table[8]    = {  4, 8, 16, 32, 64, 2, 0, 0 };
 	static int	 default_table[4] = {  1, 2, 4, 0 };
 
 	if (IS_MSOC(pSmi)) {
-	    config = (READ_SCR(pSmi, DRAM_CONTROL) >> 24) & 7;
+	    config = (READ_SCR(pSmi, DRAM_CTL) >> 13) & 7;
 	    pSmi->videoRAMKBytes = msoc_table[config] * 1024 - FB_RESERVE4USB;
 	}
 	else {

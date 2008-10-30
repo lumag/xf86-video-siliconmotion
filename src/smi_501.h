@@ -41,7 +41,7 @@ authorization from the XFree86 Project and Silicon Motion.
 #define	bits(lo, hi)			hi + 1 - lo
 
 
-#define DRAM_CONTROL			0x000010
+#define DRAM_CTL			0x000010
 #define CMD_STATUS			0x000024
 
 /* contents of either power0_clock or power1_clock */
