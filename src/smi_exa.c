@@ -72,6 +72,8 @@ SMI_DoneComposite(PixmapPtr pDst);
 
 
 #define PIXMAP_FORMAT(pixmap) SMI_DEDataFormat(pixmap->drawable.bitsPerPixel)
+#define PIXMAP_OFFSET(pixmap)	IS_MSOC(pSmi) ?				\
+    exaGetPixmapOffset(pixmap) : exaGetPixmapOffset(pixmap) >> 3
 
 Bool
 SMI_EXAInit(ScreenPtr pScreen)
@@ -105,15 +107,13 @@ SMI_EXAInit(ScreenPtr pScreen)
     pSmi->EXADriverPtr->flags = EXA_TWO_BITBLT_DIRECTIONS;
     if (pSmi->EXADriverPtr->memorySize > pSmi->EXADriverPtr->offScreenBase) {
 	/* Offscreen Pixmaps */
-	if (!IS_MSOC(pSmi)) {
-	    pSmi->EXADriverPtr->flags |= EXA_OFFSCREEN_PIXMAPS;
-	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
-		       "EXA offscreen memory manager enabled.\n");
-	}
-    } else {
+	pSmi->EXADriverPtr->flags |= EXA_OFFSCREEN_PIXMAPS;
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		   "EXA offscreen memory manager enabled.\n");
+    }
+    else
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Not enough video RAM for EXA offscreen memory manager.\n");
-    }
 
     /* 12 bit coordinates */
     pSmi->EXADriverPtr->maxX = 4096;
@@ -225,8 +225,8 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     src_pitch  = exaGetPixmapPitch(pSrcPixmap) / (pSrcPixmap->drawable.bitsPerPixel >> 3);
     dst_pitch  = exaGetPixmapPitch(pDstPixmap) / (pDstPixmap->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
-    src_offset = exaGetPixmapOffset(pSrcPixmap) >> 3;
-    dst_offset = exaGetPixmapOffset(pDstPixmap) >> 3;
+    src_offset = PIXMAP_OFFSET(pSrcPixmap);
+    dst_offset = PIXMAP_OFFSET(pDstPixmap);
 
     pSmi->AccelCmd = SMI_BltRop[alu]
 		   | SMI_BITBLT
@@ -360,7 +360,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     /* calculate pitch in pixel unit */
     dst_pitch  = exaGetPixmapPitch(pPixmap) / (pPixmap->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
-    dst_offset = exaGetPixmapOffset(pPixmap) >> 3;
+    dst_offset = PIXMAP_OFFSET(pPixmap);
 
     pSmi->AccelCmd = SMI_SolidRop[alu]
 		   | SMI_BITBLT
@@ -489,7 +489,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     dst_pixelpitch  = exaGetPixmapPitch(pDst) / (pDst->drawable.bitsPerPixel >> 3);
     src_pixelpitch = src_pitch / (pDst->drawable.bitsPerPixel >> 3);
     /* calculate offset in 8 byte (64 bit) unit */
-    dst_offset = exaGetPixmapOffset(pDst) >> 3;
+    dst_offset = PIXMAP_OFFSET(pDst);
 
     pSmi->AccelCmd = 0xCC /* GXcopy */
 		   | SMI_HOSTBLT_WRITE
@@ -595,8 +595,8 @@ SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, Pi
     WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
 
     /* Destination and Source Base Address (offset) */
-    WRITE_DPR(pSmi, 0x40, exaGetPixmapOffset(pSrc) >> 3);
-    WRITE_DPR(pSmi, 0x44, exaGetPixmapOffset(pDst) >> 3);
+    WRITE_DPR(pSmi, 0x40, PIXMAP_OFFSET(pSrc));
+    WRITE_DPR(pSmi, 0x44, PIXMAP_OFFSET(pDst));
 
     /* DE command*/
     if(SMI_ISROTATION_90(pSrcPicture->transform))
