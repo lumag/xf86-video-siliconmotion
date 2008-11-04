@@ -166,6 +166,7 @@ typedef enum
     OPTION_ACCELMETHOD,
     OPTION_PANEL_SIZE,
     OPTION_USE_FBDEV,
+    OPTION_CSCVIDEO,
     NUMBER_OF_OPTIONS
 } SMIOpts;
 
@@ -191,6 +192,7 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
     { OPTION_PANEL_SIZE,     "PanelSize",	  OPTV_ANYSTR,	{0}, FALSE },
     { OPTION_USE_FBDEV,	     "UseFBDev",	  OPTV_BOOLEAN,	{0}, FALSE },
+    { OPTION_CSCVIDEO,	     "CSCVideo",	  OPTV_BOOLEAN, {0}, TRUE },
     { -1,		     NULL,		  OPTV_NONE,	{0}, FALSE }
 };
 
@@ -882,6 +884,24 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
 	xf86DrvMsg(pScrn->scrnIndex, from, "Using %s acceleration architecture\n",
 		pSmi->useEXA ? "EXA" : "XAA");
+    }
+
+    if (IS_MSOC(pSmi)) {
+	pSmi->CSCVideo = !pSmi->useEXA || !pSmi->Dualhead;
+	from = X_DEFAULT;
+	if (xf86GetOptValBool(pSmi->Options, OPTION_CSCVIDEO, &pSmi->CSCVideo)) {
+	    from = X_CONFIG;
+
+	    /* FIXME */
+	    if (pSmi->CSCVideo && pSmi->useEXA && pSmi->Dualhead) {
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "CSCVideo requires XAA or EXA in single head mode.\n");
+		pSmi->CSCVideo = FALSE;
+	    }
+	}
+
+	xf86DrvMsg(pScrn->scrnIndex, from, "CSC Video %sabled\n",
+		   pSmi->CSCVideo ? "en" : "dis");
     }
 
     SMI_MapMmio(pScrn);

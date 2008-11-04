@@ -243,13 +243,13 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 	pScrn->displayWidth = aligned_pitch / pSmi->Bpp;
 	pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
 					   -1, -1, -1, -1, aligned_pitch, NULL);
-    }
 
-    /* Modify the screen dimensions */
-    pScrn->virtualX = width;
-    pScrn->virtualY = height;
-    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
-				       width, height, -1, -1, 0, NULL);
+	/* Modify the screen dimensions */
+	pScrn->virtualX = width;
+	pScrn->virtualY = height;
+	pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
+					   width, height, -1, -1, 0, NULL);
+    }
 
     /* Setup each crtc video processor */
     for(i=0;i<crtcConf->num_crtc;i++){

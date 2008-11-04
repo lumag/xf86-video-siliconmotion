@@ -91,14 +91,10 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
     CARD32 DEDataFormat = 0;
-    int i;
+    int i, stride;
     int xyAddress[] = { 320, 400, 512, 640, 800, 1024, 1280, 1600, 2048 };
 
     ENTER();
-
-    pSmi->Stride = ((pScrn->virtualX * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
-    if(pScrn->bitsPerPixel==24)
-       pSmi->Stride *= 3;
 
     DEDataFormat = SMI_DEDataFormat(pScrn->bitsPerPixel);
     for (i = 0; i < sizeof(xyAddress) / sizeof(xyAddress[0]); i++) {
@@ -109,11 +105,14 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
     }
 
     WaitIdle();
-    WRITE_DPR(pSmi, 0x10, (pSmi->Stride << 16) | pSmi->Stride);
+    stride = pScrn->displayWidth;
+    if (pSmi->Bpp == 3)
+	stride *= 3;
+    WRITE_DPR(pSmi, 0x10, (stride << 16) | stride);
     WRITE_DPR(pSmi, 0x1C, DEDataFormat);
     WRITE_DPR(pSmi, 0x24, 0xFFFFFFFF);
     WRITE_DPR(pSmi, 0x28, 0xFFFFFFFF);
-    WRITE_DPR(pSmi, 0x3C, (pSmi->Stride << 16) | pSmi->Stride);
+    WRITE_DPR(pSmi, 0x3C, (stride << 16) | stride);
     WRITE_DPR(pSmi, 0x40, pSmi->FBOffset >> 3);
     WRITE_DPR(pSmi, 0x44, pSmi->FBOffset >> 3);
 

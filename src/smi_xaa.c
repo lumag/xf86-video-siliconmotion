@@ -583,7 +583,8 @@ SMI_SetupForColor8x8PatternFill(ScrnInfoPtr pScrn, int patx, int paty, int rop,
 #endif
     if (pScrn->bitsPerPixel <= 16) {
 	/* PDR#950 */
-	CARD8* pattern = pSmi->FBBase + (patx + paty * pSmi->Stride) * pSmi->Bpp;
+	CARD8* pattern = pSmi->FBBase +
+	    (patx + paty * pScrn->displayWidth) * pSmi->Bpp;
 
 	WaitIdle();
 	WRITE_DPR(pSmi, 0x0C, SMI_BITBLT | SMI_COLOR_PATTERN);

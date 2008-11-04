@@ -126,7 +126,15 @@ typedef struct
 
     OptionInfoPtr	Options;
     Bool		Dualhead;
+
+    /* Don't attempt to program a video mode. Use kernel framebuffer
+     * mode instead. */
     Bool		UseFBDev;
+
+    /* CSC video uses color space conversion to render video directly to
+     * the framebuffer, without using an overlay. */
+    Bool		CSCVideo;
+
     Bool		PCIBurst;	/* Enable PCI burst mode for
 					   reads? */
     Bool		PCIRetry;	/* Enable PCI retries */
@@ -196,10 +204,6 @@ typedef struct
 					   the previous command */
     int			GEResetCnt;	/* Limit the number of errors
 					   printed using a counter */
-
-
-    /* XAA */
-    CARD32		Stride;         /* Stride of frame buffer */
 
     Bool		useBIOS;	/* Use BIOS for mode sets */
     Bool		zoomOnLCD;	/* Zoom on LCD */
