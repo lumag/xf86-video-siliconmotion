@@ -51,8 +51,11 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
 
     ENTER();
 
-    if (pSmi->lcd &&
-	(mode->HDisplay > pSmi->lcdWidth || mode->VDisplay > pSmi->lcdHeight))
+    /* FIXME LVDS currently have fixed height. But allow external crtc to
+     * have a smaller or larger size, even if only one monitor section
+     * exists in xorg.conf. */
+    if (output->name && strcmp(output->name, "LVDS") == 0 &&
+	(mode->HDisplay > pSmi->lcdWidth || mode->VDisplay != pSmi->lcdHeight))
 	RETURN(MODE_PANEL);
 
     if (!(((mode->HDisplay == 1280) && (mode->VDisplay == 1024)) ||
