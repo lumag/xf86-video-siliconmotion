@@ -97,9 +97,33 @@ SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
 static xf86OutputStatus
 SMI501_OutputDetect_crt(xf86OutputPtr output)
 {
+    ScrnInfoPtr		pScrn = output->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    MSOCRegPtr		mode = pSmi->mode;
+    xf86OutputStatus	status;
+
     ENTER();
 
-    RETURN(XF86OutputStatusDisconnected);
+    mode->crt_detect.value = READ_SCR(pSmi, CRT_DETECT);
+    mode->crt_detect.f.enable = 1;
+    WRITE_SCR(pSmi, CRT_DETECT, mode->crt_detect.value);
+    SMI501_WaitVSync(pSmi, 1);
+
+    mode->crt_detect.value = READ_SCR(pSmi, CRT_DETECT);
+
+    /* FIXME This appears to have a fixed value, whatever I do, and
+     * the binary pattern is 1000000010000100
+     * regardless of crt being connected or not, so maybe this is
+     * just telling there is a VGA output?
+     */
+    status = mode->crt_detect.f.data ?
+	XF86OutputStatusConnected : XF86OutputStatusUnknown;
+
+    mode->crt_detect.f.enable = 0;
+    WRITE_SCR(pSmi, CRT_DETECT, mode->crt_detect.value);
+    SMI501_WaitVSync(pSmi, 1);
+
+    RETURN(status);
 }
 
 static xf86OutputFuncsRec SMI501_Output0Funcs;
@@ -133,6 +157,7 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 	SMI_OutputFuncsInit_base(&SMI501_Output1Funcs);
 	SMI501_Output1Funcs.dpms	= SMI501_OutputDPMS_crt;
 	SMI501_Output1Funcs.get_modes	= SMI_OutputGetModes_native;
+	SMI501_Output1Funcs.detect	= SMI501_OutputDetect_crt;
 
 	output1 = xf86OutputCreate(pScrn, &SMI501_Output1Funcs, "VGA");
 	if (!output1)

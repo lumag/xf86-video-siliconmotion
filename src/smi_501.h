@@ -788,7 +788,30 @@ typedef struct _MSOCRegRec {
 	} f;
 	int32_t		value;
     } crt_vsync;
+
+#define CRT_DETECT			0x080224
+    /*	CRT MONITOR DETECT
+     *	Read/Write MMIO_base + 0x080224
+     *	Power-on Default Undefined
+     *
+     *	0:23	Monitor Detect Data in RGB 8:8:8. This field is read-only.
+     *	24:24	Monitor Detect Enable.
+     *		0: Disable.
+     *		1: Enable.
+     *	25:25	Monitor Detect Read Back.
+     *		1: All R, G, and B voltages are greater than 0.325 V.
+     *		0: All R, G, and B voltages are less than or equal to 0.325 V.
+     */
+    union {
+	struct {
+	    int32_t	data		: bits( 0, 23);
+	    int32_t	enable		: bits(24, 24);
+	    int32_t	voltage		: bits(25, 25);
+	} f;
+	int32_t		value;
+    } crt_detect;
 } MSOCRegRec, *MSOCRegPtr;
+
 
 #define PANEL_PALETTE			0x080400
 #define CRT_PALETTE			0x080c00
@@ -806,6 +829,7 @@ double SMI501_FindClock(double clock, int max_divider, Bool has1xclck,
 			       int32_t *x2_divider, int32_t *x2_shift);
 double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n,
 				  int32_t *xclck);
+void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);
 
 /* Initialize the CRTC-independent hardware registers */
 Bool SMI501_HWInit(ScrnInfoPtr pScrn);

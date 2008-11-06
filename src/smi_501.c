@@ -50,7 +50,6 @@ authorization from The XFree86 Project or Silicon Motion.
 static char *format_integer_base2(int32_t word);
 static void SMI501_SetClock(SMIPtr pSmi, int32_t port,
 			    int32_t pll, int32_t value);
-static void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);
 
 
 /*
@@ -517,7 +516,7 @@ SMI501_PrintRegs(ScrnInfoPtr pScrn)
 		       format_integer_base2(READ_SCR(pSmi, i)));
 }
 
-static void
+void
 SMI501_WaitVSync(SMIPtr pSmi, int vsync_count)
 {
     int32_t	status, timeout;
