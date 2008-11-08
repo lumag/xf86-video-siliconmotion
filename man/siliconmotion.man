@@ -108,14 +108,10 @@ Turn on interlaced video capturing.  Default: off.
 Use the BIOS to set the modes. This is used for custom panel timings.
 Default: on.
 .TP
-.BI "Option \*qZoomOnLCD\*q \*q" boolean \*q
-Allow changing resolution on LCD (Ctrl-Alt-Plus and Ctrl-Alt-Minus).
-Default: off.
-.TP
 .BI "Option \*qDualhead\*q \*q" boolean \*q
 Enable dualhead mode.
-Currently not all chips are supported and hardware video overlay (XV)
-will only work on the secondary VGA output.
+Currently not all chips are supported and on lynx chipsets hardware video
+overlay (XV) will only work on the secondary VGA output.
 Default: off.
 .TP
 .BI "Option \*qPanelSize\*q \*q" width x height \*q
@@ -193,18 +189,20 @@ The following PCI bus
 .B Options
 are supported:
 .TP
-.BI "Option \*qpci_burst\*q \*q" boolean \*q
+.BI "Option \*qPciBurst\*q \*q" boolean \*q
 will enable PCI burst mode. This should work on all but a
-few broken PCI chipsets, and will increase performance.  Default: off.
+few broken PCI chipsets, and will increase performance.  Default: on.
 .TP
-.BI "Option \*qpci_retry\*q \*q" boolean \*q
+.BI "Option \*qPciRetry\*q \*q" boolean \*q
 will allow the driver to rely on PCI Retry to program the registers.
-.B "pci_burst"
+.B "PciBurst"
 must be enabled for this to work. 
 This will increase performance, especially for small fills/blits, 
 because the driver does not have to poll the card before sending it
 commands to make sure it is ready. It should work on most 
-recent PCI chipsets.  Default: off.
+recent PCI chipsets.  Default: value of
+.I PciBurst
+option.
 
 .SH SEE ALSO
 __xservername__(1), __xconfigfile__(__filemansuffix__), xorgconfig(1), Xserver(1), X(__miscmansuffix__)

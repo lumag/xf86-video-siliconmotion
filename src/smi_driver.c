@@ -161,7 +161,6 @@ typedef enum
     OPTION_INTERLACED,
     /* end CZ */
     OPTION_USEBIOS,
-    OPTION_ZOOMONLCD,
     OPTION_DUALHEAD,
     OPTION_ACCELMETHOD,
     OPTION_PANEL_SIZE,
@@ -187,7 +186,6 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_INTERLACED,     "Interlaced",        OPTV_BOOLEAN, {0}, FALSE },
     /* end CZ */
     { OPTION_USEBIOS,	     "UseBIOS",		  OPTV_BOOLEAN,	{0}, FALSE },
-    { OPTION_ZOOMONLCD,	     "ZoomOnLCD",	  OPTV_BOOLEAN,	{0}, FALSE },
     { OPTION_DUALHEAD,	     "Dualhead",	  OPTV_BOOLEAN,	{0}, TRUE },
     { OPTION_ACCELMETHOD,    "AccelMethod",       OPTV_STRING,  {0}, FALSE },
     { OPTION_PANEL_SIZE,     "PanelSize",	  OPTV_ANYSTR,	{0}, FALSE },
@@ -733,15 +731,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     else {
 	/* Default to UseBIOS enabled. */
 	pSmi->useBIOS = TRUE;
-    }
-
-    if (xf86GetOptValBool(pSmi->Options, OPTION_ZOOMONLCD, &pSmi->zoomOnLCD)) {
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: ZoomOnLCD %s.\n",
-		   pSmi->zoomOnLCD ? "enabled" : "disabled");
-    }
-    else {
-	/* Default to ZoomOnLCD enabled. */
-	pSmi->zoomOnLCD = TRUE;
     }
 
     if (pSmi->useBIOS) {

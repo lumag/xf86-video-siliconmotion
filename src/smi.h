@@ -206,7 +206,6 @@ typedef struct
 					   printed using a counter */
 
     Bool		useBIOS;	/* Use BIOS for mode sets */
-    Bool		zoomOnLCD;	/* Zoom on LCD */
     XAAInfoRecPtr	XAAInfoRec;	/* XAA info Rec */
 
     /* EXA */
