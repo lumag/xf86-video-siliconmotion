@@ -147,9 +147,6 @@ static PciChipsets SMIPciChipsets[] =
 typedef enum
 {
     OPTION_PCI_BURST,
-    OPTION_FIFO_CONSERV,
-    OPTION_FIFO_MODERATE,
-    OPTION_FIFO_AGGRESSIVE,
     OPTION_PCI_RETRY,
     OPTION_NOACCEL,
     OPTION_MCLK,
@@ -172,9 +169,6 @@ typedef enum
 static const OptionInfoRec SMIOptions[] =
 {
     { OPTION_PCI_BURST,	     "pci_burst",	  OPTV_BOOLEAN, {0}, TRUE },
-    { OPTION_FIFO_CONSERV,    "fifo_conservative", OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_FIFO_MODERATE,   "fifo_moderate",	  OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_FIFO_AGGRESSIVE, "fifo_aggressive",  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_PCI_RETRY,	     "pci_retry",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_NOACCEL,	     "NoAccel",		  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_MCLK,	     "set_mclk",	  OPTV_FREQ,	{0}, FALSE },
@@ -646,28 +640,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     }
     xf86DrvMsg(pScrn->scrnIndex, from, "PCI Retry %sabled\n",
 	       pSmi->PCIRetry ? "en" : "dis");
-
-    if (xf86IsOptionSet(pSmi->Options, OPTION_FIFO_CONSERV)) {
-	pSmi->fifo_conservative = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: fifo_conservative "
-		   "set\n");
-    } else {
-	pSmi->fifo_conservative = FALSE;
-    }
-
-    if (xf86IsOptionSet(pSmi->Options, OPTION_FIFO_MODERATE)) {
-	pSmi->fifo_moderate = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: fifo_moderate set\n");
-    } else {
-	pSmi->fifo_moderate = FALSE;
-    }
-
-    if (xf86IsOptionSet(pSmi->Options, OPTION_FIFO_AGGRESSIVE)) {
-	pSmi->fifo_aggressive = TRUE;
-	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: fifo_aggressive set\n");
-    } else {
-	pSmi->fifo_aggressive = FALSE;
-    }
 
     if (xf86ReturnOptValBool(pSmi->Options, OPTION_NOACCEL, FALSE)) {
 	pSmi->NoAccel = TRUE;

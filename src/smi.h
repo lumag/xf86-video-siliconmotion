@@ -138,12 +138,6 @@ typedef struct
     Bool		PCIBurst;	/* Enable PCI burst mode for
 					   reads? */
     Bool		PCIRetry;	/* Enable PCI retries */
-    Bool		fifo_conservative;	/* Adjust fifo for
-						   acceleration? */
-    Bool		fifo_moderate;	/* Adjust fifo for
-					   acceleration? */
-    Bool		fifo_aggressive;	/* Adjust fifo for
-						   acceleration? */
     Bool		HwCursor;	/* hardware cursor enabled */
 
     CARD8		DACmask;

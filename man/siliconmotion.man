@@ -163,26 +163,6 @@ stable.  EXA is a newer acceleration architecture with better performance for
 the Render and Composite extensions, but the rendering code for it is newer and
 possibly unstable.  The default is
 .B XAA.
-.TP
-.B "Option \*qfifo_aggressive\*q"
-.TP
-.B "Option \*qfifo_moderate\*q"
-.TP
-.B "Option \*qfifo_conservative\*q"
-alter the settings
-for the threshold at which the pixel FIFO takes over the internal 
-memory bus to refill itself. The smaller this threshold, the better
-the acceleration performance of the card. You may try the fastest 
-setting
-.RB ( "fifo_aggressive" )
-and move down if you encounter pixel corruption.
-The optimal setting will probably depend on dot-clock and on color 
-depth. Note that specifying any of these options will also alter other
-memory settings which may increase performance, so trying
-.B "fifo_conservative"
-will in most cases be a slight benefit (this uses the chip defaults).
-If pixel corruption or transient streaking is observed during drawing
-operations then removing any fifo options is recommended.  Default: none.
 
 .PP
 The following PCI bus
