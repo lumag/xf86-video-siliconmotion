@@ -124,6 +124,13 @@ SMI501_Save(ScrnInfoPtr pScrn)
     save->crt_hsync.value = READ_SCR(pSmi, CRT_HSYNC);
     save->crt_vtotal.value = READ_SCR(pSmi, CRT_VTOTAL);
     save->crt_vsync.value = READ_SCR(pSmi, CRT_VSYNC);
+
+    save->alpha_display_ctl.value = READ_SCR(pSmi, ALPHA_DISPLAY_CTL);
+    save->alpha_fb_address.value = READ_SCR(pSmi, ALPHA_FB_ADDRESS);
+    save->alpha_fb_width.value = READ_SCR(pSmi, ALPHA_FB_WIDTH);
+    save->alpha_plane_tl.value = READ_SCR(pSmi, ALPHA_PLANE_TL);
+    save->alpha_plane_br.value = READ_SCR(pSmi, ALPHA_PLANE_BR);
+    save->alpha_chroma_key.value = READ_SCR(pSmi, ALPHA_CHROMA_KEY);
 }
 
 void
@@ -328,11 +335,28 @@ SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 }
 
 void
+SMI501_WriteMode_alpha(ScrnInfoPtr pScrn, MSOCRegPtr mode)
+{
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
+    WRITE_SCR(pSmi, ALPHA_FB_ADDRESS, mode->alpha_fb_address.value);
+    WRITE_SCR(pSmi, ALPHA_FB_WIDTH, mode->alpha_fb_width.value);
+
+    WRITE_SCR(pSmi, ALPHA_PLANE_TL, mode->alpha_plane_tl.value);
+    WRITE_SCR(pSmi, ALPHA_PLANE_BR, mode->alpha_plane_br.value);
+
+    WRITE_SCR(pSmi, ALPHA_CHROMA_KEY, mode->alpha_chroma_key.value);
+
+    WRITE_SCR(pSmi, ALPHA_DISPLAY_CTL, mode->alpha_display_ctl.value);
+}
+
+void
 SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
 {
     SMI501_WriteMode_common(pScrn, restore);
     SMI501_WriteMode_lcd(pScrn, restore);
     SMI501_WriteMode_crt(pScrn, restore);
+    SMI501_WriteMode_alpha(pScrn, restore);
 }
 
 void

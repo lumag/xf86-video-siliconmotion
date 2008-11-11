@@ -622,6 +622,145 @@ typedef struct _MSOCRegRec {
 	int32_t		value;
     } panel_vsync;
 
+#define ALPHA_DISPLAY_CTL		0x080100
+    /*	ALPHA DISPLAY CONTROL
+     *	Read MMIO base + 0x080100
+     *	Power-on Default 0x00010000
+     *
+     *	0:1	Alpha Plane Format
+     *		01: 16-bit RGB 5:6:5 mode.
+     *		10: 8-bit indexed a|4:4 mode.
+     *		11: 16-bit aRGB 4:4:4:4 mode.
+     *	2:2	Alpha Plane Enable
+     *		0: Disable Alpha Plane
+     *		1: Enable Alpha Plane
+     *	3:3	Enable Chroma Key.
+     *		0: Disable chroma key.
+     *		1: Enable chroma key.
+     *	24:27	Alpha Plane Alpha Value.
+     *		This field is only valid when bit 28 is set.
+     *	28:28	Alpha Select.
+     *		0: 0: Use per-pixel alpha values.
+     *		1: Use alpha value specified in Alpha.
+     */
+    union {
+	struct {
+	    int32_t	format		: bits( 0,  1);
+	    int32_t	enable		: bits( 2,  2);
+	    int32_t	chromakey	: bits( 3,  3);
+	    int32_t	u0		: bits( 4, 23);
+	    int32_t	alpha		: bits(24, 27);
+	    int32_t	select		: bits(28, 28);
+	} f;
+	int32_t		value;
+    } alpha_display_ctl;
+
+#define ALPHA_FB_ADDRESS		0x080104
+    /*	ALPHA FB ADDRESS
+     *	Read/Write MMIO_base + 0x080104
+     *	Power-on Default Undefined
+     *
+     *	4:25	Address Memory address of frame buffer for the
+     *		CRT graphics plane with 128-bit alignment.
+     *	26:26	Chip Select for External Memory.
+     *		0: CS0 of external memory.
+     *		1: CS1 of external memory.
+     *	27:27	Ext Memory Selection.
+     *		0: Local memory.
+     *		1: External memory.
+     *	31:31	Status Bit.
+     *		0: No flip pending.
+     *		1: Flip pending.
+     */
+    union {
+	struct {
+	    int32_t	u0		: bits( 0,  3);
+	    int32_t	address		: bits( 4, 25);
+	    int32_t	mextern		: bits(26, 26);
+	    int32_t	mselect		: bits(27, 27);
+	    int32_t	u1		: bits(28, 30);
+	    int32_t	pending		: bits(31, 31);
+	} f;
+	int32_t		value;
+    } alpha_fb_address;
+
+#define ALPHA_FB_WIDTH			0x080108
+    /*	ALPHA FB WIDTH
+     *	Read/Write MMIO_base + 0x080108
+     *	Power-on Default Undefined
+     *
+     *	4:13	Number of 128-bit aligned bytes per line of the FB
+     *		graphics plane
+     *	20:29	Number of bytes per line of the alpha window
+     *		specified in 128-bit aligned bytes.
+     */
+    union {
+	struct {
+	    int32_t	u0		: bits( 0,  3);
+	    int32_t	offset		: bits( 4, 13);
+	    int32_t	u1		: bits(14, 19);
+	    int32_t	width		: bits(20, 29);
+	} f;
+	int32_t		value;
+    } alpha_fb_width;
+
+#define ALPHA_PLANE_TL			0x08010c
+    /*	ALPHA PLANE TL
+     *	Read/Write MMIO_base + 0x08010c
+     *	Power-on Default Undefined
+     *
+     *	0:10	Left location of the panel graphics plane specified in pixels.
+     *	16:26	Top location of the panel graphics plane specified in lines.
+     */
+    union {
+	struct {
+	    int32_t	left		: bits( 0, 10);
+	    int32_t	u0		: bits(11, 15);
+	    int32_t	top		: bits(16, 26);
+	} f;
+	int32_t		value;
+    } alpha_plane_tl;
+
+#define ALPHA_PLANE_BR			0x080110
+    /*	ALPHA PLANE BR
+     *	Read/Write MMIO_base + 0x080110
+     *	Power-on Default Undefined
+     *
+     *	0:10	Right location of the panel graphics plane specified in pixels.
+     *	16:26	Bottom location of the panel graphics plane specified in lines.
+     */
+    union {
+	struct {
+	    int32_t	right		: bits( 0, 10);
+	    int32_t	u0		: bits(11, 15);
+	    int32_t	bottom		: bits(16, 26);
+	} f;
+	int32_t		value;
+    } alpha_plane_br;
+
+#define ALPHA_CHROMA_KEY		0x080114
+    /*	ALPHA PLANE BR
+     *	Read/Write MMIO_base + 0x080114
+     *	Power-on Default Undefined
+     *
+     *	0:15	Chroma Key Value for Alpha Plane.
+     *	16:31	Chroma Key Mask for Alpha Plane.
+     *		0: Compare respective bit.
+     *		1: Do not compare respective bit.
+     *		Note that the 0 and 1 values are mean't for every one of
+     *		the 16 5:6:5 bits
+     */
+    union {
+	struct {
+	    int32_t	value		: bits( 0, 15);
+	    int32_t	mask		: bits(16, 31);
+	} f;
+	int32_t		value;
+    } alpha_chroma_key;
+
+    /* 0x080118 to 0x80134 16 4 bit indexed rgb 5:6:5 table */
+#define ALPHA_COLOR_LOOKUP		0x080118
+
 #define CRT_DISPLAY_CTL			0x080200
     /*	CRT DISPLAY CONTROL
      *	Read MMIO_base + 0x080200
@@ -708,7 +847,7 @@ typedef struct _MSOCRegRec {
      *
      *	4:13	Number of 128-bit aligned bytes per line of the FB
      *		graphics plane
-     *	20:29	Number of bytes per line of the panel graphics window
+     *	20:29	Number of bytes per line of the crt graphics window
      *		specified in 128-bit aligned bytes.
      */
     union {
@@ -837,6 +976,7 @@ Bool SMI501_HWInit(ScrnInfoPtr pScrn);
 void SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 void SMI501_WriteMode_lcd(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 void SMI501_WriteMode_crt(ScrnInfoPtr pScrn, MSOCRegPtr mode);
+void SMI501_WriteMode_alpha(ScrnInfoPtr pScrn, MSOCRegPtr mode);
 void SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore);
 void SMI501_PowerPanel(ScrnInfoPtr pScrn, MSOCRegPtr mode, Bool on);
 
