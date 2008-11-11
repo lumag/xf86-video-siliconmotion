@@ -372,23 +372,49 @@ SMI501_CrtcSetCursorPosition(xf86CrtcPtr crtc, int x, int y)
 {
     ScrnInfoPtr		pScrn = crtc->scrn;
     SMIPtr		pSmi = SMIPTR(pScrn);
-    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf;
+#if SMI_CURSOR_ALPHA_PLANE
+    SMICrtcPrivatePtr	smi_crtc = SMICRTC(crtc);
+    MSOCRegPtr		mode;
+#endif
     int32_t		port, offset;
 
     ENTER();
 
-    if (x >= 0)
-	offset = x & SMI501_MASK_MAXBITS;
-    else
-	offset = (-x & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY;
+#if SMI_CURSOR_ALPHA_PLANE
+    if (smi_crtc->argb_cursor) {
+	mode = pSmi->mode;
 
-    if (y >= 0)
-	offset |= (y & SMI501_MASK_MAXBITS) << 16;
-    else
-	offset |= ((-y & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY) << 16;
+	/* uncomment next line if you want to see it rendering the cursor */
+	/* x = y = 0; */
 
-    port = crtc == crtcConf->crtc[0] ? 0x00f4 : 0x0234;
-    WRITE_DCR(pSmi, port, offset);
+	mode->alpha_plane_tl.f.left = x;
+	mode->alpha_plane_tl.f.top = y;
+
+	mode->alpha_plane_br.f.right = x + SMI501_CURSOR_SIZE - 1;
+	mode->alpha_plane_br.f.bottom = y + SMI501_CURSOR_SIZE - 1;
+
+	WRITE_SCR(pSmi, ALPHA_PLANE_TL, mode->alpha_plane_tl.value);
+	WRITE_SCR(pSmi, ALPHA_PLANE_BR, mode->alpha_plane_br.value);
+    }
+    else
+#endif
+    {
+	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+
+	if (x >= 0)
+	    offset = x & SMI501_MASK_MAXBITS;
+	else
+	    offset = (-x & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY;
+
+	if (y >= 0)
+	    offset |= (y & SMI501_MASK_MAXBITS) << 16;
+	else
+	    offset |= ((-y & SMI501_MASK_MAXBITS) | SMI501_MASK_BOUNDARY) << 16;
+
+	port = crtc == crtcConf->crtc[0] ? 0x00f4 : 0x0234;
+	WRITE_DCR(pSmi, port, offset);
+    }
 
     LEAVE();
 }
@@ -398,15 +424,32 @@ SMI501_CrtcShowCursor(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr		pScrn = crtc->scrn;
     SMIPtr		pSmi = SMIPTR(pScrn);
-    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf;
+#if SMI_CURSOR_ALPHA_PLANE
+    SMICrtcPrivatePtr	smi_crtc = SMICRTC(crtc);
+    MSOCRegPtr		mode;
+#endif
     int32_t		port, value;
 
     ENTER();
 
-    port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
-    value = READ_DCR(pSmi, port);
-    value |= SMI501_MASK_HWCENABLE;
-    WRITE_DCR(pSmi, port, value);
+#if SMI_CURSOR_ALPHA_PLANE
+    if (smi_crtc->argb_cursor) {
+	mode = pSmi->mode;
+
+	mode->alpha_display_ctl.f.enable = 1;
+	WRITE_SCR(pSmi, ALPHA_DISPLAY_CTL, mode->alpha_display_ctl.value);
+    }
+    else
+#endif
+    {
+	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+
+	port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
+	value = READ_DCR(pSmi, port);
+	value |= SMI501_MASK_HWCENABLE;
+	WRITE_DCR(pSmi, port, value);
+    }
 
     LEAVE();
 }
@@ -416,15 +459,32 @@ SMI501_CrtcHideCursor(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr		pScrn = crtc->scrn;
     SMIPtr		pSmi = SMIPTR(pScrn);
-    xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+    xf86CrtcConfigPtr	crtcConf;
+#if SMI_CURSOR_ALPHA_PLANE
+    SMICrtcPrivatePtr	smi_crtc = SMICRTC(crtc);
+    MSOCRegPtr		mode;
+#endif
     int32_t		port, value;
 
     ENTER();
 
-    port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
-    value = READ_DCR(pSmi, port);
-    value &= ~SMI501_MASK_HWCENABLE;
-    WRITE_DCR(pSmi, port, value);
+#if SMI_CURSOR_ALPHA_PLANE
+    if (smi_crtc->argb_cursor) {
+	mode = pSmi->mode;
+
+	mode->alpha_display_ctl.f.enable = 0;
+	WRITE_SCR(pSmi, ALPHA_DISPLAY_CTL, mode->alpha_display_ctl.value);
+    }
+    else
+#endif
+    {
+	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
+
+	port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
+	value = READ_DCR(pSmi, port);
+	value &= ~SMI501_MASK_HWCENABLE;
+	WRITE_DCR(pSmi, port, value);
+    }
 
     LEAVE();
 }
@@ -434,6 +494,9 @@ SMI501_CrtcLoadCursorImage(xf86CrtcPtr crtc, CARD8 *image)
 {
     ScrnInfoPtr		pScrn = crtc->scrn;
     SMIPtr		pSmi = SMIPTR(pScrn);
+#if SMI_CURSOR_ALPHA_PLANE
+    SMICrtcPrivatePtr	smi_crtc = SMICRTC(crtc);
+#endif
     xf86CrtcConfigPtr	crtcConf = XF86_CRTC_CONFIG_PTR(pScrn);
     int32_t		port, value;
 
@@ -445,9 +508,91 @@ SMI501_CrtcLoadCursorImage(xf86CrtcPtr crtc, CARD8 *image)
     memcpy(pSmi->FBBase + value, image,
 	   /* FIXME 1024, but then, should not be using 64x64 cursors */
 	   (SMI501_MAX_CURSOR >> 2) * SMI501_MAX_CURSOR);
+#if SMI_CURSOR_ALPHA_PLANE
+    smi_crtc->argb_cursor = FALSE;
+#endif
 
     LEAVE();
 }
+
+#if SMI_CURSOR_ALPHA_PLANE
+static void
+SMI501_CrtcLoadCursorArgb(xf86CrtcPtr crtc, CARD32 *image)
+{
+    ScrnInfoPtr		 pScrn = crtc->scrn;
+    SMIPtr		 pSmi = SMIPTR(pScrn);
+    SMICrtcPrivatePtr	 smi_crtc = SMICRTC(crtc);
+    MSOCRegPtr		 mode = pSmi->mode;
+    int16_t		*framebuffer;
+    int32_t		 x, y, bits;
+    int32_t		 format;
+
+    ENTER();
+
+#define ALPHA_RGB_565		1
+#define ALPHA_ARGB_4444		3
+
+    /* select alpha format */
+    mode->alpha_display_ctl.f.format = ALPHA_ARGB_4444;
+
+    /* 0: use per pixel alpha value  1: use alpha value specified in alpha */
+    if (mode->alpha_display_ctl.f.format == ALPHA_RGB_565) {
+	mode->alpha_display_ctl.f.select = 1;
+	/* 0 to 15, with 0 being transparent and 15 opaque */
+	mode->alpha_display_ctl.f.alpha = 7;
+    }
+    else {
+	/* use per pixel alpha */
+	mode->alpha_display_ctl.f.select = 0;
+    }
+
+    /* alpha layer buffer */
+    mode->alpha_fb_address.value = 0;
+    mode->alpha_fb_address.f.address = pSmi->FBCursorOffset >> 4;
+
+    /* more clearly: width = (SMI501_MAX_CURSOR << 1) >> 4
+     * as the structure is matching the register spec, where it says
+     * the first 4 bits are hardwired to zero */
+    mode->alpha_fb_width.f.offset = SMI501_MAX_CURSOR >> 3;
+    mode->alpha_fb_width.f.width = SMI501_MAX_CURSOR >> 3;
+
+    mode->alpha_chroma_key.f.value = 0;
+    mode->alpha_chroma_key.f.mask = 0;
+    /* enable chroma key */
+    mode->alpha_display_ctl.f.chromakey = 1;
+
+    framebuffer = (int16_t *)(pSmi->FBBase + pSmi->FBCursorOffset);
+    if (mode->alpha_display_ctl.f.format == ALPHA_RGB_565) {
+	/* convert image to rgb 5:6:5 */
+	for (y = 0; y < SMI501_MAX_CURSOR; y++) {
+	    for (x = 0; x < SMI501_MAX_CURSOR; x++) {
+		bits = image[y * SMI501_MAX_CURSOR + x];
+		framebuffer[y * SMI501_MAX_CURSOR + x] =
+		(((bits & 0xf80000) >> 8) |
+		 ((bits & 0x00fc00) >> 5) |
+		 ((bits & 0x0000f8) >> 3));
+	    }
+	}
+    }
+    else {
+	/* convert image to argb 4:4:4:4 */
+	for (y = 0; y < SMI501_MAX_CURSOR; y++) {
+	    for (x = 0; x < SMI501_MAX_CURSOR; x++) {
+		bits = image[y * SMI501_MAX_CURSOR + x];
+		framebuffer[y * SMI501_MAX_CURSOR + x] =
+		(((bits & 0xf0000000) >> 16) |
+		 ((bits & 0x00f00000) >> 12) |
+		 ((bits & 0x0000f000) >>  8) |
+		 ((bits & 0x000000f0) >>  4));
+	    }
+	}
+    }
+    SMI501_WriteMode_alpha(pScrn, mode);
+    smi_crtc->argb_cursor = TRUE;
+ 
+     LEAVE();
+ }
+#endif
 
 static xf86CrtcFuncsRec SMI501_Crtc0Funcs;
 static SMICrtcPrivateRec SMI501_Crtc0Priv;
@@ -475,6 +620,10 @@ SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 	SMI501_Crtc0Funcs.show_cursor = SMI501_CrtcShowCursor;
 	SMI501_Crtc0Funcs.hide_cursor = SMI501_CrtcHideCursor;
 	SMI501_Crtc0Funcs.load_cursor_image = SMI501_CrtcLoadCursorImage;
+#if SMI_CURSOR_ALPHA_PLANE
+	if (!pSmi->Dualhead)
+	    SMI501_Crtc0Funcs.load_cursor_argb = SMI501_CrtcLoadCursorArgb;
+#endif
     }
 
     crtc0 = xf86CrtcCreate(pScrn, &SMI501_Crtc0Funcs);

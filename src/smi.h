@@ -72,6 +72,42 @@ authorization from the XFree86 Project and Silicon Motion.
 #define SMI_USE_VIDEO		1
 #define SMI_USE_CAPTURE		1
 
+/*
+ *   Leaving attempt implementation of an argb cursor using alpha plane
+ * for the smi 501/502 under this ifdef for now. Maybe it will be fixed
+ * in a subsequent hardware revision.
+ *   The problem is that the alpha plane will only work (that is, become
+ * visible) if alpha_plane_tl is set to top:=0 and left:=0.
+ *   Also, if alpha_plane_br does not match panel dimensions, the alpha
+ * plane will be displayed tilled in the "first" row, with corruption on
+ * on all odd columns.
+ *   Since setting the alpha fb_address works, to implement an argb cursor
+ * using the alpha plane, with the current hardware bugs, it would be
+ * required to:
+ *	o allocate an offscreen area of pSmi->lcdWidth * pSmi->lcdHeight * 2
+ *	o set statically tl/tr to 0,0,pSmi->lcdWidth-1,pSmi->lcdHeight-1
+ *	o use alpha format 3 (argb 4:4:4:4), or alternatively format 1
+ *	  (rgb 5:6:5), and in the last case, a global 50% alpha is the
+ *	  best bet, and for the argb cursors being used at the time of this
+ *	  writing, they look correct, while 100% opaque looks wrong.
+ *	o when positioning the pointer, first erase it from the offscreen
+ *	  area, then repaint it at the proper offset in the alpha offscreen
+ *	  area.
+ *  .... argb software cursor works way better
+ *   (There are some other alternatives, like using 8 bits indexed mode,
+ * but when using a global alpha value, instead of per pixel, most argb
+ * cursors will not look correctly, regardless of the alpha value, that
+ * should be from 50 to 100% transparency).
+ *   But still there would be the problem of memory requiring a 128 bit
+ * alignment, what would require either moving the image in the memory,
+ * and/or some trick with the vsync pixel panning.
+ *
+ *   Until the alpha layer is corrected in some newer revision (or removed?),
+ * it could be used as something like an alternate crt, that happens to be
+ * on top of the panel (and has 16 transparency levels).
+ */
+#define SMI_CURSOR_ALPHA_PLANE	0
+
 /******************************************************************************/
 /*			S T R U C T U R E S				      */
 /******************************************************************************/

@@ -38,6 +38,9 @@ typedef struct {
     /* Load the LUT fields above to the hardware */
     void (*load_lut)(xf86CrtcPtr crtc);
 
+#if SMI_CURSOR_ALPHA_PLANE
+    Bool	argb_cursor;
+#endif
 } SMICrtcPrivateRec, *SMICrtcPrivatePtr;
 
 #define SMICRTC(crtc) ((SMICrtcPrivatePtr)(crtc)->driver_private)

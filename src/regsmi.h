@@ -304,6 +304,11 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 #define SMI501_MAX_CURSOR	64
 #define SMILYNX_CURSOR_SIZE	1024
 #define SMI501_CURSOR_SIZE	2048
+#if SMI_CURSOR_ALPHA_PLANE
+/* Stored in either 4:4:4:4 or 5:6:5 format */
+# define SMI501_ARGB_CURSOR_SIZE					\
+    (SMI501_MAX_CURSOR * SMI501_MAX_CURSOR * 2)
+#endif
 
 /* HWCursor definitons for Panel AND CRT */
 #define SMI501_MASK_HWCENABLE			0x80000000

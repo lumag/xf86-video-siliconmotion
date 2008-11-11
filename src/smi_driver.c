@@ -1487,10 +1487,16 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 		   "Logical frame buffer at %p - %p\n", pSmi->FBBase,
 		   pSmi->FBBase + pSmi->videoRAMBytes - 1);
 
-    if (IS_MSOC(pSmi))
+    if (IS_MSOC(pSmi)) {
 	/* Reserve space for panel cursr, and crt if in dual head mode */
+#if SMI_CURSOR_ALPHA_PLANE
+	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
+	    (pSmi->Dualhead ? SMI501_CURSOR_SIZE << 1 : SMI501_ARGB_CURSOR_SIZE);
+#else
 	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
 	    (pSmi->Dualhead ? SMI501_CURSOR_SIZE << 1 : SMI501_CURSOR_SIZE);
+#endif
+    }
     else {
 	/* Set up offset to hwcursor memory area, at the end of
 	 * the frame buffer.
@@ -1730,6 +1736,10 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	    size = SMI501_MAX_CURSOR;
 	    flags = (HARDWARE_CURSOR_SOURCE_MASK_INTERLEAVE_1 |
 		     HARDWARE_CURSOR_SWAP_SOURCE_AND_MASK);
+#if SMI_CURSOR_ALPHA_PLANE
+	    if (!pSmi->Dualhead)
+		flags |= HARDWARE_CURSOR_ARGB;
+#endif
 	}
 	else {
 	    size = SMILYNX_MAX_CURSOR;
