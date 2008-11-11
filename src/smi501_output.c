@@ -94,6 +94,7 @@ SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
     LEAVE();
 }
 
+#ifdef USE_CRTC_DETECT
 static xf86OutputStatus
 SMI501_OutputDetect_crt(xf86OutputPtr output)
 {
@@ -125,6 +126,7 @@ SMI501_OutputDetect_crt(xf86OutputPtr output)
 
     RETURN(status);
 }
+#endif
 
 static xf86OutputFuncsRec SMI501_Output0Funcs;
 static xf86OutputFuncsRec SMI501_Output1Funcs;
@@ -157,7 +159,9 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 	SMI_OutputFuncsInit_base(&SMI501_Output1Funcs);
 	SMI501_Output1Funcs.dpms	= SMI501_OutputDPMS_crt;
 	SMI501_Output1Funcs.get_modes	= SMI_OutputGetModes_native;
+#ifdef USE_CRTC_DETECT
 	SMI501_Output1Funcs.detect	= SMI501_OutputDetect_crt;
+#endif
 
 	output1 = xf86OutputCreate(pScrn, &SMI501_Output1Funcs, "VGA");
 	if (!output1)
