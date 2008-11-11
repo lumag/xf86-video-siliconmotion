@@ -1846,19 +1846,19 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 			 short vid_w, short vid_h, short drw_w, short drw_h,
 			 RegionPtr clipboxes)
 {
-    CARD32	ScaleXn, ScaleXd, ScaleYn, ScaleYd;
-    CARD32	SrcTn, SrcTd, SrcLn, SrcLd;
-    CARD32	SrcRn, SrcRd, SrcBn, SrcBd;
-    CARD32	SrcDimX, SrcDimY, DestDimX, DestDimY;
-    CARD32	SrcFormat, DstFormat, HFilter, VFilter, byOrder;
-    CARD32	SrcYBase, SrcUBase, SrcVBase, SrcYPitch, SrcUVPitch;
-    CARD32	DestPitch, DestHeight, DestWidth, DestBpp;
-    CARD32	SrcBpp = 0, SrcLnAdd = 0;
+    int32_t	ScaleXn, ScaleXd, ScaleYn, ScaleYd;
+    int32_t	SrcTn, SrcTd, SrcLn, SrcLd;
+    int32_t	SrcDimX, SrcDimY;
+    int32_t	SrcFormat, DstFormat, HFilter, VFilter, byOrder;
+    int32_t	SrcYBase, SrcUBase, SrcVBase, SrcYPitch, SrcUVPitch;
+    int32_t	rect_x, rect_y, rect_w, rect_h;
+    int32_t	DestPitch, DestBpp;
+    int32_t	SrcBpp = 0, SrcLnAdd = 0;
     SMIPtr	pSmi = SMIPTR(pScrn);
     BoxPtr	pbox = REGION_RECTS(clipboxes);
     int		i, nbox = REGION_NUM_RECTS(clipboxes);
-    xRectangle	rect;
-    CARD32	CSC_Control;
+    int32_t	CSC_Control;
+    float	wscale, hscale;
 
     ENTER();
 
@@ -1868,25 +1868,29 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
     SrcYBase = offset;
     SrcYPitch = pitch;
 
-    DestPitch = (pScrn->displayWidth * pSmi->Bpp + 15) & ~15;
+    /* Don't need to round as it is shifted right */
+    DestPitch = pScrn->displayWidth * pSmi->Bpp;
     DestBpp = pSmi->Bpp;
 
     byOrder = 0;
 
-    ScaleXn = (vid_w - 1) / (drw_w - 1);
-    ScaleXd = ((vid_w - 1) << 13) / (drw_w - 1) - (ScaleXn << 13);
+    wscale = (vid_w - 1) / (float)(drw_w - 1);
+    hscale = (vid_h - 1) / (float)(drw_h - 1);
 
-    ScaleYn = (vid_h - 1) / (drw_h - 1);
-    ScaleYd = ((vid_h - 1) << 13) / (drw_h - 1) - (ScaleYn << 13);
+    ScaleXn = wscale;
+    ScaleXd = ((vid_w - 1) << 13) / (float)(drw_w - 1) - (ScaleXn << 13);
+
+    ScaleYn = hscale;
+    ScaleYd = ((vid_h - 1) << 13) / (float)(drw_h - 1) - (ScaleYn << 13);
+
+    /* Use start of framebuffer as base offset */
+    WRITE_DPR(pSmi, 0xF8, 0);
 
     for (i = 0; i < nbox; i++, pbox++) {
-	rect.x = pbox->x1;
-	rect.y = pbox->y1;
-	rect.width = pbox->x2 - pbox->x1;
-	rect.height = pbox->y2 - pbox->y1;
-
-	DestHeight = rect.height;
-	DestWidth = rect.width;
+	rect_x = pbox->x1;
+	rect_y = pbox->y1;
+	rect_w = pbox->x2 - rect_x;
+	rect_h = pbox->y2 - rect_y;
 
 	switch (id) {
 	    case FOURCC_YV12:
@@ -1937,46 +1941,37 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 	}
 
 	HFilter = 1;
-	VFilter = 1;
 
-	SrcLn = (rect.x - dstBox->x1) * (vid_w - 1) / (drw_w - 1);
-	SrcLd = ((rect.x -  dstBox->x1) << 13) * 1.0 *
-	    (vid_w - 1) / (drw_w - 1) - (SrcLn << 13);
+	/*   VFilter causes corruption/noisy in the last video pixel line,
+	 * regardless of 1x1 or scaling up/down the video. */
+	VFilter = 0;
 
-	SrcRn = (rect.x + rect.width  - dstBox->x1) *
-	    (vid_w - 1) / (drw_w-1);
-	SrcRd = ((rect.x + rect.width  - dstBox->x1) << 13) * 1.0 *
-	    (vid_w - 1) / (drw_w - 1) - (SrcRn << 13);
+	SrcLn = rect_x - dstBox->x1;
+	SrcLd = SrcLn << 13;
+	SrcLn *= wscale;
+	SrcLd *= wscale;
 
-	SrcTn = (rect.y - dstBox->y1) * (vid_h - 1) / (drw_h - 1);
-	SrcTd = ((rect.y - dstBox->y1) << 13) * 1.0 *
-	    (vid_h-1) / (drw_h - 1) - (SrcTn << 13);
+	SrcTn = rect_y - dstBox->y1;
+	SrcTd = SrcTn << 13;
+	SrcTn *= hscale;
+	SrcTd *= hscale;
 
-	SrcBn = (rect.y + rect.height  - dstBox->y1) *
-	    (vid_h - 1) / (drw_h - 1);
-	SrcBd = ((rect.y + rect.height  - dstBox->y1) << 13) * 1.0 *
-	    (vid_h - 1) / (drw_h - 1) - (SrcBn << 13);
-
-	SrcDimX = (SrcRd == 0) ? (SrcRn - SrcLn + 1) : (SrcRn - SrcLn + 2);
-	SrcDimY = (SrcBd == 0) ? (SrcBn - SrcTn + 1) : (SrcBn - SrcTn + 2);
-
-	DestDimX = rect.width;
-	DestDimY = rect.height;
+	SrcDimX = rect_w * wscale;
+	SrcDimY = rect_h * hscale;
 
 	WRITE_DPR(pSmi, 0xCC, 0x0);
 	WRITE_DPR(pSmi, 0xD0, (SrcLn + SrcLnAdd << 16) | SrcLd);
 	WRITE_DPR(pSmi, 0xD4, SrcTn << 16 | SrcTd);
 	WRITE_DPR(pSmi, 0xE0, SrcDimX << 16 | SrcDimY);
 	WRITE_DPR(pSmi, 0xE4, (SrcYPitch >> 4) << 16 | (SrcUVPitch >> 4));
-	WRITE_DPR(pSmi, 0xE8, (rect.x) << 16 | rect.y);
-	WRITE_DPR(pSmi, 0xEC, DestDimX << 16 | DestDimY);
-	WRITE_DPR(pSmi, 0xF0, (DestPitch >> 4) << 16 | DestHeight);
+	WRITE_DPR(pSmi, 0xE8, rect_x << 16 | rect_y);
+	WRITE_DPR(pSmi, 0xEC, rect_w << 16 | rect_h);
+	WRITE_DPR(pSmi, 0xF0, (DestPitch >> 4) << 16 | rect_h);
 	WRITE_DPR(pSmi, 0xF4, (ScaleXn << 13 | ScaleXd) << 16 |
 		  (ScaleYn << 13 | ScaleYd));
 	WRITE_DPR(pSmi, 0xC8, SrcYBase);
 	WRITE_DPR(pSmi, 0xD8, SrcUBase);
 	WRITE_DPR(pSmi, 0xDC, SrcVBase);
-	WRITE_DPR(pSmi, 0xF8, 0);
 
 	CSC_Control = (1 << 31 | SrcFormat << 28 | DstFormat << 26 |
 		       HFilter << 25 | VFilter << 24 | byOrder << 23);
