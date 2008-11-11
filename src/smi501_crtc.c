@@ -440,7 +440,7 @@ SMI501_CrtcLoadCursorImage(xf86CrtcPtr crtc, CARD8 *image)
     ENTER();
 
     port = crtc == crtcConf->crtc[0] ? 0x00f0 : 0x0230;
-    value = pSmi->FBCursorOffset + (port == 0x00f0 ? 0 : SMI501_MAX_CURSOR);
+    value = pSmi->FBCursorOffset + (port == 0x00f0 ? 0 : SMI501_CURSOR_SIZE);
     WRITE_DCR(pSmi, port, value);
     memcpy(pSmi->FBBase + value, image,
 	   /* FIXME 1024, but then, should not be using 64x64 cursors */
