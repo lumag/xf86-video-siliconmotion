@@ -51,11 +51,16 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
 
     ENTER();
 
-    /* FIXME LVDS currently have fixed height. But allow external crtc to
-     * have a smaller or larger size, even if only one monitor section
-     * exists in xorg.conf. */
+    /* FIXME May also need to test for IS_MSOC(pSmi) here.
+     * Only accept modes matching the panel size because the panel cannot
+     * be centered neither shrinked/expanded due to hardware bugs.
+     * Note that as long as plane tr/br and plane window x/y are set to 0
+     * and the mode height matches the panel height, it will work and
+     * set the mode, but at offset 0, and properly program the crt.
+     * But use panel dimensions so that "full screen" programs will do
+     * their own centering. */
     if (output->name && strcmp(output->name, "LVDS") == 0 &&
-	(mode->HDisplay > pSmi->lcdWidth || mode->VDisplay != pSmi->lcdHeight))
+	(mode->HDisplay != pSmi->lcdWidth || mode->VDisplay != pSmi->lcdHeight))
 	RETURN(MODE_PANEL);
 
     if (!(((mode->HDisplay == 1280) && (mode->VDisplay == 1024)) ||

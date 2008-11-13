@@ -218,11 +218,21 @@ SMI501_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     mode->panel_wheight.f.y = 0;
     mode->panel_wheight.f.height = xf86mode->VDisplay;
 
-    mode->panel_plane_tl.f.top = 0;
+#ifdef USE_PANEL_CENTER
+    mode->panel_plane_tl.f.left = (pSmi->lcdWidth - xf86mode->HDisplay) >> 1;
+    mode->panel_plane_tl.f.top = (pSmi->lcdHeight - xf86mode->VDisplay) >> 1;
+
+    mode->panel_plane_br.f.right = mode->panel_plane_tl.f.left +
+	xf86mode->HDisplay - 1;
+    mode->panel_plane_br.f.bottom = mode->panel_plane_tl.f.top +
+	xf86mode->VDisplay - 1;
+#else
     mode->panel_plane_tl.f.left = 0;
+    mode->panel_plane_tl.f.top = 0;
 
     mode->panel_plane_br.f.right = xf86mode->HDisplay - 1;
     mode->panel_plane_br.f.bottom = xf86mode->VDisplay - 1;
+#endif
 
     /* 0 means pulse high */
     mode->panel_display_ctl.f.hsync = !(xf86mode->Flags & V_PHSYNC);
