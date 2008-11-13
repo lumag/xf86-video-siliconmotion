@@ -356,7 +356,9 @@ SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
     SMI501_WriteMode_common(pScrn, restore);
     SMI501_WriteMode_lcd(pScrn, restore);
     SMI501_WriteMode_crt(pScrn, restore);
+#if SMI_CURSOR_ALPHA_PLANE
     SMI501_WriteMode_alpha(pScrn, restore);
+#endif
 }
 
 void
