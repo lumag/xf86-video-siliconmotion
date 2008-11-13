@@ -395,6 +395,10 @@ typedef struct _MSOCRegRec {
      *	2:2	Panel Graphics Plane Enable.
      *		0: Disable panel graphics plane.
      *		1: Enable panel graphics plane.
+     *	3:3	Enable Gamma Control. Gamma control can only
+     *		be enabled in RGB 5:6:5 and RGB 8:8:8 modes.
+     *		0: Disable.
+     *		1: Enable.
      *	8:8	Enable Panel Timing.
      *		0: Disable panel timing.
      *		1: Enable panel timing.
@@ -421,7 +425,8 @@ typedef struct _MSOCRegRec {
 	struct {
 	    int32_t	format		: bits( 0,  1);
 	    int32_t	enable		: bits( 2,  2);
-	    int32_t	u0		: bits( 3,  7);
+	    int32_t	gamma		: bits( 3,  3);
+	    int32_t	u0		: bits( 4,  7);
 	    int32_t	timing		: bits( 8,  8);
 	    int32_t	u1		: bits( 9, 11);
 	    int32_t	hsync		: bits(12, 12);

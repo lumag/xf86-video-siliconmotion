@@ -885,8 +885,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     /*
      * If the driver can do gamma correction, it should call xf86SetGamma()
-     * here. (from MGA, no ViRGE gamma support yet, but needed for
-     * xf86HandleColormaps support.)
      */
     {
 	Gamma zeros = { 0.0, 0.0, 0.0 };
@@ -1763,7 +1761,6 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Initialize colormap layer.  Must follow initialization of the default
      * colormap.  And SetGamma call, else it will load palette with solid white.
      */
-    /* CZ 2.11.2001: CMAP_PALETTED_TRUECOLOR for gamma correction */
     if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits,SMI_LoadPalette, NULL,
 			     CMAP_RELOAD_ON_MODE_SWITCH | CMAP_PALETTED_TRUECOLOR))
 	RETURN(FALSE);

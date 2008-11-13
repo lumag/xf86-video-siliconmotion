@@ -65,6 +65,9 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
     mode->panel_fb_width.f.offset = pitch >> 4;
     mode->panel_fb_width.f.width = width >> 4;
 
+    if (pSmi->Bpp > 1)
+	mode->panel_display_ctl.f.gamma = 1;
+
     WRITE_SCR(pSmi, PANEL_DISPLAY_CTL, mode->panel_display_ctl.value);
     WRITE_SCR(pSmi, PANEL_FB_WIDTH, mode->panel_fb_width.value);
 
@@ -97,6 +100,8 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
     mode->crt_fb_width.f.offset = pitch >> 4;
     mode->crt_fb_width.f.width = width >> 4;
 
+    if (pSmi->Bpp > 1)
+	mode->crt_display_ctl.f.gamma = 1;
 
     WRITE_SCR(pSmi, CRT_DISPLAY_CTL, mode->crt_display_ctl.value);
     WRITE_SCR(pSmi, CRT_FB_WIDTH, mode->crt_fb_width.value);
