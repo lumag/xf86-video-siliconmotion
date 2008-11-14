@@ -390,8 +390,10 @@ void SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
 xf86MonPtr SMI_ddc1(ScrnInfoPtr pScrn);
 void SMI_PrintRegs(ScrnInfoPtr pScrn);
 
+#ifndef HAVE_XMODES
 /* smi_dga.c */
 Bool SMI_DGAInit(ScreenPtr pScrn);
+#endif
 
 /* smi_video.c */
 void SMI_InitVideo(ScreenPtr pScreen);

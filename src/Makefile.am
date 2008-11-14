@@ -36,7 +36,6 @@ siliconmotion_drv_la_SOURCES = \
          smi_xaa.c \
          smi_exa.c \
          smi_dac.c \
-         smi_dga.c \
          smi_driver.c \
          smi.h \
          smi_i2c.c \
@@ -52,3 +51,7 @@ siliconmotion_drv_la_SOURCES = \
 	 smilynx.h \
 	 smi501_crtc.c \
 	 smi501_output.c
+
+if !XMODES
+siliconmotion_drv_la_SOURCES += smi_dga.c
+endif
