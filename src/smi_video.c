@@ -109,7 +109,6 @@ static int SMI_QueryImageAttributes(ScrnInfoPtr pScrn,
 static void SMI_DisplayVideo(ScrnInfoPtr pScrn, int id, int offset,
 		short width, short height, int pitch, int x1, int y1, int x2, int y2,
 		BoxPtr dstBox, short vid_w, short vid_h, short drw_w, short drw_h);
-static void SMI_CSC_Start(SMIPtr pSmi, CARD32 CSC_Control);
 static void SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 				     short width, short height, int pitch,
 				     int x1, int y1, int x2, int y2,
@@ -138,10 +137,6 @@ static void CopyYV12ToVideoMem(unsigned char *src1, unsigned char *src2,
 			       unsigned char *src3, unsigned char *dst,
 			       int src1Pitch, int src23Pitch, int dstPitch,
 			       int height, int width);
-static void SMI_CopyYV12Data(unsigned char *src1, unsigned char *src2,
-			     unsigned char *src3, unsigned char *dst,
-			     int srcPitch1, int srcPitch2, int dstPitch,
-			     int height, int width);
 static int SMI_AllocSurface(ScrnInfoPtr pScrn,
 		int id, unsigned short width, unsigned short height,
 		XF86SurfacePtr surface);
@@ -621,7 +616,6 @@ void
 SMI_InitVideo(ScreenPtr pScreen)
 {
     ScrnInfoPtr pScrn = xf86Screens[pScreen->myNum];
-    SMIPtr psmi = SMIPTR(pScrn);
     XF86VideoAdaptorPtr *ptrAdaptors, *newAdaptors = NULL;
     XF86VideoAdaptorPtr newAdaptor = NULL;
     int numAdaptors;
@@ -1817,29 +1811,6 @@ SMI_DisplayVideo(
 }
 
 static void
-SMI_CSC_Start(SMIPtr pSmi, CARD32 CSC_Control)
-{
-    CARD32	CSC_Control_Old; 
-
-    while (1) {
-	CSC_Control_Old =  READ_DPR(pSmi, 0xFC);
-	if (CSC_Control_Old & 0x80000000)
-	    continue;
-	else {
-	    CSC_Control |= 1 << 31;
-	    WRITE_DPR(pSmi, 0xFC, CSC_Control);
-	    break;
-	}
-    }
-    /* CSC stop */
-    while (1) {
-	CSC_Control_Old =  READ_DPR(pSmi, 0xFC);
-	if (!(CSC_Control_Old & 0x80000000))
-	    break;
-    }
-}
-
-static void
 SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 			 short width, short height, int pitch,
 			 int x1, int y1, int x2, int y2, BoxPtr dstBox,
@@ -1848,71 +1819,57 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 {
     int32_t	ScaleXn, ScaleXd, ScaleYn, ScaleYd;
     int32_t	SrcTn, SrcTd, SrcLn, SrcLd;
+    int32_t	SrcRn, SrcBn;
     int32_t	SrcDimX, SrcDimY;
-    int32_t	SrcFormat, DstFormat, HFilter, VFilter, byOrder;
     int32_t	SrcYBase, SrcUBase, SrcVBase, SrcYPitch, SrcUVPitch;
-    int32_t	rect_x, rect_y, rect_w, rect_h;
-    int32_t	DestPitch, DestBpp;
-    int32_t	SrcBpp = 0, SrcLnAdd = 0;
+    int32_t	DestPitch;
     SMIPtr	pSmi = SMIPTR(pScrn);
     BoxPtr	pbox = REGION_RECTS(clipboxes);
     int		i, nbox = REGION_NUM_RECTS(clipboxes);
-    int32_t	CSC_Control;
-    float	wscale, hscale;
+    int32_t	rect_x, rect_y, rect_w, rect_h, csc;
+    float	Hscale, Vscale;
 
     ENTER();
-
-    if (!pScrn->vtSema)
-	return;
 
     SrcYBase = offset;
     SrcYPitch = pitch;
 
-    /* Don't need to round as it is shifted right */
-    DestPitch = pScrn->displayWidth * pSmi->Bpp;
-    DestBpp = pSmi->Bpp;
+    DestPitch = (pScrn->displayWidth * pSmi->Bpp + 15) & ~15;
 
-    byOrder = 0;
+    Hscale = (vid_w - 1) / (float)(drw_w - 1);
+    ScaleXn = Hscale;
+    ScaleXd = ((vid_w - 1) << 13) / (drw_w - 1) - (ScaleXn << 13);
 
-    wscale = (vid_w - 1) / (float)(drw_w - 1);
-    hscale = (vid_h - 1) / (float)(drw_h - 1);
+    Vscale = (vid_h - 1) / (float)(drw_h - 1);
+    ScaleYn = Vscale;
+    ScaleYd = ((vid_h - 1) << 13) / (drw_h - 1) - (ScaleYn << 13);
 
-    ScaleXn = wscale;
-    ScaleXd = ((vid_w - 1) << 13) / (float)(drw_w - 1) - (ScaleXn << 13);
-
-    ScaleYn = hscale;
-    ScaleYd = ((vid_h - 1) << 13) / (float)(drw_h - 1) - (ScaleYn << 13);
-
+    /* CSC constants */
+    WRITE_DPR(pSmi, 0xcc, 0);
     /* Use start of framebuffer as base offset */
-    WRITE_DPR(pSmi, 0xF8, 0);
+    WRITE_DPR(pSmi, 0xf8, 0);
+
+    csc = (1 << 31) | (1 << 25);
+    if (pSmi->Bpp > 2)
+	csc |= 1 << 26;
+    if (id == FOURCC_YV12 || id == FOURCC_I420)
+	csc |= 2 << 28;
 
     for (i = 0; i < nbox; i++, pbox++) {
 	rect_x = pbox->x1;
 	rect_y = pbox->y1;
-	rect_w = pbox->x2 - rect_x;
-	rect_h = pbox->y2 - rect_y;
+	rect_w = pbox->x2 - pbox->x1;
+	rect_h = pbox->y2 - pbox->y1;
 
 	switch (id) {
 	    case FOURCC_YV12:
-		SrcFormat = 2;
-		byOrder = 0;
-		SrcLnAdd = 0;
-
-		SrcYPitch = pitch;
 		SrcUVPitch = SrcYPitch / 2;
-
 		SrcVBase = SrcYBase + SrcYPitch * height;
 		SrcUBase = SrcVBase + SrcUVPitch * height / 2;
 		break;
 
 	    case FOURCC_I420:
-		SrcFormat = 2;
-		byOrder = 0;
-		SrcLnAdd = 0;
-
-		SrcYPitch = pitch;
 		SrcUVPitch = SrcYPitch / 2;
-
 		SrcUBase = SrcYBase + SrcYPitch * height;
 		SrcVBase = SrcUBase + SrcUVPitch * height / 2;
 		break;
@@ -1922,60 +1879,42 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 	    case FOURCC_RV32:
 		SrcUBase = SrcVBase = SrcYBase;
 		SrcUVPitch = SrcYPitch;
-		SrcFormat = 0;
-		byOrder = 0;
-		SrcBpp = 16 / 8;
-		SrcLnAdd = 0;
 		break;
-	}
 
-	switch (DestBpp) {
-	    case 2:
-		DstFormat = 0;
-		break;
-	    case 4:
-		DstFormat = 1;
-		break;
 	    default:
 		return;
 	}
 
-	HFilter = 1;
+	SrcLn = (rect_x - dstBox->x1) * Hscale;
+	SrcLd = ((rect_x - dstBox->x1) << 13) * Hscale - (SrcLn << 13);
+	SrcRn = (rect_x + rect_w - dstBox->x1) * Hscale;
 
-	/*   VFilter causes corruption/noisy in the last video pixel line,
-	 * regardless of 1x1 or scaling up/down the video. */
-	VFilter = 0;
+	SrcTn = (rect_y - dstBox->y1) * Vscale;
+	SrcTd = ((rect_y - dstBox->y1) << 13) * Vscale - (SrcTn << 13);
+	SrcBn = (rect_y + rect_h - dstBox->y1) * Vscale;
 
-	SrcLn = rect_x - dstBox->x1;
-	SrcLd = SrcLn << 13;
-	SrcLn *= wscale;
-	SrcLd *= wscale;
+	SrcDimX = SrcRn - SrcLn + 2;
+	SrcDimY = SrcBn - SrcTn + 2;
 
-	SrcTn = rect_y - dstBox->y1;
-	SrcTd = SrcTn << 13;
-	SrcTn *= hscale;
-	SrcTd *= hscale;
-
-	SrcDimX = rect_w * wscale;
-	SrcDimY = rect_h * hscale;
-
-	WRITE_DPR(pSmi, 0xCC, 0x0);
-	WRITE_DPR(pSmi, 0xD0, (SrcLn + SrcLnAdd << 16) | SrcLd);
-	WRITE_DPR(pSmi, 0xD4, SrcTn << 16 | SrcTd);
-	WRITE_DPR(pSmi, 0xE0, SrcDimX << 16 | SrcDimY);
-	WRITE_DPR(pSmi, 0xE4, (SrcYPitch >> 4) << 16 | (SrcUVPitch >> 4));
-	WRITE_DPR(pSmi, 0xE8, rect_x << 16 | rect_y);
-	WRITE_DPR(pSmi, 0xEC, rect_w << 16 | rect_h);
-	WRITE_DPR(pSmi, 0xF0, (DestPitch >> 4) << 16 | rect_h);
-	WRITE_DPR(pSmi, 0xF4, (ScaleXn << 13 | ScaleXd) << 16 |
+	WRITE_DPR(pSmi, 0xD0, (SrcLn << 16) | SrcLd);
+	WRITE_DPR(pSmi, 0xD4, (SrcTn << 16) | SrcTd);
+	WRITE_DPR(pSmi, 0xE0, (SrcDimX << 16) | SrcDimY);
+	WRITE_DPR(pSmi, 0xE4, ((SrcYPitch >> 4) << 16) | (SrcUVPitch >> 4));
+	WRITE_DPR(pSmi, 0xE8, (rect_x << 16) | rect_y);
+	WRITE_DPR(pSmi, 0xEC, (rect_w << 16) | rect_h);
+	WRITE_DPR(pSmi, 0xF0, ((DestPitch >> 4) << 16) | rect_h);
+	WRITE_DPR(pSmi, 0xF4, (((ScaleXn << 13) | ScaleXd) << 16) |
 		  (ScaleYn << 13 | ScaleYd));
 	WRITE_DPR(pSmi, 0xC8, SrcYBase);
 	WRITE_DPR(pSmi, 0xD8, SrcUBase);
 	WRITE_DPR(pSmi, 0xDC, SrcVBase);
 
-	CSC_Control = (1 << 31 | SrcFormat << 28 | DstFormat << 26 |
-		       HFilter << 25 | VFilter << 24 | byOrder << 23);
-	SMI_CSC_Start(pSmi, CSC_Control);
+	while (READ_DPR(pSmi, 0xfc) & (1 << 31))
+	    ;
+	WRITE_DPR(pSmi, 0xfc, csc);
+	/* CSC stop */
+	while (READ_DPR(pSmi, 0xfc) & (1 << 31))
+	    ;
     }
 
     LEAVE();
@@ -2396,32 +2335,6 @@ CopyYV12ToVideoMem(unsigned char *src1, unsigned char *src2,
 	memcpy(dst, src3, width / 2);
 	src3 += src23Pitch;
 	dst += dstPitch / 2;
-    }
-
-    LEAVE();
-}
-
-static void
-SMI_CopyYV12Data(unsigned char *src1, unsigned char *src2,
-		 unsigned char *src3, unsigned char *dst,
-		 int srcPitch1, int srcPitch2, int dstPitch,
-		 int height, int width)
-{
-    CARD32	*pDst = (CARD32 *)dst;
-    int		i, j;
-
-    ENTER();
-
-    for (j = 0; j < height; j++) {
-	for (i = 0; i < width; i++)
-	    pDst[i] = ( src1[i << 1]	   | (src1[(i << 1) + 1] << 16) |
-		       (src3[i	   ] << 8) | (src2[i	       ] << 24));
-	pDst += dstPitch >> 2;
-	src1 += srcPitch1;
-	if (j & 1) {
-	    src2 += srcPitch2;
-	    src3 += srcPitch2;
-	}
     }
 
     LEAVE();
