@@ -63,20 +63,13 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
 	(mode->HDisplay != pSmi->lcdWidth || mode->VDisplay != pSmi->lcdHeight))
 	RETURN(MODE_PANEL);
 
-    if (!(((mode->HDisplay == 1280) && (mode->VDisplay == 1024)) ||
-	  ((mode->HDisplay == 1024) && (mode->VDisplay == 768)) ||
-	  ((mode->HDisplay == 800) && (mode->VDisplay == 600)) ||
-	  ((mode->HDisplay == 640) && (mode->VDisplay == 480)) ||
-	  ((mode->HDisplay == 320) && (mode->VDisplay == 240)) ||
-	  ((mode->HDisplay == 400) && (mode->VDisplay == 300)) ||
-	  ((mode->HDisplay == 1280) && (mode->VDisplay == 960)) ||
-	  ((mode->HDisplay == 1280) && (mode->VDisplay == 768)) ||
-	  ((mode->HDisplay == 1024) && (mode->VDisplay == 600)) ||
-	  ((mode->HDisplay == 800) && (mode->VDisplay == 480)) ||
-	  ((mode->HDisplay == 720) && (mode->VDisplay == 540)) ||
-	  ((mode->HDisplay == 720) && (mode->VDisplay == 480))))
+    /* The driver is actually programming modes, instead of loading registers
+     * state from static tables. But still, only accept modes that should
+     * be handled correctly by all hardwares. On the MSOC, currently, only
+     * the crt can be programmed to different resolution modes.
+     */
+    if (mode->HDisplay & 15)
 	RETURN(MODE_BAD_WIDTH);
-
 
     if((mode->Clock < pSmi->clockRange.minClock) ||
        (mode->Clock > pSmi->clockRange.maxClock) ||
