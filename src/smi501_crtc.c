@@ -39,6 +39,14 @@ authorization from The XFree86 Project or Silicon Motion.
 #undef VERBLEV
 #define VERBLEV		1
 
+/*
+ * Prototypes
+ */
+static void SMI501_CrtcHideCursor(xf86CrtcPtr crtc);
+
+/*
+ * Implementation
+ */
 static void
 SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 {
@@ -49,9 +57,11 @@ SMI501_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
 
     ENTER();
 
+    if (!pSmi->HwCursor)
+	SMI501_CrtcHideCursor(crtc);
+
     mode->panel_display_ctl.value = READ_SCR(pSmi, PANEL_DISPLAY_CTL);
     mode->panel_fb_width.value = READ_SCR(pSmi, PANEL_FB_WIDTH);
-
 
     mode->panel_display_ctl.f.format =
 	pScrn->bitsPerPixel == 8 ? 0 :
@@ -83,9 +93,11 @@ SMI501_CrtcVideoInit_crt(xf86CrtcPtr crtc)
 
     ENTER();
 
+    if (!pSmi->HwCursor)
+	SMI501_CrtcHideCursor(crtc);
+
     mode->crt_display_ctl.value = READ_SCR(pSmi, CRT_DISPLAY_CTL);
     mode->crt_fb_width.value = READ_SCR(pSmi, CRT_FB_WIDTH);
-
 
     mode->crt_display_ctl.f.format =
 	pScrn->bitsPerPixel == 8 ? 0 :
