@@ -1017,10 +1017,6 @@ SMI_EnterVT(int scrnIndex, int flags)
     if (!xf86SetDesiredModes(pScrn))
 	RETURN(FALSE);
 
-    /* Initialize the hardware cursor */
-    if (pSmi->HwCursor)
-	xf86_show_cursors(pScrn);
-
     /* Reset the grapics engine */
     if (!pSmi->NoAccel)
 	SMI_EngineReset(pScrn);

@@ -82,9 +82,6 @@ SMI_CrtcPrepare(xf86CrtcPtr crtc)
 
     ENTER();
 
-    if (pSmi->HwCursor)
-	crtc->funcs->hide_cursor(crtc);
-
     LEAVE();
 }
 
@@ -95,23 +92,6 @@ SMI_CrtcCommit(xf86CrtcPtr crtc)
     SMIPtr pSmi = SMIPTR(pScrn);
 
     ENTER();
-
-    /* Problem:
-     *	When starting in Dualhead mode, both hw cursors will be shown,
-     *	and at the same position, as both are at the same address.
-     *	When reconfiguring with something like:
-     *	$ xrandr --output VGA --right-of LVDS
-     *	what will happen is basically:
-     *	hide_cursor(panel)
-     *	hide_cursor(crt)
-     *	<set-crt-mode-and-modify-mapped-address>
-     *	show_cursor(panel)	<- besides a sw argb cursor is being used...
-     *
-     *	It should not be a problem if argb cursors were supported,
-     *	or only one output is available...
-     */
-    if (pSmi->HwCursor)
-	xf86_reload_cursors(pScrn->pScreen);
 
     LEAVE();
 }
