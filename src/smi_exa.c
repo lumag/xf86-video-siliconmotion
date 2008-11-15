@@ -65,6 +65,9 @@ static void
 SMI_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
               int dstX, int dstY, int width, int height);
 static void
+SMI501_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+		 int dstX, int dstY, int width, int height);
+static void
 SMI730_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
               int dstX, int dstY, int width, int height);
 static void
@@ -153,7 +156,9 @@ SMI_EXAInit(ScreenPtr pScreen)
     pSmi->EXADriverPtr->CheckComposite = SMI_CheckComposite;
     pSmi->EXADriverPtr->PrepareComposite = SMI_PrepareComposite;
 
-    if (pSmi->Chipset == SMI_COUGAR3DR)
+    if (IS_MSOC(pSmi))
+	pSmi->EXADriverPtr->Composite = SMI501_Composite;
+    else if (pSmi->Chipset == SMI_COUGAR3DR)
 	pSmi->EXADriverPtr->Composite = SMI730_Composite;
     else
 	pSmi->EXADriverPtr->Composite = SMI_Composite;
@@ -640,6 +645,27 @@ SMI_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
     WRITE_DPR(pSmi, 0x00, (xFixedToInt(v.vector[0]) << 16) + (xFixedToInt(v.vector[1]) & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (dstX << 16) + (dstY & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (height << 16) + (width & 0xFFFF));
+
+    LEAVE();
+}
+
+#define MSOC_ROTBLTWIDTH		8
+static void
+SMI501_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
+		 int dstX, int dstY, int width, int height)
+{
+    ENTER();
+
+    /* SMI501 cannot rotate-blt more than 32 bytes.
+     * Based on smi's sample smi_shadow.c */
+    while (height > MSOC_ROTBLTWIDTH) {
+	SMI_Composite(pDst, srcX, srcY, maskX, maskY, dstX, dstY,
+		      width, MSOC_ROTBLTWIDTH);
+	srcY	+= MSOC_ROTBLTWIDTH;
+	dstY	+= MSOC_ROTBLTWIDTH;
+	height	-= MSOC_ROTBLTWIDTH;
+    }
+    SMI_Composite(pDst, srcX, srcY, maskX, maskY, dstX, dstY, width, height);
 
     LEAVE();
 }
