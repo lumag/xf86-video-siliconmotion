@@ -397,5 +397,8 @@ Bool SMI_DGAInit(ScreenPtr pScrn);
 
 /* smi_video.c */
 void SMI_InitVideo(ScreenPtr pScreen);
+CARD32 SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size);
+void SMI_FreeMemory(ScrnInfoPtr pScrn, void *mem_struct);
+
 
 #endif  /*_SMI_H*/

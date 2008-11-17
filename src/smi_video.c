@@ -130,8 +130,6 @@ static void SMI_BlockHandler(int i, pointer blockData, pointer pTimeout,
 
 static void SMI_InitOffscreenImages(ScreenPtr pScreen);
 static void SMI_VideoSave(ScreenPtr pScreen, ExaOffscreenArea *area);
-static CARD32 SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size);
-static void SMI_FreeMemory(ScrnInfoPtr pScrn, void *mem_struct);
 
 static void CopyYV12ToVideoMem(unsigned char *src1, unsigned char *src2,
 			       unsigned char *src3, unsigned char *dst,
@@ -2216,7 +2214,7 @@ SMI_VideoSave(ScreenPtr pScreen, ExaOffscreenArea *area)
     LEAVE();
 }
 
-static CARD32
+CARD32
 SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 {
     ScreenPtr	pScreen = screenInfo.screens[pScrn->scrnIndex];
@@ -2281,7 +2279,7 @@ SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
     RETURN(offset);
 }
 
-static void
+void
 SMI_FreeMemory(
 	ScrnInfoPtr pScrn,
 	void *mem_struct

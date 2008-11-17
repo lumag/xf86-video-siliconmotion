@@ -119,22 +119,26 @@ SMI_CrtcGammaSet(xf86CrtcPtr crtc, CARD16 *red, CARD16 *green, CARD16 *blue,
 static void *
 SMI_CrtcShadowAllocate (xf86CrtcPtr crtc, int width, int height)
 {
-    ScrnInfoPtr pScrn = crtc->scrn;
-    SMIPtr pSmi = SMIPTR(pScrn);
-    SMICrtcPrivatePtr crtcPriv = SMICRTC(crtc);
+    ScrnInfoPtr	 	 pScrn = crtc->scrn;
+    SMIPtr	 	 pSmi = SMIPTR(pScrn);
+    SMICrtcPrivatePtr	 crtcPriv = SMICRTC(crtc);
+    int			 offset, size;
+    char		*result = NULL;
 
     ENTER();
 
-    if(!pSmi->NoAccel && pSmi->useEXA){
-	int aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
+    size = (pSmi->useEXA ? ((width * pSmi->Bpp + 15) & ~15) : width) * height;
+    offset = SMI_AllocateMemory(pScrn, &crtcPriv->shadowArea, size);
 
-	crtcPriv->shadowArea = exaOffscreenAlloc(pScrn->pScreen, aligned_pitch * height, 16, TRUE, NULL, NULL);
-
-	if(crtcPriv->shadowArea)
-	    RETURN(pSmi->FBBase + crtcPriv->shadowArea->offset);
+    if (offset) {
+	result = pSmi->FBBase;
+	if (pSmi->useEXA)
+	    result += ((ExaOffscreenArea *)crtcPriv->shadowArea)->offset;
+	else
+	    result += offset * pSmi->Bpp;
     }
 
-    RETURN(NULL);
+    RETURN(result);
 }
 
 static PixmapPtr
@@ -155,16 +159,17 @@ SMI_CrtcShadowCreate (xf86CrtcPtr crtc, void *data, int width, int height)
 static void
 SMI_CrtcShadowDestroy (xf86CrtcPtr crtc, PixmapPtr pPixmap, void *data)
 {
-    ScrnInfoPtr pScrn = crtc->scrn;
-    SMICrtcPrivatePtr crtcPriv = SMICRTC(crtc);
+    ScrnInfoPtr		pScrn = crtc->scrn;
+    SMIPtr		pSmi = SMIPTR(pScrn);
+    SMICrtcPrivatePtr	crtcPriv = SMICRTC(crtc);
 
     ENTER();
 
-    if(pPixmap)
+    if (pSmi->useEXA && pPixmap)
 	FreeScratchPixmapHeader(pPixmap);
 
-    if(crtcPriv->shadowArea){
-	exaOffscreenFree(pScrn->pScreen, crtcPriv->shadowArea);
+    if (crtcPriv->shadowArea) {
+	SMI_FreeMemory(pScrn, crtcPriv->shadowArea);
 	crtcPriv->shadowArea = NULL;
     }
 

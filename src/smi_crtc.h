@@ -28,7 +28,7 @@ typedef struct {
     /* Memory copy of the CRTC color palette */
     CARD16 lut_r[256],lut_g[256],lut_b[256];
     /* Allocated memory area used as shadow pixmap (for rotation) */
-    ExaOffscreenArea* shadowArea;
+    void* shadowArea;
 
     /* Setup the CRTC registers to show the specified framebuffer location*/
     void (*adjust_frame)(xf86CrtcPtr crtc, int x, int y);
