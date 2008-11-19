@@ -245,11 +245,13 @@ typedef struct
 					   as framebuffer */
     PictTransformPtr	renderTransform;
 
+#ifndef XMODES
     /* DGA */
     DGAModePtr		DGAModes;	/* Pointer to DGA modes */
     int			numDGAModes;	/* Number of DGA modes */
     Bool		DGAactive;	/* Flag if DGA is active */
     int			DGAViewportStatus;
+#endif
 
     /* DPMS */
     int			CurrentDPMS;	/* Current DPMS state */
