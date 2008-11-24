@@ -124,7 +124,7 @@ SMI501_OutputDetect_crt(xf86OutputPtr output)
     WRITE_SCR(pSmi, CRT_DETECT, mode->crt_detect.value);
     SMI501_WaitVSync(pSmi, 1);
 
-    RETURN(status);
+    LEAVE(status);
 }
 #endif
 
@@ -147,7 +147,7 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 
     output0 = xf86OutputCreate(pScrn, &SMI501_Output0Funcs, "LVDS");
     if (!output0)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     output0->possible_crtcs = 1 << 0;
     output0->possible_clones = 0;
@@ -165,7 +165,7 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 
 	output1 = xf86OutputCreate(pScrn, &SMI501_Output1Funcs, "VGA");
 	if (!output1)
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 
 	output1->possible_crtcs = 1 << 1;
 	output1->possible_clones = 0;
@@ -173,5 +173,5 @@ SMI501_OutputPreInit(ScrnInfoPtr pScrn)
 	output1->doubleScanAllowed = FALSE;
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }

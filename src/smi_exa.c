@@ -88,7 +88,7 @@ SMI_EXAInit(ScreenPtr pScreen)
 
     if (!(pSmi->EXADriverPtr = exaDriverAlloc())) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Failed to allocate EXADriverRec.\n");
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     /* Require 2.1 semantics:
@@ -166,13 +166,13 @@ SMI_EXAInit(ScreenPtr pScreen)
 
     if(!exaDriverInit(pScreen, pSmi->EXADriverPtr)) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "exaDriverInit failed.\n");
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "EXA Acceleration enabled.\n");
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -224,7 +224,7 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     /* Bit Mask not supported > 16 bpp */
     if ((pSrcPixmap->drawable.bitsPerPixel > 16) && 
 	(!EXA_PM_IS_SOLID(&pSrcPixmap->drawable, planemask)))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* calculate pitch in pixel unit */
     src_pitch  = exaGetPixmapPitch(pSrcPixmap) / (pSrcPixmap->drawable.bitsPerPixel >> 3);
@@ -267,7 +267,7 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -355,12 +355,12 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 
     /* HW ignores alpha */
     if (pPixmap->drawable.bitsPerPixel == 32)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Bit Mask not supported > 16 bpp */
     if ((pPixmap->drawable.bitsPerPixel > 16) && 
 	(!EXA_PM_IS_SOLID(&pPixmap->drawable, planemask)))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* calculate pitch in pixel unit */
     dst_pitch  = exaGetPixmapPitch(pPixmap) / (pPixmap->drawable.bitsPerPixel >> 3);
@@ -402,7 +402,7 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -466,7 +466,7 @@ SMI_DownloadFromScreen(PixmapPtr pSrc, int x, int y, int w, int h,
 	dst += dst_pitch;
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 Bool
@@ -539,7 +539,7 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
 
     exaWaitSync(pDst->drawable.pScreen);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /* --------------------------------------- EXA Composite ---------------------------------------- */
@@ -562,16 +562,16 @@ SMI_CheckComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, Pict
 
     if(op!=PictOpSrc || pMaskPicture ||
        pSrcPicture->repeatType || !pSrcPicture->transform)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     if(!SMI_ISROTATION_90(pSrcPicture->transform) &&
        !SMI_ISROTATION_270(pSrcPicture->transform))
-        RETURN(FALSE);
+        LEAVE(FALSE);
 
     if(PICT_FORMAT_BPP(pSrcPicture->format) == 24)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static Bool
@@ -613,7 +613,7 @@ SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, Pi
 
     pSmi->renderTransform = pSrcPicture->transform;
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void

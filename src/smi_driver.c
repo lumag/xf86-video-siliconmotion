@@ -370,7 +370,7 @@ SMI_GetRec(ScrnInfoPtr pScrn)
 	pScrn->driverPrivate = xnfcalloc(sizeof(SMIRec), 1);
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -395,7 +395,7 @@ SMI_AvailableOptions(int chipid, int busid)
 {
     ENTER();
 
-    RETURN(SMIOptions);
+    LEAVE(SMIOptions);
 }
 
 static void
@@ -426,11 +426,11 @@ SMI_Probe(DriverPtr drv, int flags)
 
     if (numDevSections <= 0)
 	/* There's no matching device section in the config file, so quit now. */
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
 #ifndef XSERVER_LIBPCIACCESS
     if (xf86GetPciVideoInfo() == NULL)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 #endif
 
     numUsed = xf86MatchPciInstances(SILICONMOTION_NAME, PCI_SMI_VENDOR_ID,
@@ -440,7 +440,7 @@ SMI_Probe(DriverPtr drv, int flags)
     /* Free it since we don't need that list after this */
     xfree(devSections);
     if (numUsed <= 0)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     if (flags & PROBE_DETECT)
 	foundScreen = TRUE;
@@ -473,7 +473,7 @@ SMI_Probe(DriverPtr drv, int flags)
     }
     xfree(usedChips);
 
-    RETURN(foundScreen);
+    LEAVE(foundScreen);
 }
 
 static Bool
@@ -491,11 +491,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
      * are supported.
      */
     if (pScrn->numEntities > 1)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Allocate the SMIRec driverPrivate */
     if (!SMI_GetRec(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
     pSmi = SMIPTR(pScrn);
 
     /* Find the PCI slot for this screen */
@@ -518,13 +518,13 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (flags & PROBE_DETECT) {
 	if (!IS_MSOC(pSmi))
 	    SMI_ProbeDDC(pScrn, xf86GetEntityInfo(pScrn->entityList[0])->index);
-	RETURN(TRUE);
+	LEAVE(TRUE);
     }
 
     if (pEnt->location.type != BUS_PCI || pEnt->resources) {
 	xfree(pEnt);
 	SMI_FreeRec(pScrn);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
     pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
 
@@ -534,7 +534,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (!IS_MSOC(pSmi)) {
 	/* The vgahw module should be loaded here when needed */
 	if (!xf86LoadSubModule(pScrn, "vgahw"))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 
 	xf86LoaderReqSymLists(vgahwSymbols, NULL);
 
@@ -542,21 +542,21 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	 * Allocate a vgaHWRec
 	 */
 	if (!vgaHWGetHWRec(pScrn))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
     }
 
     /*
      * The first thing we should figure out is the depth, bpp, etc.
      */
     if (!xf86SetDepthBpp(pScrn, 0, 0, 0, Support32bppFb))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Check that the returned depth is one we support */
     if (pScrn->depth != 8 && pScrn->depth != 16 && pScrn->depth != 24) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Given depth (%d) is not supported by this driver\n",
 		   pScrn->depth);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
 
@@ -565,7 +565,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Given bpp (%d) is not supported by this driver\n",
 		   pScrn->bitsPerPixel);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     xf86PrintDepthBpp(pScrn);
@@ -584,18 +584,18 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 #endif
 
 	if (!xf86SetWeight(pScrn, zeros, masks))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
     }
 
     if (!xf86SetDefaultVisual(pScrn, -1))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* We don't currently support DirectColor at > 8bpp */
     if (pScrn->depth > 8 && pScrn->defaultVisual != TrueColor) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Given default visual (%s) "
 		   "is not supported at depth %d\n",
 		   xf86GetVisualName(pScrn->defaultVisual), pScrn->depth);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     /* We use a programmable clock */
@@ -614,7 +614,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     /* Process the options */
     if (!(pSmi->Options = xalloc(sizeof(SMIOptions))))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     memcpy(pSmi->Options, SMIOptions, sizeof(SMIOptions));
     xf86ProcessOptions(pScrn->scrnIndex, pScrn->options, pSmi->Options);
@@ -759,13 +759,13 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (pScrn->chipset == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "ChipID 0x%04X is not "
 				"recognised\n", pSmi->Chipset);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     if (pSmi->Chipset < 0) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Chipset \"%s\" is not "
 		   "recognised\n", pScrn->chipset);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     xf86DrvMsg(pScrn->scrnIndex, from, "Chipset: \"%s\"\n", pScrn->chipset);
@@ -813,7 +813,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    if (pScrn->bitsPerPixel != 16) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Dualhead only supported at "
 			   "depth 16\n");
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    }
 	}
 
@@ -892,7 +892,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	if (!xf86SetGamma(pScrn, zeros)) {
 	    SMI_EnableVideo(pScrn);
 	    SMI_UnmapMem(pScrn);
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	}
     }
 
@@ -917,15 +917,15 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     pSmi->clockRange.doubleScanAllowed = FALSE;
 
     if(!SMI_CrtcPreInit(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     if(!SMI_OutputPreInit(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Only allow growing the screen dimensions if EXA is being used */
     if (!xf86InitialConfiguration (pScrn, !pSmi->NoAccel && pSmi->useEXA)){
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes found\n");
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
 
@@ -944,7 +944,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     if (xf86LoadSubModule(pScrn, "fb") == NULL) {
 	SMI_FreeRec(pScrn);
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     xf86LoaderReqSymLists(fbSymbols, NULL);
@@ -954,7 +954,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	if (!pSmi->useEXA) {
 	    if (!xf86LoadSubModule(pScrn, "xaa")) {
 		SMI_FreeRec(pScrn);
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    }
 	    xf86LoaderReqSymLists(xaaSymbols, NULL);
 	} else {
@@ -969,7 +969,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 				&req, &errmaj, &errmin)) {
 		LoaderErrorMsg(NULL, "exa", errmaj, errmin);
 		SMI_FreeRec(pScrn);
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    }
 	    xf86LoaderReqSymLists(exaSymbols, NULL);
 	}
@@ -979,11 +979,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     if (pSmi->HwCursor) {
 	if (!xf86LoadSubModule(pScrn, "ramdac")) {
 	    SMI_FreeRec(pScrn);
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	}
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /*
@@ -1011,17 +1011,17 @@ SMI_EnterVT(int scrnIndex, int flags)
 
     /* Do the CRTC independent initialization */
     if(!SMI_HWInit(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Initialize the chosen modes */
     if (!xf86SetDesiredModes(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Reset the grapics engine */
     if (!pSmi->NoAccel)
 	SMI_EngineReset(pScrn);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /*
@@ -1429,7 +1429,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
     ENTER();
 
     if (pSmi->MapBase == NULL && SMI_MapMmio(pScrn) == FALSE)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
 
@@ -1464,14 +1464,14 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 					     result);
 
 	if (err)
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
     }
 #endif
 
     if (pSmi->FBBase == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "Internal error: could not map framebuffer.\n");
-	RETURN(FALSE);
+	LEAVE(FALSE);
     }
 
     xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
@@ -1523,7 +1523,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	if (xf86IsPrimaryPci(pSmi->PciInfo)) {
 	    hwp->MapSize = 0x10000;
 	    if (!vgaHWMapMem(pScrn))
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    pSmi->PrimaryVidMapped = TRUE;
 	}
     }
@@ -1531,7 +1531,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Reserved: %08lX\n",
 	       (unsigned long)pSmi->FBReserved);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /* UnMapMem - contains half of pre-4.0 EnterLeave function.  The EnterLeave
@@ -1591,7 +1591,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     /* Map MMIO regs and framebuffer */
     if (!SMI_MapMem(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
 
@@ -1637,10 +1637,10 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     if (!miSetVisualTypes(pScrn->depth, miGetDefaultVisualMask(pScrn->depth),
 			  pScrn->rgbBits, pScrn->defaultVisual))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     if (!miSetPixmapDepths ())
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /*
      * Call the framebuffer layer's ScreenInit function
@@ -1650,7 +1650,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 	  pSmi->FBBase, pScrn->virtualX, pScrn->virtualY, pScrn->displayWidth);
     if(!fbScreenInit(pScreen, pSmi->FBBase, pScrn->virtualX, pScrn->virtualY, pScrn->xDpi,
 		     pScrn->yDpi, pScrn->displayWidth, pScrn->bitsPerPixel))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     xf86SetBlackWhitePixels(pScreen);
 
@@ -1675,7 +1675,7 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
  
     /* Do the CRTC independent initialization */
     if(!SMI_HWInit(pScrn))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Unless using EXA, regardless or using XAA or not, needs offscreen
      * management at least for video. */
@@ -1700,14 +1700,14 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     /* Initialize acceleration layer */
     if (!pSmi->NoAccel) {
 	if (pSmi->useEXA && !SMI_EXAInit(pScreen))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	else if (!pSmi->useEXA && !SMI_XAAInit(pScreen))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
     }
 
     /* Initialize the chosen modes */
     if (!xf86SetDesiredModes(pScrn))
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 
     SMI_PrintRegs(pScrn);
 
@@ -1756,14 +1756,14 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
     /* Initialise default colormap */
     if (!miCreateDefColormap(pScreen))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Initialize colormap layer.  Must follow initialization of the default
      * colormap.  And SetGamma call, else it will load palette with solid white.
      */
     if (!xf86HandleColormaps(pScreen, 256, pScrn->rgbBits,SMI_LoadPalette, NULL,
 			     CMAP_RELOAD_ON_MODE_SWITCH | CMAP_PALETTED_TRUECOLOR))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     pScreen->SaveScreen = SMI_SaveScreen;
     pSmi->CloseScreen = pScreen->CloseScreen;
@@ -1778,14 +1778,14 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     SMI_InitVideo(pScreen);
 
     if(!xf86CrtcScreenInit(pScreen))
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     /* Report any unused options (only for the first generation) */
     if (serverGeneration == 1) {
 	xf86ShowUnusedOptions(pScrn->scrnIndex, pScrn->options);
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /*
@@ -1848,7 +1848,7 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
     pScreen->CloseScreen = pSmi->CloseScreen;
     ret = (*pScreen->CloseScreen)(scrnIndex, pScreen);
 
-    RETURN(ret);
+    LEAVE(ret);
 }
 
 static void
@@ -1870,7 +1870,7 @@ SMI_SaveScreen(ScreenPtr pScreen, int mode)
 	pScrn->DPMSSet(pScrn, DPMSModeOff, 0);
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 void
@@ -1900,7 +1900,7 @@ SMI_SwitchMode(int scrnIndex, DisplayModePtr mode, int flags)
     if (!pSmi->NoAccel)
 	SMI_EngineReset(pScrn);
 
-    RETURN(ret);
+    LEAVE(ret);
 }
 
 void
@@ -2054,9 +2054,9 @@ SMI_HWInit(ScrnInfoPtr pScrn)
     ENTER();
 
     if(IS_MSOC(pSmi))
-	RETURN(SMI501_HWInit(pScrn));
+	LEAVE(SMI501_HWInit(pScrn));
     else
-	RETURN(SMILynx_HWInit(pScrn));
+	LEAVE(SMILynx_HWInit(pScrn));
 }
 
 void

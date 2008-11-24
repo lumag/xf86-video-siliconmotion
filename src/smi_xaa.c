@@ -80,7 +80,7 @@ SMI_XAAInit(ScreenPtr pScreen)
 
     pSmi->XAAInfoRec = infoPtr = XAACreateInfoRec();
     if (infoPtr == NULL)
-	RETURN(FALSE);
+	LEAVE(FALSE);
 
     infoPtr->Flags = PIXMAP_CACHE
 		   | LINEAR_FRAMEBUFFER
@@ -190,7 +190,7 @@ SMI_XAAInit(ScreenPtr pScreen)
 
     ret = XAAInit(pScreen, infoPtr);
 
-    RETURN(ret);
+    LEAVE(ret);
 }
 
 /******************************************************************************/

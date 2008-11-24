@@ -150,7 +150,7 @@ SMILynx_OutputGetModes_crt(xf86OutputPtr output)
 		 (pMon->rawData[6] == 0xFF) &&
 		 (pMon->rawData[7] == 0x00)) {
 		xf86OutputSetEDID(output,pMon);
-		RETURN(xf86OutputGetEDIDModes(output));
+		LEAVE(xf86OutputGetEDIDModes(output));
 	    }
 	}
 
@@ -158,7 +158,7 @@ SMILynx_OutputGetModes_crt(xf86OutputPtr output)
 	pMon=SMILynx_ddc1(pScrn);
 	if(pMon){
 	    xf86OutputSetEDID(output,pMon);
-	    RETURN(xf86OutputGetEDIDModes(output));
+	    LEAVE(xf86OutputGetEDIDModes(output));
 	}
 
 	/* Try DDC2 */
@@ -166,12 +166,12 @@ SMILynx_OutputGetModes_crt(xf86OutputPtr output)
 	    pMon=xf86OutputGetEDID(output,pSmi->I2C);
 	    if(pMon){
 		xf86OutputSetEDID(output,pMon);
-		RETURN(xf86OutputGetEDIDModes(output));
+		LEAVE(xf86OutputGetEDIDModes(output));
 	    }
 	}
     }
 
-    RETURN(NULL);
+    LEAVE(NULL);
 }
 
 static xf86OutputStatus
@@ -202,9 +202,9 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D, SR7D);
 
     if(status)
-	RETURN(XF86OutputStatusConnected);
+	LEAVE(XF86OutputStatusConnected);
     else
-	RETURN(XF86OutputStatusDisconnected);
+	LEAVE(XF86OutputStatusDisconnected);
 }
 
 static xf86OutputFuncsRec SMILynx_Output0Funcs;
@@ -228,7 +228,7 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 
 	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
 	    if(!output0)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 
 	    output0->possible_crtcs = 1 << 0;
 	    output0->possible_clones = 0;
@@ -244,7 +244,7 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 
 	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
 	    if(!output0)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 
 	    output0->possible_crtcs = 1 << 0;
 	    output0->possible_clones = 0;
@@ -259,7 +259,7 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 
 	    output1=xf86OutputCreate(pScrn,&SMILynx_Output1Funcs,"VGA");
 	    if(!output1)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 
 	    output1->possible_crtcs = 1 << 1;
 	    output1->possible_clones = 0;
@@ -274,7 +274,7 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 
 	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
 	    if(!output0)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 
 	    output0->possible_crtcs = 1 << 0;
 	    output0->possible_clones = 0;
@@ -283,6 +283,6 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 	}
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 

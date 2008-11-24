@@ -151,7 +151,7 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
     VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, 0x00);
     VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, 0x00);
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 /*
@@ -603,7 +603,7 @@ SMILynx_ddc1Read(ScrnInfoPtr pScrn)
 
     ret = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x72) & 0x08;
 
-    RETURN(ret);
+    LEAVE(ret);
 }
 
 xf86MonPtr
@@ -623,7 +623,7 @@ SMILynx_ddc1(ScrnInfoPtr pScrn)
 					 SMILynx_ddc1Read));
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x72, tmp);
 
-    RETURN(pMon);
+    LEAVE(pMon);
 }
 
 

@@ -653,7 +653,7 @@ SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 
     crtc0 = xf86CrtcCreate(pScrn, &SMI501_Crtc0Funcs);
     if (!crtc0)
-	RETURN(FALSE);
+	LEAVE(FALSE);
     crtc0->driver_private = &SMI501_Crtc0Priv;
 
     /* CRTC1 is CRT */
@@ -674,10 +674,10 @@ SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	crtc1 = xf86CrtcCreate(pScrn, &SMI501_Crtc1Funcs);
 	if (!crtc1)
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	crtc1->driver_private = &SMI501_Crtc1Priv;
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 

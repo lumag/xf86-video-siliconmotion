@@ -84,7 +84,7 @@ SMI_DGAInit(ScreenPtr pScreen)
 	newmodes = xrealloc(modes, (num + 1) * sizeof(DGAModeRec));
 	if (newmodes == NULL) {
 	    xfree(modes);
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	}
 
 	modes = newmodes;
@@ -144,7 +144,7 @@ SMI_DGAInit(ScreenPtr pScreen)
 
     ret = DGAInit(pScreen, &SMI_DGAFuncs, modes, num);
 
-    RETURN(ret);
+    LEAVE(ret);
 }
 
 static Bool
@@ -177,7 +177,7 @@ SMI_SetMode(ScrnInfoPtr pScrn, DGAModePtr pMode)
 	SMI_SwitchMode(index, pMode->mode, 0);
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 
@@ -188,7 +188,7 @@ SMI_GetViewport(ScrnInfoPtr pScrn)
 
     ENTER();
 
-    RETURN(pSmi->DGAViewportStatus);
+    LEAVE(pSmi->DGAViewportStatus);
 }
 
 static void
@@ -274,6 +274,6 @@ SMI_OpenFramebuffer(ScrnInfoPtr pScrn, char **name, unsigned char **mem,
     *offset = 0;
     *flags  = DGA_NEED_ROOT;
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 

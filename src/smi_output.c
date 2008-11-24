@@ -61,7 +61,7 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
      * their own centering. */
     if (output->name && strcmp(output->name, "LVDS") == 0 &&
 	(mode->HDisplay != pSmi->lcdWidth || mode->VDisplay != pSmi->lcdHeight))
-	RETURN(MODE_PANEL);
+	LEAVE(MODE_PANEL);
 
     /* The driver is actually programming modes, instead of loading registers
      * state from static tables. But still, only accept modes that should
@@ -69,17 +69,17 @@ SMI_OutputModeValid(xf86OutputPtr output, DisplayModePtr mode)
      * the crt can be programmed to different resolution modes.
      */
     if (mode->HDisplay & 15)
-	RETURN(MODE_BAD_WIDTH);
+	LEAVE(MODE_BAD_WIDTH);
 
     if((mode->Clock < pSmi->clockRange.minClock) ||
        (mode->Clock > pSmi->clockRange.maxClock) ||
        ((mode->Flags & V_INTERLACE) && !pSmi->clockRange.interlaceAllowed) ||
        ((mode->Flags & V_DBLSCAN) && (mode->VScan > 1) && !pSmi->clockRange.doubleScanAllowed)){
-	RETURN(MODE_CLOCK_RANGE);
+	LEAVE(MODE_CLOCK_RANGE);
     }
 
 
-    RETURN(MODE_OK);
+    LEAVE(MODE_OK);
 }
 
 static Bool
@@ -89,7 +89,7 @@ SMI_OutputModeFixup(xf86OutputPtr output, DisplayModePtr mode, DisplayModePtr ad
 
     /* Nothing */
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -127,7 +127,7 @@ SMI_OutputDetect(xf86OutputPtr output)
 {
     ENTER();
 
-    RETURN(XF86OutputStatusUnknown);
+    LEAVE(XF86OutputStatusUnknown);
 }
 
 xf86OutputStatus
@@ -135,7 +135,7 @@ SMI_OutputDetect_lcd(xf86OutputPtr output)
 {
     ENTER();
 
-    RETURN(XF86OutputStatusConnected);
+    LEAVE(XF86OutputStatusConnected);
 }
 
 DisplayModePtr
@@ -145,9 +145,9 @@ SMI_OutputGetModes_native(xf86OutputPtr output)
     ENTER();
 
 #ifdef HAVE_XMODES
-    RETURN(xf86CVTMode(pSmi->lcdWidth, pSmi->lcdHeight, 60.0f, FALSE, FALSE));
+    LEAVE(xf86CVTMode(pSmi->lcdWidth, pSmi->lcdHeight, 60.0f, FALSE, FALSE));
 #else
-    RETURN(NULL);
+    LEAVE(NULL);
 #endif
 }
 
@@ -185,9 +185,9 @@ SMI_OutputPreInit(ScrnInfoPtr pScrn)
     ENTER();
 
     if(SMI_MSOC_SERIES(pSmi->Chipset)){
-	RETURN( SMI501_OutputPreInit(pScrn) );
+	LEAVE( SMI501_OutputPreInit(pScrn) );
     }else{
-	RETURN( SMILynx_OutputPreInit(pScrn) );
+	LEAVE( SMILynx_OutputPreInit(pScrn) );
     }
 }
 

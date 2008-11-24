@@ -524,14 +524,14 @@ SMI_AddEncoding(XF86VideoEncodingPtr enc, int i,
 			   strlen(input_string) + 
 			   strlen(channel_string)+3);
     if (NULL == enc[i].name)
-	RETURN(-1);
+	LEAVE(-1);
 
     enc[i].width  = VideoNorms[norm].Wa;
     enc[i].height = VideoNorms[norm].Ha;
     enc[i].rate   = VideoNorms[norm].rate;
     sprintf(enc[i].name,"%s-%s-%s", norm_string, input_string, channel_string);
 
-    RETURN(0);
+    LEAVE(0);
 }
 
 
@@ -588,7 +588,6 @@ SMI_BuildEncodings(SMI_PortPtr p)
 	}
     }
     LEAVE();
-    return;
     
  fail:
     if (p->input) xfree(p->input);
@@ -828,7 +827,7 @@ SMI_SetupVideo(ScreenPtr pScreen)
     ptrAdaptor = xcalloc(1, sizeof(XF86VideoAdaptorRec) +
 		 sizeof(DevUnion) + sizeof(SMI_PortRec));
     if (ptrAdaptor == NULL)
-	RETURN(NULL);
+	LEAVE(NULL);
 
     ptrAdaptor->type = XvInputMask
 #if SMI_USE_CAPTURE
@@ -907,7 +906,7 @@ SMI_SetupVideo(ScreenPtr pScreen)
 #if 0
     /* aaa does not work ? */
     if (xf86I2CProbeAddress(pSmi->I2C, SAA7111))
-        RETURN(NULL);
+        LEAVE(NULL);
     DEBUG("SAA7111 detected\n");
 #endif
 
@@ -950,7 +949,7 @@ SMI_SetupVideo(ScreenPtr pScreen)
     
     SMI_ResetVideo(pScrn);
 
-    RETURN(ptrAdaptor);
+    LEAVE(ptrAdaptor);
 }
 
 
@@ -1059,10 +1058,10 @@ SMI_PutVideo(
     dstBox.y2 = drw_y + drw_h;
 
     if(!xf86_crtc_clip_video_helper(pScrn, &crtc, NULL, &dstBox, &x1, &x2, &y1, &y2, clipBoxes, width, height))
-	RETURN(Success);
+	LEAVE(Success);
 
     if(pSmi->Dualhead && crtc == crtcConf->crtc[0])
-	RETURN(Success);
+	LEAVE(Success);
 
     /* Transform dstBox to the CRTC coordinates */
     dstBox.x1 -= crtc->x;
@@ -1211,7 +1210,7 @@ SMI_PutVideo(
 		    cpr00 ^= 0x00030000;
 		} else {
 		    DEBUG("allocate error\n");
-		    RETURN(BadAlloc);
+		    LEAVE(BadAlloc);
 		}
 	    }
 	}
@@ -1303,7 +1302,7 @@ SMI_PutVideo(
     pPort->videoStatus = CLIENT_VIDEO_ON;
     DEBUG("SMI_PutVideo success\n");
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 #endif
 
@@ -1406,7 +1405,7 @@ SMI_SetPortAttribute(
         res = BadMatch;
     }
 
-    RETURN(res);
+    LEAVE(res);
 }
 
 
@@ -1436,9 +1435,9 @@ SMI_GetPortAttribute(
     else if (attribute == xvColorKey)
         *value = pPort->Attribute[XV_COLORKEY];
     else
-	RETURN(BadMatch);
+	LEAVE(BadMatch);
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 
 
@@ -1514,13 +1513,13 @@ SMI_PutImage(
     if (pSmi->CSCVideo) {
 	if (!xf86XVClipVideoHelper(&dstBox, &x1, &x2, &y1, &y2, clipBoxes,
 				   width, height))
-	    RETURN(Success);
+	    LEAVE(Success);
     }
     else {
 	if (!xf86_crtc_clip_video_helper(pScrn, &crtc, NULL, &dstBox,
 					 &x1, &x2, &y1, &y2, clipBoxes,
 					 width, height))
-	    RETURN(Success);
+	    LEAVE(Success);
 
 	/* Transform dstBox to the CRTC coordinates */
 	dstBox.x1 -= crtc->x;
@@ -1573,7 +1572,7 @@ SMI_PutImage(
     size = dstPitch * height;
     pPort->video_offset = SMI_AllocateMemory(pScrn, &pPort->video_memory, size);
     if (pPort->video_memory == NULL)
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
 
     top = y1 >> 16;
     left = (x1 >> 16) & ~1;
@@ -1647,7 +1646,7 @@ SMI_PutImage(
     }
     pPort->videoStatus = CLIENT_VIDEO_ON;
 
-    RETURN(Success);
+    LEAVE(Success);
 	
 }
 
@@ -1728,7 +1727,7 @@ SMI_QueryImageAttributes(
 	break;
     }
 
-    RETURN(size);
+    LEAVE(size);
 }
 
 
@@ -2123,11 +2122,11 @@ SMI_SendI2C(
     ENTER();
 
     if (pSmi->I2C == NULL)
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
 
     dev = xf86CreateI2CDevRec();
     if (dev == NULL)
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
 
     dev->DevName = devName;
     dev->SlaveAddr = device;
@@ -2147,7 +2146,7 @@ SMI_SendI2C(
 
     xf86DestroyI2CDevRec(dev, TRUE);
 
-    RETURN(status);
+    LEAVE(status);
 }
 #endif
 
@@ -2172,7 +2171,6 @@ SMI_InitOffscreenImages(
     offscreenImages = xalloc(sizeof(XF86OffscreenImageRec));
     if (offscreenImages == NULL) {
 	LEAVE();
-	return;
     }
 
     offscreenImages->image = SMI_VideoImages;
@@ -2228,7 +2226,7 @@ SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 
 	if (area != NULL) {
 	    if (area->size >= size)
-		RETURN(area->offset);
+		LEAVE(area->offset);
 
 	    exaOffscreenFree(pScrn->pScreen, area);
 	}
@@ -2250,10 +2248,10 @@ SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 
 	if (linear) {
 	    if (linear->size >= size)
-		RETURN(linear->offset * pSmi->Bpp);
+		LEAVE(linear->offset * pSmi->Bpp);
 
 	    if (xf86ResizeOffscreenLinear(linear, size))
-		RETURN(linear->offset * pSmi->Bpp);
+		LEAVE(linear->offset * pSmi->Bpp);
 
 	    xf86FreeOffscreenLinear(linear);
 	}
@@ -2263,7 +2261,7 @@ SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 	    xf86QueryLargestOffscreenLinear(pScreen, &max_size, 16,
 					    PRIORITY_EXTREME);
 	    if (max_size < size)
-		RETURN(0);
+		LEAVE(0);
 
 	    xf86PurgeUnlockedOffscreenAreas(pScreen);
 	}
@@ -2276,7 +2274,7 @@ SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size)
 	DEBUG("offset = %p\n", offset);
     }
 
-    RETURN(offset);
+    LEAVE(offset);
 }
 
 void
@@ -2355,7 +2353,7 @@ SMI_AllocSurface(
     ENTER();
 
     if (width > pSmi->lcdWidth || height > pSmi->lcdHeight)
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
 
     switch (id) {
     case FOURCC_YV12:
@@ -2372,7 +2370,7 @@ SMI_AllocSurface(
 	bpp = 4;
 	break;
     default:
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
     }
 
     width = (width + 1) & ~1;
@@ -2381,18 +2379,18 @@ SMI_AllocSurface(
 
     offset = SMI_AllocateMemory(pScrn, &surface_memory, size);
     if (offset == 0)
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
 
     surface->pitches = xalloc(sizeof(int));
     if (surface->pitches == NULL) {
 	SMI_FreeMemory(pScrn, surface_memory);
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
     }
     surface->offsets = xalloc(sizeof(int));
     if (surface->offsets == NULL) {
 	xfree(surface->pitches);
 	SMI_FreeMemory(pScrn, surface_memory);
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
     }
 
     ptrOffscreen = xalloc(sizeof(SMI_OffscreenRec));
@@ -2400,7 +2398,7 @@ SMI_AllocSurface(
 	xfree(surface->offsets);
 	xfree(surface->pitches);
 	SMI_FreeMemory(pScrn, surface_memory);
-	RETURN(BadAlloc);
+	LEAVE(BadAlloc);
     }
 
     surface->pScrn = pScrn;
@@ -2414,7 +2412,7 @@ SMI_AllocSurface(
     ptrOffscreen->surface_memory = surface_memory;
     ptrOffscreen->isOn = FALSE;
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 
 static int
@@ -2436,7 +2434,7 @@ SMI_FreeSurface(
     xfree(surface->offsets);
     xfree(surface->devPrivate.ptr);
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 
 static int
@@ -2475,7 +2473,7 @@ SMI_DisplaySurface(
 
     if(!xf86_crtc_clip_video_helper(surface->pScrn, &crtc, NULL, &dstBox,
 				    &x1, &x2, &y1, &y2, clipBoxes, surface->width, surface->height))
-	RETURN(Success);
+	LEAVE(Success);
 
     /* Transform dstBox to the CRTC coordinates */
     dstBox.x1 -= crtc->x;
@@ -2511,7 +2509,7 @@ SMI_DisplaySurface(
         pPort->freeTime = currentTime.milliseconds + FREE_DELAY;
     }
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 
 static int
@@ -2534,7 +2532,7 @@ SMI_StopSurface(
 	ptrOffscreen->isOn = FALSE;
     }
 
-    RETURN(Success);
+    LEAVE(Success);
 }
 
 static int

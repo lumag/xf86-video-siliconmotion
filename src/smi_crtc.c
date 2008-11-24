@@ -49,7 +49,7 @@ SMI_CrtcLock (xf86CrtcPtr crtc)
 
     WaitIdle();
 
-    RETURN(FALSE);
+    LEAVE(FALSE);
 }
 
 static void
@@ -71,7 +71,7 @@ SMI_CrtcModeFixup(xf86CrtcPtr crtc,
 
     /* Nothing */
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 static void
@@ -138,7 +138,7 @@ SMI_CrtcShadowAllocate (xf86CrtcPtr crtc, int width, int height)
 	    result += offset * pSmi->Bpp;
     }
 
-    RETURN(result);
+    LEAVE(result);
 }
 
 static PixmapPtr
@@ -152,7 +152,7 @@ SMI_CrtcShadowCreate (xf86CrtcPtr crtc, void *data, int width, int height)
 
     aligned_pitch = (width * pSmi->Bpp + 15) & ~15;
 
-    RETURN(GetScratchPixmapHeader(pScrn->pScreen,width,height,pScrn->depth,
+    LEAVE(GetScratchPixmapHeader(pScrn->pScreen,width,height,pScrn->depth,
 				  pScrn->bitsPerPixel,aligned_pitch,data));
 }
 
@@ -207,7 +207,7 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 	if(!fbArea){
 	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 		   "SMI_CrtcConfigResize: Not enough memory to resize the framebuffer\n");
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	}
 
 	if(pSmi->fbArea)
@@ -243,7 +243,7 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 	SMICRTC(crtc)->adjust_frame(crtc,crtc->x,crtc->y);
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
 void
@@ -280,8 +280,8 @@ SMI_CrtcPreInit(ScrnInfoPtr pScrn)
     xf86CrtcSetSizeRange(pScrn,128,128,4096,4096);
 
     if(SMI_MSOC_SERIES(pSmi->Chipset)){
-	RETURN( SMI501_CrtcPreInit(pScrn) );
+	LEAVE( SMI501_CrtcPreInit(pScrn) );
     }else{
-	RETURN( SMILynx_CrtcPreInit(pScrn) );
+	LEAVE( SMILynx_CrtcPreInit(pScrn) );
     }
 }

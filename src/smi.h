@@ -291,20 +291,17 @@ extern int smi_indent;
 # define VERBLEV	1
 # define ENTER()	xf86ErrorFVerb(VERBLEV, "%*c %s\n",\
 				       smi_indent++, '>', __FUNCTION__)
-# define LEAVE()	xf86ErrorFVerb(VERBLEV, "%*c %s\n",\
-				       --smi_indent, '<', __FUNCTION__)
-# define RETURN(value)							\
+# define LEAVE(value)							\
     do {								\
 	xf86ErrorFVerb(VERBLEV, "%*c %s\n",				\
 		       --smi_indent, '<', __FUNCTION__);		\
-	return (value);							\
+	return __VA_ARGS__;						\
     } while (0)
 # define DEBUG(...)	xf86ErrorFVerb(VERBLEV, __VA_ARGS__)
 #else
 # define VERBLEV	4
 # define ENTER()	/**/
-# define LEAVE()	/**/
-# define RETURN(value)	return (value)
+# define LEAVE(...)	return __VA_ARGS__
 # define DEBUG(...)	/**/
 #endif
 

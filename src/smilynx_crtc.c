@@ -250,7 +250,6 @@ SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
 
     if (!vgaHWInit(pScrn, mode)) {
 	LEAVE();
-	return;
     }
 
     if ((mode->HDisplay == 640) && SMI_LYNXM_SERIES(pSmi->Chipset)) {
@@ -710,7 +709,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
 	if(!crtc0)
-	    RETURN(FALSE);
+	    LEAVE(FALSE);
 	crtc0->driver_private = &SMILynx_Crtc0Priv;
     }else{
 	if(pSmi->Dualhead){
@@ -723,7 +722,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	    crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
 	    if(!crtc0)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    crtc0->driver_private = &SMILynx_Crtc0Priv;
 
 	    /* CRTC1 is CRT */
@@ -735,7 +734,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	    crtc1=xf86CrtcCreate(pScrn,&SMILynx_Crtc1Funcs);
 	    if(!crtc1)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    crtc1->driver_private = &SMILynx_Crtc1Priv;
 
 	}else{
@@ -757,11 +756,11 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	    crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
 	    if(!crtc0)
-		RETURN(FALSE);
+		LEAVE(FALSE);
 	    crtc0->driver_private = &SMILynx_Crtc0Priv;
 	}
     }
 
-    RETURN(TRUE);
+    LEAVE(TRUE);
 }
 
