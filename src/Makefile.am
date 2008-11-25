@@ -51,7 +51,3 @@ siliconmotion_drv_la_SOURCES = \
 	 smilynx.h \
 	 smi501_crtc.c \
 	 smi501_output.c
-
-if !XMODES
-siliconmotion_drv_la_SOURCES += smi_dga.c
-endif

@@ -245,14 +245,6 @@ typedef struct
 					   as framebuffer */
     PictTransformPtr	renderTransform;
 
-#ifndef XMODES
-    /* DGA */
-    DGAModePtr		DGAModes;	/* Pointer to DGA modes */
-    int			numDGAModes;	/* Number of DGA modes */
-    Bool		DGAactive;	/* Flag if DGA is active */
-    int			DGAViewportStatus;
-#endif
-
     /* DPMS */
     int			CurrentDPMS;	/* Current DPMS state */
 
@@ -260,15 +252,6 @@ typedef struct
     Bool		lcd;		/* LCD active, 1=DSTN, 2=TFT */
     int			lcdWidth;	/* LCD width */
     int			lcdHeight;	/* LCD height */
-
-#if 0
-    /* Polylines - #671 */
-    ValidateGCProcPtr	ValidatePolylines;	/* Org.
-						   ValidatePolylines
-						   function */
-    Bool		polyLines;	/* Our polylines patch is
-					   active */
-#endif
 
     /* XvExtension */
     int			videoKey;	/* Video chroma key */

@@ -1820,9 +1820,6 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
 	exaDriverFini(pScreen);
 	pSmi->EXADriverPtr = NULL;
     }
-    if (pSmi->DGAModes != NULL) {
-	xfree(pSmi->DGAModes);
-    }
     if (pSmi->pInt10 != NULL) {
 	xf86FreeInt10(pSmi->pInt10);
 	pSmi->pInt10 = NULL;
