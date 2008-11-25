@@ -1038,6 +1038,8 @@ SMI_LeaveVT(int scrnIndex, int flags)
 
     ENTER();
 
+    SMI_AccelSync(pScrn);
+
     /* Ensure that the rotation BlockHandler is unwrapped, and the shadow
        pixmaps are deallocated, as the video memory is going to be
        unmapped.  */
@@ -1807,17 +1809,9 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
     if (pSmi->HwCursor)
 	xf86_cursors_fini(pScreen);
 
-    if (pScrn->vtSema) {
-	if (!IS_MSOC(pSmi)) {
-	    vgaHWPtr	hwp = VGAHWPTR(pScrn);
-
-	    SMILynx_WriteMode(pScrn, &hwp->SavedReg, pSmi->save);
-	    vgaHWLock(hwp);
-	}
-	else
-	    SMI501_WriteMode(pScrn, pSmi->save);
-	SMI_UnmapMem(pScrn);
-    }
+    if (pScrn->vtSema)
+	/* Restore console mode and unmap framebuffer */
+	SMI_LeaveVT(scrnIndex, 0);
 
     if (pSmi->XAAInfoRec != NULL) {
 	XAADestroyInfoRec(pSmi->XAAInfoRec);
