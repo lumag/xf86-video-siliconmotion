@@ -1717,10 +1717,6 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
 
 #ifdef HAVE_XMODES
     xf86DiDGAInit(pScreen, (unsigned long)(pSmi->FBBase + pScrn->fbOffset));
-#else
-    /* hardware cursor needs to wrap this layer */
-    if (!pSmi->NoAccel && !pSmi->useEXA)
-	SMI_DGAInit(pScreen);
 #endif
 
     /* Initialise cursor functions */
