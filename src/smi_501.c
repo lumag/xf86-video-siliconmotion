@@ -131,6 +131,21 @@ SMI501_Save(ScrnInfoPtr pScrn)
     save->alpha_plane_tl.value = READ_SCR(pSmi, ALPHA_PLANE_TL);
     save->alpha_plane_br.value = READ_SCR(pSmi, ALPHA_PLANE_BR);
     save->alpha_chroma_key.value = READ_SCR(pSmi, ALPHA_CHROMA_KEY);
+
+    /* Also save accel state to properly restore kernel framebuffer */
+    save->accel_src = READ_SCR(pSmi, ACCEL_SRC);
+    save->accel_dst = READ_SCR(pSmi, ACCEL_DST);
+    save->accel_dim = READ_SCR(pSmi, ACCEL_DIM);
+    save->accel_ctl = READ_SCR(pSmi, ACCEL_CTL);
+    save->accel_pitch = READ_SCR(pSmi, ACCEL_PITCH);
+    save->accel_fmt = READ_SCR(pSmi, ACCEL_FMT);
+    save->accel_clip_tl = READ_SCR(pSmi, ACCEL_CLIP_TL);
+    save->accel_clip_br = READ_SCR(pSmi, ACCEL_CLIP_BR);
+    save->accel_pat_lo = READ_SCR(pSmi, ACCEL_PAT_LO);
+    save->accel_pat_hi = READ_SCR(pSmi, ACCEL_PAT_HI);
+    save->accel_wwidth = READ_SCR(pSmi, ACCEL_WWIDTH);
+    save->accel_src_base = READ_SCR(pSmi, ACCEL_SRC_BASE);
+    save->accel_dst_base = READ_SCR(pSmi, ACCEL_DST_BASE);
 }
 
 void
@@ -353,12 +368,29 @@ SMI501_WriteMode_alpha(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 void
 SMI501_WriteMode(ScrnInfoPtr pScrn, MSOCRegPtr restore)
 {
+    SMIPtr	pSmi = SMIPTR(pScrn);
+
     SMI501_WriteMode_common(pScrn, restore);
     SMI501_WriteMode_lcd(pScrn, restore);
     SMI501_WriteMode_crt(pScrn, restore);
 #if SMI_CURSOR_ALPHA_PLANE
     SMI501_WriteMode_alpha(pScrn, restore);
 #endif
+
+    /* This function should be called when switching to virtual console */
+    WRITE_SCR(pSmi, ACCEL_SRC, restore->accel_src);
+    WRITE_SCR(pSmi, ACCEL_DST, restore->accel_dst);
+    WRITE_SCR(pSmi, ACCEL_DIM, restore->accel_dim);
+    WRITE_SCR(pSmi, ACCEL_CTL, restore->accel_ctl);
+    WRITE_SCR(pSmi, ACCEL_PITCH, restore->accel_pitch);
+    WRITE_SCR(pSmi, ACCEL_FMT, restore->accel_fmt);
+    WRITE_SCR(pSmi, ACCEL_CLIP_TL, restore->accel_clip_tl);
+    WRITE_SCR(pSmi, ACCEL_CLIP_BR, restore->accel_clip_br);
+    WRITE_SCR(pSmi, ACCEL_PAT_LO, restore->accel_pat_lo);
+    WRITE_SCR(pSmi, ACCEL_PAT_HI, restore->accel_pat_hi);
+    WRITE_SCR(pSmi, ACCEL_WWIDTH, restore->accel_wwidth);
+    WRITE_SCR(pSmi, ACCEL_SRC_BASE, restore->accel_src_base);
+    WRITE_SCR(pSmi, ACCEL_DST_BASE, restore->accel_dst_base);
 }
 
 void

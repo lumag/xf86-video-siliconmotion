@@ -954,11 +954,51 @@ typedef struct _MSOCRegRec {
 	} f;
 	int32_t		value;
     } crt_detect;
-} MSOCRegRec, *MSOCRegPtr;
-
 
 #define PANEL_PALETTE			0x080400
 #define CRT_PALETTE			0x080c00
+
+#define ACCEL_SRC			0x100000
+    int32_t	accel_src;
+
+#define ACCEL_DST			0x100004
+    int32_t	accel_dst;
+
+#define ACCEL_DIM			0x100008
+    int32_t	accel_dim;
+
+#define ACCEL_CTL			0x10000c
+    int32_t	accel_ctl;
+
+#define ACCEL_PITCH			0x100010
+    int32_t	accel_pitch;
+
+#define ACCEL_FMT			0x10001c
+    int32_t	accel_fmt;
+
+#define ACCEL_CLIP_TL			0x10002c
+    int32_t	accel_clip_tl;
+
+#define ACCEL_CLIP_BR			0x100030
+    int32_t	accel_clip_br;
+
+#define ACCEL_PAT_LO			0x100034
+    int32_t	accel_pat_lo;
+
+#define ACCEL_PAT_HI			0x100038
+    int32_t	accel_pat_hi;
+
+#define ACCEL_WWIDTH			0x10003c
+    int32_t	accel_wwidth;
+
+#define ACCEL_SRC_BASE			0x100040
+    int32_t	accel_src_base;
+
+#define ACCEL_DST_BASE			0x100044
+    int32_t	accel_dst_base;
+
+} MSOCRegRec, *MSOCRegPtr;
+
 
 /* In Kb - documentation says it is 64Kb... */
 #define FB_RESERVE4USB			512
