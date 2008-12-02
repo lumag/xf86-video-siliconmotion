@@ -45,7 +45,7 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
     int		vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
     int		vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
     CARD8 SR17, SR20, SR21, SR22, SR24, SR30, SR31, SR32, SR34,
-	SR66, SR68, SR69, SR6A, SR6B;
+	SR66, SR68, SR69, SR6A, SR6B, CR9E;
 
     ENTER();
 
@@ -63,6 +63,7 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
     SR69 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x69);
     SR6A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6A);
     SR6B = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6B);
+    CR9E = VGAIN8_INDEX(pSmi, vgaCRIndex,vgaCRData,0x9E);
 
     if (pSmi->PCIBurst) {
 	SR17 |= 0x20;
@@ -108,6 +109,9 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
 	SR34 |= 0x80;
     }
 
+    /* Disable Vertical Expansion/Vertical Centering/Horizontal Centering */
+    CR9E &= ~0x7;
+
     /* Program MCLK */
     if (pSmi->MCLK > 0)
 	SMI_CommonCalcClock(pScrn->scrnIndex, pSmi->MCLK,
@@ -150,6 +154,7 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0xA0, 0x00);
     VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, 0x00);
     VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, 0x00);
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData,0x9E, CR9E);
 
     LEAVE(TRUE);
 }
