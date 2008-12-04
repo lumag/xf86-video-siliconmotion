@@ -214,8 +214,11 @@ SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
     ScrnInfoPtr pScrn=crtc->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
     vgaHWPtr hwp = VGAHWPTR(pScrn);
+    int vgaIOBase  = hwp->IOBase;
+    int vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
+    int vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
     vgaRegPtr vganew = &hwp->ModeReg;
-    CARD8 SR6C, SR6D;
+    CARD8 SR6C, SR6D, CR30, CR33;
 
     ENTER();
 
@@ -259,13 +262,37 @@ SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
     }
     vganew->MiscOutReg |= 0x20;
 
-    if(pSmi->Chipset != SMI_COUGAR3DR){
-	/* Enable LCD */
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31,
-		      VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31) | 0x01);
+    {
+	unsigned long HTotal=(mode->CrtcHTotal>>3)-5;
+	unsigned long HBlankEnd=(mode->CrtcHBlankEnd>>3)-1;
+	unsigned long VTotal=mode->CrtcVTotal-2;
+	unsigned long VDisplay=mode->CrtcVDisplay-1;
+	unsigned long VBlankStart=mode->CrtcVBlankStart-1;
+	unsigned long VBlankEnd=mode->CrtcVBlankEnd-1;
+	unsigned long VSyncStart=mode->CrtcVSyncStart;
+
+	/* Fix HBlankEnd/VBlankEnd */
+	if((mode->CrtcHBlankEnd >> 3) == (mode->CrtcHTotal >> 3)) HBlankEnd=0;
+	if(mode->CrtcVBlankEnd == mode->CrtcVTotal) VBlankEnd=0;
+
+	vganew->CRTC[3] = (vganew->CRTC[3] & ~0x1F) | (HBlankEnd & 0x1F);
+	vganew->CRTC[5] = (vganew->CRTC[5] & ~0x80) | (HBlankEnd & 0x20) >> 5 << 7;
+	vganew->CRTC[22] = VBlankEnd & 0xFF;
+
+	/* Write the overflow from several VGA registers */
+	CR30 = (VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30) & 0x30) |
+	    (HTotal & 0x100) >> 8 << 6 |
+	    (VTotal & 0x400) >> 10 << 3 |
+	    (VDisplay & 0x400) >> 10 << 2 |
+	    (VBlankStart & 0x400) >> 10 << 1 |
+	    (VSyncStart & 0x400) >> 10 << 0;
+	CR33 = (HBlankEnd & 0xC0) >> 6 << 5 | (VBlankEnd & 0x300) >> 8 << 3;
     }
 
     vgaHWRestore(pScrn, vganew, VGA_SR_MODE);
+
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30, CR30);
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, CR33);
 
     LEAVE();
 }
@@ -335,6 +362,7 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
 	unsigned long VSyncStart=mode->CrtcVSyncStart;
 	unsigned long VSyncEnd=mode->CrtcVSyncEnd;
 
+	/* Fix HBlankEnd/VBlankEnd */
 	if((mode->CrtcHBlankEnd >> 3) == (mode->CrtcHTotal >> 3)) HBlankEnd=0;
 	if(mode->CrtcVBlankEnd == mode->CrtcVTotal) VBlankEnd=0;
 
@@ -364,6 +392,13 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
 		      (VBlankStart & 0x200) >> 9 << 5 );
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4C, HDisplay & 0xFF );
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4D, VDisplay & 0xFF );
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30,
+		      (VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E) & 0x30) |
+		      (HTotal & 0x100) >> 8 << 6 |
+		      (VTotal & 0x400) >> 10 << 3 |
+		      (VDisplay & 0x400) >> 10 << 2 |
+		      (VBlankStart & 0x400) >> 10 << 1 |
+		      (VSyncStart & 0x400) >> 10 << 0);
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33,
 		      (HBlankEnd & 0xC0) >> 6 << 5 |
 		      (VBlankEnd & 0x300) >> 8 << 3);
