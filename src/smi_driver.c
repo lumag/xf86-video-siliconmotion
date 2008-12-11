@@ -717,6 +717,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    xf86LoaderReqSymLists(vbeSymbols, NULL);
 	    pSmi->pVbe = VBEInit(pSmi->pInt10, pEnt->index);
 	}
+
+	if(!pSmi->pVbe){
+	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING, "VBE initialization failed: falling back to UseBIOS disabled.\n");
+	    pSmi->useBIOS = FALSE;
+	}
     }
 
     xf86RegisterResources(pEnt->index, NULL, ResExclusive);
@@ -934,9 +939,11 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     SMI_EnableVideo(pScrn);
     SMI_UnmapMem(pScrn);
 
-    if(pSmi->useBIOS){
+    if(pSmi->pVbe){
        vbeFree(pSmi->pVbe);
        pSmi->pVbe = NULL;
+    }
+    if(pSmi->pInt10){
        xf86FreeInt10(pSmi->pInt10);
        pSmi->pInt10 = NULL;
     }
@@ -1827,13 +1834,13 @@ SMI_CloseScreen(int scrnIndex, ScreenPtr pScreen)
 	exaDriverFini(pScreen);
 	pSmi->EXADriverPtr = NULL;
     }
-    if (pSmi->pInt10 != NULL) {
-	xf86FreeInt10(pSmi->pInt10);
-	pSmi->pInt10 = NULL;
-    }
     if (pSmi->pVbe != NULL) {
 	vbeFree(pSmi->pVbe);
 	pSmi->pVbe = NULL;
+    }
+    if (pSmi->pInt10 != NULL) {
+	xf86FreeInt10(pSmi->pInt10);
+	pSmi->pInt10 = NULL;
     }
     if (pSmi->ptrAdaptor != NULL) {
 	xfree(pSmi->ptrAdaptor);
