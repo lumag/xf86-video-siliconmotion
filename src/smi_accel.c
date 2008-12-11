@@ -103,6 +103,7 @@ SMI_EngineReset(ScrnInfoPtr pScrn)
 	    break;
 	}
     }
+    DEDataFormat |= 0x40000000; /* Force pattern origin coordinates to (0,0) */
 
     WaitIdle();
     stride = pScrn->displayWidth;
