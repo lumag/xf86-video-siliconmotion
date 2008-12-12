@@ -168,6 +168,7 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
     MSOCRegPtr	save;
     MSOCRegPtr	mode;
     SMIPtr	pSmi = SMIPTR(pScrn);
+    int32_t	x_select, x_divider, x_shift;
 
     save = pSmi->save;
     mode = pSmi->mode;
@@ -194,38 +195,25 @@ SMI501_HWInit(ScrnInfoPtr pScrn)
     mode->power_ctl.f.status = 0;
     mode->power_ctl.f.mode = 0;
 
-    /* FIXME fixed at 336/3/0 as in the smi sources */
-    mode->clock.f.m_select = 1;
-    mode->clock.f.m_divider = 1;
-    mode->clock.f.m_shift = 0;
-
-    switch (pSmi->MCLK) {
-	case 168000:	    /* 336/1/1 */
-	    mode->clock.f.m1_select = 1;
-	    mode->clock.f.m1_divider = 0;
-	    mode->clock.f.m1_shift = 1;
-	    break;
-	case 96000:	    /* 288/3/0 */
-	    mode->clock.f.m1_select = 0;
-	    mode->clock.f.m1_divider = 1;
-	    mode->clock.f.m1_shift = 0;
-	    break;
-	case 144000:	    /* 288/1/1 */
-	    mode->clock.f.m1_select = 0;
-	    mode->clock.f.m1_divider = 0;
-	    mode->clock.f.m1_shift = 1;
-	    break;
-	case 112000:	    /* 336/3/0 */
-	    mode->clock.f.m1_select = 1;
-	    mode->clock.f.m1_divider = 1;
-	    mode->clock.f.m1_shift = 0;
-	    break;
-	default:
-	    /* Do nothing. Use what was configured by the kernel.
-	     * Accordingly to SMI, this should be 144Mhz for 6ns sdram,
-	     * or 112Mhz for other types of sdram. */
-	    break;
+    if (pSmi->MCLK) {
+	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		       "MCLK request %d\n", pSmi->MCLK);
+	(void)SMI501_FindMemClock(pSmi->MCLK, &x_select, &x_divider, &x_shift);
+	mode->clock.f.m_select = x_select;
+	mode->clock.f.m_divider = x_divider;
+	mode->clock.f.m_shift = x_shift;
     }
+    /* Else use what was configured by the kernel. */
+
+    if (pSmi->MXCLK) {
+	xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		       "MXCLK request %d\n", pSmi->MXCLK);
+	(void)SMI501_FindMemClock(pSmi->MXCLK, &x_select, &x_divider, &x_shift);
+	mode->clock.f.m1_select = x_select;
+	mode->clock.f.m1_divider = x_divider;
+	mode->clock.f.m1_shift = x_shift;
+    }
+    /* Else use what was configured by the kernel. */
 
     if (!pSmi->Dualhead) {
 	/* crt clones panel */
@@ -253,17 +241,21 @@ SMI501_WriteMode_common(ScrnInfoPtr pScrn, MSOCRegPtr mode)
 
 	clock.value = READ_SCR(pSmi, mode->current_clock);
 
-	clock.f.m_select = mode->clock.f.m_select;
-	pll = clock.value;
-	clock.f.m_divider = mode->clock.f.m_divider;
-	clock.f.m_shift = mode->clock.f.m_shift;
-	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	if (pSmi->MCLK) {
+	    clock.f.m_select = mode->clock.f.m_select;
+	    pll = clock.value;
+	    clock.f.m_divider = mode->clock.f.m_divider;
+	    clock.f.m_shift = mode->clock.f.m_shift;
+	    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	}
 
-	clock.f.m1_select = mode->clock.f.m1_select;
-	pll = clock.value;
-	clock.f.m1_divider = mode->clock.f.m1_divider;
-	clock.f.m1_shift = mode->clock.f.m1_shift;
-	SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	if (pSmi->MXCLK) {
+	    clock.f.m1_select = mode->clock.f.m1_select;
+	    pll = clock.value;
+	    clock.f.m1_divider = mode->clock.f.m1_divider;
+	    clock.f.m1_shift = mode->clock.f.m1_shift;
+	    SMI501_SetClock(pSmi, mode->current_clock, pll, clock.value);
+	}
 
 	WRITE_SCR(pSmi, MISC_CTL, mode->misc_ctl.value);
 
@@ -469,7 +461,7 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
 	 multiplier += 2, mclk  = multiplier * 24 * 1000.0) {
 	for (divider = 1; divider <= max_divider; divider += 2) {
 	    for (shift = 0; shift < 8; shift++) {
-		/* Divider 1 not in specs form cards older then 502 */
+		/* Divider 1 not in specs for cards older then 502 */
 		for (xclck = 1; xclck >= !has1xclck; xclck--) {
 		    diff = (mclk / (divider << shift << xclck)) - clock;
 		    if (fabs(diff) < best) {
@@ -495,6 +487,42 @@ SMI501_FindClock(double clock, int32_t max_divider, Bool has1xclck,
 
     return (best);
 }
+
+double
+SMI501_FindMemClock(double clock, int32_t *x1_select,
+		    int32_t *x1_divider, int32_t *x1_shift)
+{
+    double	diff, best, mclk;
+    int32_t	multiplier, divider, shift;
+
+    best = 0x7fffffff;
+    for (multiplier = 12, mclk  = multiplier * 24 * 1000.0;
+	 mclk <= 14 * 24 * 1000.0;
+	 multiplier += 2, mclk = multiplier * 24 * 1000.0) {
+	for (divider = 1; divider <= 3; divider += 2) {
+	    for (shift = 0; shift < 8; shift++) {
+		diff = (mclk / (divider << shift)) - clock;
+		if (fabs(diff) < best) {
+		    *x1_shift = shift;
+		    *x1_divider = divider == 1 ? 0 : 1;
+		    *x1_select = mclk == 12 * 24 * 1000.0 ? 0 : 1;
+
+		    /* Remember best diff */
+		    best = fabs(diff);
+		}
+	    }
+	}
+    }
+
+    xf86ErrorFVerb(VERBLEV,
+		   "\tMatching clock %5.2f, diff %5.2f (%d/%d/%d)\n",
+		   ((*x1_select ? 14 : 12) * 24 * 1000.0) /
+		   ((*x1_divider == 0 ? 1 : 3) << *x1_shift),
+		    best, *x1_shift, *x1_divider, *x1_select);
+
+    return (best);
+}
+
 
 double
 SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n, int32_t *xclck)

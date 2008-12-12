@@ -1011,6 +1011,8 @@ void SMI501_PrintRegs(ScrnInfoPtr pScrn);
 double SMI501_FindClock(double clock, int max_divider, Bool has1xclck,
 			       int32_t *x2_1xclck, int32_t *x2_select,
 			       int32_t *x2_divider, int32_t *x2_shift);
+double SMI501_FindMemClock(double clock, int32_t *x1_select,
+			   int32_t *x1_divider, int32_t *x1_shift);
 double SMI501_FindPLLClock(double clock, int32_t *m, int32_t *n,
 				  int32_t *xclck);
 void SMI501_WaitVSync(SMIPtr pSmi, int vsync_count);

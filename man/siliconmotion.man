@@ -131,16 +131,22 @@ The following video memory
 .B Options
 are supported:
 .TP
-.BI "Option \*qset_mclk\*q \*q" integer \*q
-sets the memory clock, where
-.I integer
-is in kHz, and
-.I integer
-<= 100000.  Default: probe the memory clock value,
-and use it at server start.
-
-
+.BI "Option \*qmclk\*q \*q" integer \*q
+Sets the memory clock. You must specify the units.  For example \fI50Mhz\fP
+is the same as \fI50000Khz\fP or \fI50000000Hz\fP.
+On MSOC chips this is the main clock source for all functional blocks, such
+as the 2D engine, GPIO, Video Engine, and DMA Engine. This option is only
+used for debugging purposes on MSOC chips.
+Default: probe the memory clock value, and use it at server start.
+.TP
+.BI "Option \*qmxclk\*q \*q" integer \*q
+Sets the memory clock. You must specify the units.  For example \fI50Mhz\fP
+is the same as \fI50000Khz\fP or \fI50000000Hz\fP.
+Clock source for the local SDRAM controller. This option is only available
+on MSOC chips and used only for debugging purposes.
+Default: probe the memory clock value, and use it at server start.
 .PP
+
 The following acceleration and graphics engine
 .B Options
 are supported:

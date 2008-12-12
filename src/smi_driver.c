@@ -150,6 +150,7 @@ typedef enum
     OPTION_PCI_RETRY,
     OPTION_NOACCEL,
     OPTION_MCLK,
+    OPTION_MXCLK,
     OPTION_SWCURSOR,
     OPTION_HWCURSOR,
     OPTION_VIDEOKEY,
@@ -171,7 +172,8 @@ static const OptionInfoRec SMIOptions[] =
     { OPTION_PCI_BURST,	     "pci_burst",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_PCI_RETRY,	     "pci_retry",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_NOACCEL,	     "NoAccel",		  OPTV_BOOLEAN, {0}, FALSE },
-    { OPTION_MCLK,	     "set_mclk",	  OPTV_FREQ,	{0}, FALSE },
+    { OPTION_MCLK,	     "MCLK",		  OPTV_FREQ,	{0}, FALSE },
+    { OPTION_MXCLK,	     "MXCLK",		  OPTV_FREQ,	{0}, FALSE },
     { OPTION_HWCURSOR,	     "HWCursor",	  OPTV_BOOLEAN, {0}, TRUE },
     { OPTION_SWCURSOR,	     "SWCursor",	  OPTV_BOOLEAN, {0}, FALSE },
     { OPTION_VIDEOKEY,	     "VideoKey",	  OPTV_INTEGER, {0}, FALSE },
@@ -1194,12 +1196,12 @@ SMI_DetectPanelSize(ScrnInfoPtr pScrn)
 static void
 SMI_DetectMCLK(ScrnInfoPtr pScrn)
 {
-    double	real;
-    int		mclk;
-    SMIPtr	pSmi = SMIPTR(pScrn);
+    double		real;
+    MSOCClockRec	clock;
+    int			mclk, mxclk;
+    SMIPtr		pSmi = SMIPTR(pScrn);
 
-    pSmi->MCLK = 0;
-
+    pSmi->MCLK = pSmi->MXCLK = 0;
     if (xf86GetOptValFreq(pSmi->Options, OPTION_MCLK, OPTUNITS_MHZ, &real)) {
 	pSmi->MCLK = (int)(real * 1000.0);
 	if (!IS_MSOC(pSmi) && pSmi->MCLK > 120000) {
@@ -1211,17 +1213,17 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
     }
     mclk = pSmi->MCLK;
 
-    if (pSmi->MCLK == 0) {
-	if (IS_MSOC(pSmi)) {
-	    int			clock, shift, divider;
+    if (IS_MSOC(pSmi)) {
+	clock.value = READ_SCR(pSmi, CURRENT_CLOCK);
+	if (xf86GetOptValFreq(pSmi->Options, OPTION_MXCLK, OPTUNITS_MHZ, &real))
+	    pSmi->MXCLK = (int)(real * 1000.0);
+	mxclk = pSmi->MXCLK;
+    }
 
-	    /* FIXME this should just read smi_501.h's bitfields... */
-	    clock = READ_SCR(pSmi, CURRENT_CLOCK);
-	    shift = clock & ((1 << 3) - 1);
-	    divider = (clock >> 3) & 1 ? 3 : 1;
-	    clock = clock & (1 << 4) ? 336 : 288;
-	    mclk = (clock / (divider << shift)) * 1000;
-	}
+    if (pSmi->MCLK == 0) {
+	if (IS_MSOC(pSmi))
+	    mclk = (clock.f.m_select ? 336 : 288) /
+		((clock.f.m_divider ? 3 : 1) << (unsigned)clock.f.m_shift);
 	else {
 	    unsigned char	shift, m, n;
 
@@ -1243,8 +1245,14 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
 	}
     }
 
-    /* FIXME Don't actually set pSmi->MCLK */
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MCLK = %1.3f\n", mclk / 1000.0);
+    if (IS_MSOC(pSmi)) {
+	if (pSmi->MXCLK == 0)
+	    mxclk = (clock.f.m1_select ? 336 : 288) /
+		((clock.f.m1_divider ? 3 : 1) << (unsigned)clock.f.m1_shift);
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MXCLK = %1.3f\n",
+		   mxclk / 1000.0);
+    }
 }
 
 static Bool
