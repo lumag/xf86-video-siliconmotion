@@ -485,7 +485,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     SMIPtr pSmi;
     MessageType from;
     vgaHWPtr hwp;
-    int vgaCRIndex, vgaIOBase;
 	
     ENTER();
 
@@ -545,6 +544,13 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	 */
 	if (!vgaHWGetHWRec(pScrn))
 	    LEAVE(FALSE);
+
+	hwp = VGAHWPTR(pScrn);
+	pSmi->PIOBase = hwp->PIOOffset;
+
+	xf86ErrorFVerb(VERBLEV, "\tSMI_PreInit vgaCRIndex=%x, vgaIOBase=%x, "
+		       "MMIOBase=%p\n", hwp->IOBase + VGA_CRTC_INDEX_OFFSET,
+		       hwp->IOBase, hwp->MMIOBase);
     }
 
     /*
@@ -702,6 +708,10 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "Option: UseBIOS %s.\n",
 		   pSmi->useBIOS ? "enabled" : "disabled");
     }
+    else if(pSmi->Chipset == SMI_LYNX3DM){
+	/* Default to UseBIOS disabled. */
+	pSmi->useBIOS = FALSE;
+    }
     else {
 	/* Default to UseBIOS enabled. */
 	pSmi->useBIOS = TRUE;
@@ -823,14 +833,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		LEAVE(FALSE);
 	    }
 	}
-
-	hwp = VGAHWPTR(pScrn);
-	vgaIOBase  = hwp->IOBase;
-	vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
-	pSmi->PIOBase = hwp->PIOOffset;
-
-	xf86ErrorFVerb(VERBLEV, "\tSMI_PreInit vgaCRIndex=%x, vgaIOBase=%x, "
-		       "MMIOBase=%p\n", vgaCRIndex, vgaIOBase, hwp->MMIOBase);
     }
     xf86DrvMsg(pScrn->scrnIndex, from, "Dual head %sabled\n",
 	       pSmi->Dualhead ? "en" : "dis");
@@ -1025,6 +1027,10 @@ SMI_EnterVT(int scrnIndex, int flags)
     /* Initialize the chosen modes */
     if (!xf86SetDesiredModes(pScrn))
 	LEAVE(FALSE);
+
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Done writing mode.  Register dump:\n");
+    SMI_PrintRegs(pScrn);
 
     /* Reset the grapics engine */
     if (!pSmi->NoAccel)
@@ -1271,6 +1277,8 @@ SMI_MapMmio(ScrnInfoPtr pScrn)
     SMIPtr	pSmi = SMIPTR(pScrn);
     CARD32	memBase;
 
+    SMI_EnableMmio(pScrn);
+
     switch (pSmi->Chipset) {
 	case SMI_COUGAR3DR:
 	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
@@ -1396,9 +1404,12 @@ static Bool
 SMI_DetectMem(ScrnInfoPtr pScrn)
 {
     SMIPtr	pSmi = SMIPTR(pScrn);
+    MessageType from;
 
-    if ((pScrn->videoRam = pScrn->confScreen->device->videoRam))
+    if ((pScrn->videoRam = pScrn->confScreen->device->videoRam)){
 	pSmi->videoRAMKBytes = pScrn->videoRam;
+	from = X_CONFIG;
+    }
     else {
 	unsigned char	 config;
 	static int	 lynx3d_table[4]  = {  0, 2, 4, 6 };
@@ -1430,11 +1441,12 @@ SMI_DetectMem(ScrnInfoPtr pScrn)
 		    break;
 	    }
 	}
+	from = X_PROBED;
     }
 
     pSmi->videoRAMBytes = pSmi->videoRAMKBytes * 1024;
     pScrn->videoRam     = pSmi->videoRAMKBytes;
-    xf86DrvMsg(pScrn->scrnIndex, X_PROBED,
+    xf86DrvMsg(pScrn->scrnIndex, from,
 	       "videoram: %dkB\n", pSmi->videoRAMKBytes);
 
     return (TRUE);
@@ -1453,18 +1465,10 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 
     pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
 
-    if (IS_MSOC(pSmi)) {
-	pSmi->fbMapOffset = 0;
-    }
-    else {
-	SMI_EnableMmio(pScrn);
-
-	if (pSmi->Chipset == SMI_LYNX3DM) 
-	    pSmi->fbMapOffset = 0x200000;
-	else
-	    pSmi->fbMapOffset = 0x0;
-
-    }
+    if (pSmi->Chipset == SMI_LYNX3DM)
+	pSmi->fbMapOffset = 0x200000;
+    else
+	pSmi->fbMapOffset = 0x0;
 
 #ifndef XSERVER_LIBPCIACCESS
     pSmi->FBBase = xf86MapPciMem(pScrn->scrnIndex,
@@ -1729,6 +1733,8 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     if (!xf86SetDesiredModes(pScrn))
 	    LEAVE(FALSE);
 
+    xf86DrvMsgVerb(pScrn->scrnIndex, X_INFO, VERBLEV,
+		   "Done writing mode.  Register dump:\n");
     SMI_PrintRegs(pScrn);
 
     miInitializeBackingStore(pScreen);
