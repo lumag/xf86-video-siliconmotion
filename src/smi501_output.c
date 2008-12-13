@@ -61,7 +61,7 @@ SMI501_OutputDPMS_lcd(xf86OutputPtr output, int dpms)
     LEAVE();
 }
 
-void
+static void
 SMI501_OutputDPMS_crt(xf86OutputPtr output, int dpms)
 {
     ScrnInfoPtr pScrn = output->scrn;

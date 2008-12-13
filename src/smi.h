@@ -275,7 +275,7 @@ extern int smi_indent;
 # define VERBLEV	1
 # define ENTER()	xf86ErrorFVerb(VERBLEV, "%*c %s\n",\
 				       smi_indent++, '>', __FUNCTION__)
-# define LEAVE(value)							\
+# define LEAVE(...)							\
     do {								\
 	xf86ErrorFVerb(VERBLEV, "%*c %s\n",				\
 		       --smi_indent, '<', __FUNCTION__);		\
@@ -372,11 +372,6 @@ void SMI_LoadPalette(ScrnInfoPtr pScrn, int numColors, int *indicies,
 		     LOCO *colors, VisualPtr pVisual);
 xf86MonPtr SMI_ddc1(ScrnInfoPtr pScrn);
 void SMI_PrintRegs(ScrnInfoPtr pScrn);
-
-#ifndef HAVE_XMODES
-/* smi_dga.c */
-Bool SMI_DGAInit(ScreenPtr pScrn);
-#endif
 
 /* smi_video.c */
 void SMI_InitVideo(ScreenPtr pScreen);

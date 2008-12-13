@@ -78,7 +78,7 @@ AM_CONDITIONAL(XSERVER_LIBPCIACCESS, test "x$XSERVER_LIBPCIACCESS" = xyes)
 AM_CONDITIONAL(XMODES, test "x$XMODES" = xyes)
 
 if test "x$XMODES" = xyes; then
-    XORG_CFLAGS="$XORG_CFLAGS -DHAVE_XMODES"
+    AC_DEFINE(HAVE_XMODES, 1, [X server has new mode code])
 fi
 
 AC_SUBST([XORG_CFLAGS])

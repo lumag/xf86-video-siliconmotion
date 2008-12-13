@@ -77,22 +77,14 @@ SMI_CrtcModeFixup(xf86CrtcPtr crtc,
 static void
 SMI_CrtcPrepare(xf86CrtcPtr crtc)
 {
-    ScrnInfoPtr pScrn = crtc->scrn;
-    SMIPtr pSmi = SMIPTR(pScrn);
-
     ENTER();
-
     LEAVE();
 }
 
 static void
 SMI_CrtcCommit(xf86CrtcPtr crtc)
 {
-    ScrnInfoPtr pScrn = crtc->scrn;
-    SMIPtr pSmi = SMIPTR(pScrn);
-
     ENTER();
-
     LEAVE();
 }
 
@@ -123,7 +115,7 @@ SMI_CrtcShadowAllocate (xf86CrtcPtr crtc, int width, int height)
     SMIPtr	 	 pSmi = SMIPTR(pScrn);
     SMICrtcPrivatePtr	 crtcPriv = SMICRTC(crtc);
     int			 offset, size;
-    char		*result = NULL;
+    unsigned char	*result = NULL;
 
     ENTER();
 
