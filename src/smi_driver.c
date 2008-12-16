@@ -1016,7 +1016,10 @@ SMI_EnterVT(int scrnIndex, int flags)
     pSmi->Save(pScrn);
 
     /* FBBase may have changed after remapping the memory */
+    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
+				       -1,-1,-1,-1,-1, pSmi->FBBase + pSmi->FBOffset);
     pScrn->pixmapPrivate.ptr=pSmi->FBBase + pSmi->FBOffset;
+
     if(pSmi->useEXA)
        pSmi->EXADriverPtr->memoryBase=pSmi->FBBase;
 
@@ -1059,6 +1062,11 @@ SMI_LeaveVT(int scrnIndex, int flags)
        pixmaps are deallocated, as the video memory is going to be
        unmapped.  */
     xf86RotateCloseScreen(pScrn->pScreen);
+
+    /* Pixmaps that by chance get allocated near the former aperture
+       address shouldn't be considered offscreen. */
+    if(pSmi->useEXA)
+       pSmi->EXADriverPtr->memoryBase=NULL;
 
     /* Clear frame buffer */
     memset(pSmi->FBBase, 0, pSmi->videoRAMBytes);

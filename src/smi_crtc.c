@@ -209,12 +209,13 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 	pSmi->FBOffset = fbArea->offset;
 	pScrn->fbOffset = pSmi->FBOffset + pSmi->fbMapOffset;
 
+	pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
+					   -1,-1,-1,-1,-1, pSmi->FBBase + pSmi->FBOffset);
+
 	if(pScrn->pixmapPrivate.ptr)
-	    /* Framebuffer access is disabled */
+	    /* The pixmap devPrivate just set may be overwritten by
+	       xf86EnableDisableFBAccess */
 	    pScrn->pixmapPrivate.ptr = pSmi->FBBase + pSmi->FBOffset;
-	else
-	    pScrn->pScreen->ModifyPixmapHeader(pScrn->pScreen->GetScreenPixmap(pScrn->pScreen),
-					       -1,-1,-1,-1,-1, pSmi->FBBase + pSmi->FBOffset);
 
 	/* Modify the screen pitch */
 	pScrn->displayWidth = aligned_pitch / pSmi->Bpp;
