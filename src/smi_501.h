@@ -42,7 +42,108 @@ authorization from the XFree86 Project and Silicon Motion.
 
 
 #define DRAM_CTL			0x000010
+
+#define CMD_ADDR			0x000018
+/*	COMMAND LIST ADDRESS
+ *	Read/Write MMIO_base + 0x000018
+ *	Power-on Default N/A
+ *
+ *	0:27	The current address of the Command List. The Command List
+ *		updates this address continuously. Bits [2:0] are hardwired
+ *		to "0" since every command must be aligned on a 64-bit
+ *		boundary. It always points to the instruction being executed.
+ *	28:29	Reserved
+ *	30:30	Idle status.
+ *		0: busy.
+ *		1: idle (default).
+ *	31:31	When this bit is programmed to "1" the Command List will
+ *		fetch the first instruction from the Command List specified
+ *		by the Command List Address field. It will remain "1" as long
+ *		as the Command List is executing code in the Command List.
+ *		As soon as you program this bit to "0", the Command List will
+ *		stop executing. Programming it back to "1" will continue the
+ *		Command List at the address it has left off.
+ */
+typedef union _MSOCCmdAddrRec {
+    struct {
+	int32_t		address		: bits( 0, 27);
+	int32_t		u0		: bits(28, 29);
+	int32_t		idle		: bits(30, 30);
+	int32_t		start		: bits(31, 31);
+    } f;
+    int32_t		value;
+} MSOCCmdAddrRec, *MSOCCmdAddrPtr;
+
+#define CMD_COND			0x00001c
+#define CMD_RETADDR			0x000020
+
 #define CMD_STATUS			0x000024
+/*	COMMAND LIST STATUS
+ *	Read/Write MMIO_base + 0x000024
+ *	Power-on Default 0b0000.0000.000X.XXXX.XXXX.X000.0000.0XXX
+ *
+ *	0:0	2D Engine Status.
+ *		0: Idle.
+ *		1: Busy.
+ *	1:1	2D Command FIFO Status.
+ *		0: Not empty.
+ *		1: Empty.
+ *	2:2	2D Setup Engine Status.
+ *		0: Idle.
+ *		1: Busy.
+ *	3:10	Reserved
+ *	11:11	Panel Vertical Sync Status.
+ *		0: Not active.
+ *		1: Active.
+ *	12:12	CRT Vertical Sync Status.
+ *		0: Not active.
+ *		1: Active.
+ *	13:13	Panel Graphics Layer Status.
+ *		0: No flip pending.
+ *		1: Flip in progress.
+ *	14:14	Video Layer Status.
+ *		0: No flip pending.
+ *		1: Flip in progress.
+ *	15:15	Current Video Field.
+ *		0: Odd.
+ *		1: Even.
+ *	16:16	CRT Graphics Layer Status.
+ *		0: No flip pending.
+ *		1: Flip in progress.
+ *	17:17	Memory DMA Status.
+ *		0: Idle.
+ *		1: Busy.
+ *	18:18	2D Color Space Conversion Status.
+ *		0: Idle.
+ *		1: Busy.
+ *	19:19	Command FIFO on HIF bus.
+ *		0: Not empty.
+ *		1: Empty.
+ *	20:20	2D Memory FIFO Status.
+ *		0: Not empty.
+ *		1: Empty.
+ *	21:31	Reserved
+ */
+typedef union _MSOCCmdStatusRec {
+    struct {
+	int32_t		engine		: bits( 0,  0);
+	int32_t		cmdfifo		: bits( 1,  1);
+	int32_t		setup		: bits( 2,  2);
+	int32_t		u0		: bits( 3, 10);
+	int32_t		pvsync		: bits(11, 11);
+	int32_t		cvsync		: bits(12, 12);
+	int32_t		player		: bits(13, 13);
+	int32_t		vlayer		: bits(14, 14);
+	int32_t		vfield		: bits(15, 15);
+	int32_t		clayer		: bits(16, 16);
+	int32_t		dma		: bits(17, 17);
+	int32_t		csc		: bits(18, 18);
+	int32_t		cmdhif		: bits(19, 19);
+	int32_t		memfifo		: bits(20, 20);
+	int32_t		u1		: bits(21, 31);
+    } f;
+    int32_t		value;
+} MSOCCmdStatusRec, *MSOCCmdStatusPtr;
 
 /* contents of either power0_clock or power1_clock */
 #define CURRENT_CLOCK			0x00003c
@@ -999,10 +1100,249 @@ typedef struct _MSOCRegRec {
 
 } MSOCRegRec, *MSOCRegPtr;
 
+typedef enum smi_cli_cmd_code {
+    /*	Load Memory 0000b
+     *
+     *	0:0	When this bit is programmed to "0", the 32-bit DWord
+     *		data (bits [63:32]) is written to the Memory Address.
+     *		When this bit is programmed to "1", the 16-bit Word
+     *		data (bits [47:32]) is written to the Memory Address.
+     *	1:27	The Memory Address to write data to. Bits [3:0] are
+     *		hardwired to "0" since all Memory Addresses should be
+     *		128-bit aligned.
+     *	28:31	0000b
+     *	32:61	The data to be loaded in the memory address specified
+     *		by Memory Address. The data format is either 32-bit
+     *		DWords or 16-bit Words.
+     *	62:63	Bits [63:62] are the byte-enable signals for the Word
+     *		data. They are active high.
+     */
+    smi_cli_load_mem,
 
-/* In Kb - documentation says it is 64Kb... */
-#define FB_RESERVE4USB			512
+    /*	Load Register 0001b
+     *
+     *	0:27	The register address (in the space 0x00000000 -
+     *		0x001FFFFF) to write data to. Bits [0:1] are
+     *		hardwired to "0"since all register addresses should
+     *		be 32-bit aligned.
+     *	28:31	001b
+     *	32:63	The data to be loaded in the register specified by
+     *		Register Address.
+     */
+    smi_cli_load_reg,
 
+    /*	Load Memory Immediate 0010b
+     *
+     *	0:27	The starting memory address to write data to.
+     *		Bits [1:0] are hardwired to "0".
+     *	28:31	0010b
+     *	32:63	The number of DWORDs to load into the memory.
+     *
+     *	 The data that must be loaded into the memory directly follows
+     * this command. Make sure the correct number of DWORDs (DWORD Count)
+     * is provided, otherwise unpredicted results will happen. Also, if
+     * an odd number of DWORDs is specified, the last DWORD should be
+     * padded with a dummy DWORD to align the next command to 64-bit again.
+     */
+    smi_cli_load_mem_imm,
+
+    /*	Load Register Immediate 0011b
+     *
+     *	0:27	The register address (in the space 0x00000000 -
+     *		0x001FFFFF) to write data to. Bits [0:1] are
+     *		hardwired to "0"since all register addresses should
+     *		be 32-bit aligned.
+     *	28:31	0011b
+     *	32:63	The number of DWORDs to load into the registers.
+     *
+     *	 The data that must be loaded into the registers directly follows
+     * this command. Make sure the correct number of DWORDs (DWORD Count)
+     * is provided, otherwise unpredicted results will happen. Also, if
+     * an odd number of DWORDs is specified, the last DWORD should be
+     * padded with a dummy DWORD to align the next command to 64-bit again.
+     */
+    smi_cli_load_reg_imm,
+
+    /*	Load Memory Indirect 0100b
+     *
+     *	0:27	The starting memory address to write data to.
+     *		Bits [1:0] are hardwired to "0".
+     *	28:31	0100b
+     *	32:63	The number of DWORDs to copy into the memory.
+     *	64:91	The starting memory address to read data from.
+     *		Bits [65:64] are hardwired to "0".
+     *	92:127	Unused.
+     *
+     *	 This command copies data from the memory location specified
+     * by Source Memory Address into the memory location specified by
+     * Memory Address. The DWORD Count specifies the number of DWORDs
+     * to copy. This command is most useful to copy texture, bitmap,
+     * or vertex data to off-screen memory for caching purposes.
+     */
+    smi_cli_load_mem_ind,
+
+    /*	Load Register Indirect 0101b
+     *
+     *	0:27	The register address (in the space 0x00000000 -
+     *		0x001FFFFF) to write data to. Bits [0:1] are
+     *		hardwired to "0"since all register addresses should
+     *		be 32-bit aligned.
+     *	28:31	0101b
+     *	32:63	The number of DWORDs to copy into the memory.
+     *	64:91	The starting memory address to read data from.
+     *		Bits [65:64] are hardwired to "0".
+     *	92:127  Unused.
+     *
+     *	 This command copies data from the memory location specified
+     * by Source Memory Address into the register bank location specified
+     * by Register Address. The DWORD Count specifies the number of DWORDs
+     * to copy. This command is most useful to copy texture, bitmap,
+     * or vertex data to the engine FIFOs for processing.
+     */
+    smi_cli_load_reg_ind,
+
+    /*	Status Test 0110b
+     *
+     *	0:0	2D Drawing Engine
+     *		(0 = idle, 1 = busy).
+     *	1:1	2D and Color Space Conversion command FIFO
+     *		(0 = not empty, 1 = empty).
+     *	2:2	2D Setup Engine (0 = idle, 1 = busy).
+     *	3:10	Unused.
+     *	11:11	Vertical Sync for Panel pipe
+     *		(0 = not active, 1 = active).
+     *	12:12	Vertical Sync for CRT pipe
+     *		(0 = not active, 1 = active).
+     *	13:13	Panel Graphics Layer status bit.
+     *	14:14	Video Layer status bit.
+     *	15:15	Current Video Layer field for BOB
+     *		(0 = odd, 1 = even).
+     *	16:16	CRT Graphics Layer status bit.
+     *	17:17	Memory DMA busy bit.
+     *	18:18	Color Space Conversion busy bit.
+     *	19:19	Command FIFO on HIF bus
+     *		(0 = not empty, 1 = empty).
+     *	20:20	2D and Color Space Conversion memory FIFO
+     *		(0 = not empty, 1 = empty).
+     *	21:27	Unused.
+     *	28:31	0110b
+     *	32:52	Bits Values
+     *	53:63	Unused
+     *
+     *	 The Status Test command will wait until the requested status
+     * is met. The value of the Status Test register is masked with the
+     * internal hardware state and compared to the state in the Bit Values.
+     * If the result does not equal the Bit Values, the command list
+     * interpreter will wait until the hardware status changes. The
+     * pseudo code looks like this:
+     *	    WHILE (Hardware State & Mask [20:0]
+     *		   != Bit Values [52:32] & Mask [20:0]) NOP;
+     */
+    smi_cli_status_test,
+
+    /*	Finish 1000b
+     *
+     *	0:0	If the Interrupt bit is set, the FINISH command
+     *		will generate an interrupt that can still be
+     *		masked by the Command List mask bit in the Interrupt
+     *		Mask register. When an interrupt is generated, the
+     *		Command List bit in Interrupt Status register will
+     *		be set to "1".
+     *	1:27	Unused
+     *	28:31	1000b
+     *	32:63	Unused
+     *
+     *	 The FINISH command stops executing commands in the Command List
+     * and clears the Start bit ([31]) of the Command List Address register.
+     */
+    smi_cli_finish = 8,
+
+    /*	Goto 1001b
+     *
+     *	0:27	The address of the new code to execute.
+     *		Bits [2:0] are hardwired to "0" since all addresses
+     *		need to be 64-bit aligned.
+     *	28:31	1001b
+     *	32:32	Relative bit. If set, the specified Address is relative
+     *		to the address of the current command (signed addition).
+     *	33:63	Unused.
+     *
+     *	 The GOTO command will jump to the Command List code located at
+     * the specified Address.
+     */
+    smi_cli_goto,
+
+    /*	Gosub 1011b
+     *
+     *	0:27	The address of the new code to execute.
+     *		Bits [2:0] are hardwired to "0" since all addresses
+     *		need to be 64-bit aligned.
+     *	28:31	1011b
+     *	32:32	If the Relative bit is set, the specified Address
+     *		is relative to the address of the current command
+     *		(signed addition).
+     *	33:63	Unused.
+     *
+     *	 The GOSUB command will store the address of the next instruction
+     * it would execute in the Command List Return Address register and
+     * starts executing the Command List code located at the specified
+     * Address.
+     */
+    smi_cli_gosub,
+
+    /*	Return 1010b
+     *
+     *	0:27	Unused
+     *	28:31	1011b
+     *	32:63	Unused.
+     *
+     *	 The RETURN command will jump to the address specified in the
+     * Command List Return Address register. The RETURN command should
+     * terminate a subroutine that is being called by GOSUB.
+     */
+    smi_cli_return,
+
+    /*	Conditional Jump 1100b
+     *
+     *	0:27	A signed relative value that will be added to the
+     *		address of the next command in the Command List if
+     *		the result of the condition is TRUE. Bits [2:0] are
+     *		hardwired to "0" since all addresses need to be 64-bit
+     *		aligned.
+     *	28:31	1100b
+     *	32:63	The Condition field consists of a 32-bit mask that
+     *		will be applied to the Command List Condition Register.
+     *		If the result of this mask is TRUE (any bit set), the
+     *		condition shall return TRUE and the jump is taken by
+     *		adding the signed value of Address to the address of
+     *		the next command in the Command List.
+     *		The formula of the condition is:
+     *		    RESULT = Condition * Command List Condition register
+     */
+    smi_cli_cond_jump
+} smi_cli_cmd_code_t;
+
+/* Generic command list entry that matches most commands patterns */
+typedef union smi_cli_entry {
+    struct {
+	int64_t	base	: bits( 0, 27);
+	int64_t	cmd	: bits(28, 31);
+	int64_t	data	: bits(32, 63);
+    } f;
+    int64_t		value;
+} smi_cli_entry_t;
+
+/*
+ *  512 kb reserved for usb buffers
+ *
+ * In linux kernel source tree:
+ * % grep USB_DMA_BUFFER_SIZE `find . -name sm5\*`
+ * ./drivers/mfd/sm501.c:  sm501_create_mem(sm, &pdev->resource[1], sm50x_mem_size-USB_DMA_BUFFER_SIZE, USB_DMA_BUFFER_SIZE);
+ * ./drivers/mfd/sm501.c:  sm501_create_mem(sm, &pdev->resource[2], 0, sm50x_mem_size-USB_DMA_BUFFER_SIZE);
+ * ./include/linux/sm501.h:#define USB_DMA_BUFFER_SIZE 0x80000
+ *
+ */
+#define SHARED_USB_DMA_BUFFER_SIZE	512
 
 void SMI501_Save(ScrnInfoPtr pScrn);
 void SMI501_DisplayPowerManagementSet(ScrnInfoPtr pScrn,

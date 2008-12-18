@@ -605,25 +605,26 @@ SMI501_PrintRegs(ScrnInfoPtr pScrn)
 void
 SMI501_WaitVSync(SMIPtr pSmi, int vsync_count)
 {
-    int32_t	status, timeout;
+    MSOCCmdStatusRec	status;
+    int32_t		timeout;
 
     while (vsync_count-- > 0) {
 	/* Wait for end of vsync */
 	timeout = 0;
 	do {
 	    /* bit 11: vsync active *if set* */
-	    status = READ_SCR(pSmi, CMD_STATUS);
+	    status.value = READ_SCR(pSmi, CMD_STATUS);
 	    if (++timeout == 10000)
 		break;
-	} while (status & (1 << 11));
+	} while (status.f.pvsync);
 
 	/* Wait for start of vsync */
 	timeout = 0;
 	do {
-	    status = READ_SCR(pSmi, CMD_STATUS);
+	    status.value = READ_SCR(pSmi, CMD_STATUS);
 	    if (++timeout == 10000)
 		break;
-	} while (!(status & (1 << 11)));
+	} while (!status.f.pvsync);
     }
 }
 

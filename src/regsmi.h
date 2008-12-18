@@ -213,11 +213,12 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 /* Wait until GP is idle */
 #define WaitIdle()							\
     do {								\
-	int	status;							\
 	int	loop = MAXLOOP;						\
 									\
 	mem_barrier();							\
 	if (IS_MSOC(pSmi)) {						\
+	    MSOCCmdStatusRec	status;					\
+									\
 	    /* bit 0:	2d engine idle if *not set*
 	     * bit 1:	2d fifo empty if *set*
 	     * bit 2:	2d setup idle if if *not set*
@@ -225,12 +226,19 @@ VGAOUT8(SMIPtr pSmi, int port, CARD8 data)
 	     * bit 19:  command fifo empty if *set*
 	     * bit 20:  2d memory fifo empty idle if *set*
 	     */								\
-	    for (status = READ_SCR(pSmi, 0x0024);			\
-		 loop && (status & 0x1C0007) != 0x180002;		\
-		 status = READ_SCR(pSmi, 0x0024), loop--)		\
+	    for (status.value = READ_SCR(pSmi, CMD_STATUS);		\
+		 loop && (status.f.engine	||			\
+			  !status.f.cmdfifo	||			\
+			  status.f.setup	||			\
+			  status.f.csc		||			\
+			  !status.f.cmdhif	||			\
+			  !status.f.memfifo);				\
+		 status.value = READ_SCR(pSmi, CMD_STATUS), loop--)	\
 		 ;							\
 	}								\
 	else {								\
+	    int	status;							\
+									\
 	    for (status = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,		\
 				       VGA_SEQ_DATA, 0x16);		\
 		 loop && (status & 0x18) != 0x10;			\

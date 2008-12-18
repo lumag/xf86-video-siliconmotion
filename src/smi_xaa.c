@@ -30,6 +30,7 @@ authorization from the XFree86 Project and silicon Motion.
 #endif
 
 #include "smi.h"
+#include "smi_501.h"
 
 #include "miline.h"
 #include "xaalocal.h"

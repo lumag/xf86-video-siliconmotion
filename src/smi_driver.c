@@ -1427,7 +1427,8 @@ SMI_DetectMem(ScrnInfoPtr pScrn)
 
 	if (IS_MSOC(pSmi)) {
 	    config = (READ_SCR(pSmi, DRAM_CTL) >> 13) & 7;
-	    pSmi->videoRAMKBytes = msoc_table[config] * 1024 - FB_RESERVE4USB;
+	    pSmi->videoRAMKBytes = msoc_table[config] * 1024 -
+		SHARED_USB_DMA_BUFFER_SIZE;
 	}
 	else {
 	    config = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x71);
