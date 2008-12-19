@@ -1522,6 +1522,21 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 #else
 	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
 	    (pSmi->Dualhead ? SMI501_CURSOR_SIZE << 1 : SMI501_CURSOR_SIZE);
+
+# ifdef SMI501_CLI_DEBUG
+	if (pSmi->useEXA) {
+	    pSmi->batch_active = FALSE;
+	    pSmi->batch_length = 4096;
+	    pSmi->FBReserved -= pSmi->batch_length << 3;
+	    pSmi->batch_offset = pSmi->FBReserved;
+	    pSmi->batch_handle = (int64_t *)(pSmi->FBBase + pSmi->batch_offset);
+	    pSmi->batch_finish = -1;
+	    pSmi->batch_index = 0;
+	    xf86DrvMsg(pScrn->scrnIndex, X_INFO,
+		       "Using command list interpreter debug code\n");
+	}
+# endif
+
 #endif
     }
     else {

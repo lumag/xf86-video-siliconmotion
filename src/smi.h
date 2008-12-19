@@ -71,6 +71,7 @@ authorization from the XFree86 Project and Silicon Motion.
 #define SMI_USE_IMAGE_WRITES	0
 #define SMI_USE_VIDEO		1
 #define SMI_USE_CAPTURE		1
+#define SMI501_CLI_DEBUG	0
 
 /*
  *   Leaving attempt implementation of an argb cursor using alpha plane
@@ -262,6 +263,15 @@ typedef struct
 					   structure */
     void (*BlockHandler)(int i, pointer blockData, pointer pTimeout,
 					 pointer pReadMask);
+#ifdef SMI501_CLI_DEBUG
+    /* SMI 501/502 Command List Interpreter */
+    Bool		 batch_active;
+    int64_t		*batch_handle;	/* Virtual address */
+    int			 batch_offset;	/* Physical smi 501 address */
+    int			 batch_length;	/* Length in 8 byte units */
+    int			 batch_finish;	/* Last finish command offset */
+    int			 batch_index;
+#endif
 } SMIRec, *SMIPtr;
 
 #define SMIPTR(p) ((SMIPtr)((p)->driverPrivate))

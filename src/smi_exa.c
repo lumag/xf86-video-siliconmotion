@@ -27,6 +27,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "smi.h"
 
+#if SMI501_CLI_DEBUG
+# include "smi_501.h"
+# undef WRITE_DPR
+# define WRITE_DPR(pSmi, dpr, data)					\
+    do {								\
+	if (pSmi->batch_active)						\
+	    BATCH_LOAD_REG((pSmi->DPRBase - pSmi->MapBase) +		\
+			   dpr, data);					\
+	else								\
+	    MMIO_OUT32(pSmi->DPRBase, dpr, data);			\
+	DEBUG("DPR%02X = %08X\n", dpr, data);				\
+    } while (0)
+#endif
 
 static void
 SMI_EXASync(ScreenPtr pScreen, int marker);
@@ -241,13 +254,16 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
 	pSmi->AccelCmd |= SMI_RIGHT_TO_LEFT;
     }
 
-    WaitQueue();
-
     if (pDstPixmap->drawable.bitsPerPixel == 24) {
 	src_pitch *= 3;
 	dst_pitch *= 3;
     }
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(7);
+#else
+    WaitQueue();
+#endif
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
     /* Destination and Source Row Pitch */
@@ -266,6 +282,9 @@ SMI_PrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap, int xdir, int ydir,
     WRITE_DPR(pSmi, 0x44, dst_offset);
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     LEAVE(TRUE);
 }
@@ -304,10 +323,17 @@ SMI_Copy(PixmapPtr pDstPixmap, int srcX, int srcY, int dstX,
 	}
     }
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(3);
+#else
     WaitQueue();
+#endif
     WRITE_DPR(pSmi, 0x00, (srcX  << 16) + (srcY & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (dstX  << 16) + (dstY & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (width << 16) + (height & 0xFFFF));
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     LEAVE();
 }
@@ -371,11 +397,15 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
 		   | SMI_BITBLT
 		   | SMI_QUICK_START;
 
-    WaitQueue();
-
     if (pPixmap->drawable.bitsPerPixel == 24) {
 	dst_pitch *= 3;
     }
+
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(10);
+#else
+    WaitQueue();
+#endif
 
     /* Destination Window Width */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (dst_pitch & 0xFFFF));
@@ -401,6 +431,9 @@ SMI_PrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg)
     WRITE_DPR(pSmi, 0x38, 0xFFFFFFFF);
 
     WRITE_DPR(pSmi, 0x0C, pSmi->AccelCmd);
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     LEAVE(TRUE);
 }
@@ -427,9 +460,16 @@ SMI_Solid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2)
 	}
     }
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(2);
+#else
     WaitQueue();
+#endif
     WRITE_DPR(pSmi, 0x04, (x1 << 16) | (y1 & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w  << 16) | (h  & 0xFFFF));
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     LEAVE();
 }
@@ -503,7 +543,11 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     /* set clipping */
     SMI_SetClippingRectangle(pScrn, x, y, x+w, y+h);
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(9);
+#else
     WaitQueue();
+#endif
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pixelpitch << 16) | (src_pixelpitch & 0xFFFF));
 
@@ -528,6 +572,9 @@ SMI_UploadToScreen(PixmapPtr pDst, int x, int y, int w, int h,
     WRITE_DPR(pSmi, 0x00, 0);
     WRITE_DPR(pSmi, 0x04, (x << 16) | (y & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (w << 16) | (h & 0xFFFF));
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     while (h--) {
 	memcpy(pSmi->DataPortBase, src, aligned_pitch);
@@ -585,7 +632,11 @@ SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, Pi
 
     ENTER();
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(7);
+#else
     WaitQueue();
+#endif
 
     /* Destination and Source Window Widths */
     WRITE_DPR(pSmi, 0x3C, (dst_pitch << 16) | (src_pitch & 0xFFFF));
@@ -610,6 +661,10 @@ SMI_PrepareComposite(int op, PicturePtr pSrcPicture, PicturePtr pMaskPicture, Pi
     else
         WRITE_DPR(pSmi, 0x0C, 0xCC /*GXCopy*/ | SMI_ROTATE_BLT |
 		    SMI_ROTATE_CCW | SMI_QUICK_START);
+
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     pSmi->renderTransform = pSrcPicture->transform;
 
@@ -640,11 +695,18 @@ SMI_Composite(PixmapPtr pDst, int srcX, int srcY, int maskX, int maskY,
     v.vector[2] = xFixed1;
     PictureTransformPoint(t, &v);
 
+#if SMI501_CLI_DEBUG
+    BATCH_BEGIN(3);
+#else
     WaitQueue();
+#endif
 
     WRITE_DPR(pSmi, 0x00, (xFixedToInt(v.vector[0]) << 16) + (xFixedToInt(v.vector[1]) & 0xFFFF));
     WRITE_DPR(pSmi, 0x04, (dstX << 16) + (dstY & 0xFFFF));
     WRITE_DPR(pSmi, 0x08, (height << 16) + (width & 0xFFFF));
+#if SMI501_CLI_DEBUG
+    BATCH_END();
+#endif
 
     LEAVE();
 }

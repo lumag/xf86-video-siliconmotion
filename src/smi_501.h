@@ -1332,6 +1332,109 @@ typedef union smi_cli_entry {
     int64_t		value;
 } smi_cli_entry_t;
 
+
+#ifdef SMI501_CLI_DEBUG
+
+/* ensure there are "count" command list "slots" 8 bytes wide free */
+#define BATCH_BEGIN(COUNT)						\
+    do {								\
+	if (IS_MSOC(pSmi)) {						\
+	    smi_cli_entry_t *entry;					\
+	    MSOCCmdAddrRec   address;					\
+									\
+	    pSmi->batch_active = TRUE;					\
+	    ErrorF("BATCH_BEGIN(%d)\n", COUNT); 			\
+	    /* One for finish */					\
+	    if (pSmi->batch_index + COUNT + 1 >= pSmi->batch_length) {	\
+		entry = (smi_cli_entry_t *)				\
+		    &pSmi->batch_handle[pSmi->batch_index];		\
+		entry->f.cmd = smi_cli_goto;				\
+		/* start of buffer */					\
+		entry->f.base = pSmi->batch_offset;			\
+		/* absolute jump */					\
+		entry->f.data = 0;					\
+		ErrorF("wrap: from %d\n", pSmi->batch_index);		\
+		address.value = READ_SCR(pSmi, CMD_ADDR);		\
+		pSmi->batch_index = 0;					\
+	    }								\
+	}								\
+    } while (0)
+
+/* load register */
+#define BATCH_LOAD_REG(PORT, VALUE)					\
+    do {								\
+	smi_cli_entry_t	*entry = (smi_cli_entry_t *)			\
+	    &pSmi->batch_handle[pSmi->batch_index++];			\
+									\
+	ErrorF("BATCH_LOAD_REG(%x, %x)\n", PORT, VALUE);		\
+	entry->f.cmd = smi_cli_load_reg;				\
+	entry->f.base = PORT;						\
+	entry->f.data = VALUE;						\
+    } while (0)
+
+/* Appending to the Command List
+ *
+ * The procedure for chaining command lists is:
+ * 1. Fill the command list buffer after the last FINISH command.
+ *    The software should always keep track of the address of the
+ *    last FINISH command.
+ * 2. Terminate the command list with a FINISH and remember the
+ *    address of this FINISH.
+ * 3. Stop the command list by programming "0" in bit 31 of the
+ *    Command List Address register.
+ * 4. Read and remember the current program counter.
+ * 5. Replace the previous FINISH command with a NOP command
+ *    (00000000C0000000).
+ * 6. Restart the command list by programming the saved program counter
+ *    and "1" in bit 31 of the Command List Address register.
+ */
+#define BATCH_END()							\
+    do {								\
+	if (pSmi->batch_active) {					\
+	    MSOCCmdAddrRec   address;					\
+	    smi_cli_entry_t *entry = (smi_cli_entry_t *)		\
+		&pSmi->batch_handle[pSmi->batch_index]; 		\
+									\
+	    ErrorF("BATCH_END()\n");					\
+	    pSmi->batch_active = FALSE;					\
+	    /* Add new finish command */				\
+	    entry->f.cmd = smi_cli_finish;				\
+	    /* Don't generate irq when processing the finish command */ \
+	    entry->f.base = 0;						\
+	    address.value = READ_SCR(pSmi, CMD_ADDR);			\
+	    ErrorF("<<address = %d, finish = %d, index = %d\n",		\
+		   (address.f.address - pSmi->batch_offset) >> 3,	\
+		   pSmi->batch_finish, pSmi->batch_index);		\
+	    address.f.start = 0;					\
+	    WRITE_SCR(pSmi, CMD_ADDR, address.value);			\
+	    WaitIdle();							\
+	    if (pSmi->batch_finish >= 0)				\
+		pSmi->batch_handle[pSmi->batch_finish] =		\
+		/* wait for idle engine */				\
+		/* just add a noop as there are 2 WaitIdle()'s */	\
+		    /*0x180002601e0007ll*/0x00000000c0000000ll/*0x60060005ll*/; 	\
+	    address.f.address = pSmi->batch_offset +			\
+		((pSmi->batch_finish + 1) << 3);			\
+	    /* New finish is current index */				\
+	    pSmi->batch_finish = pSmi->batch_index;			\
+	    /* Where to start adding new entries */			\
+	    ++pSmi->batch_index;					\
+	    /* Start executing list again */				\
+	    address.f.start = 1;					\
+	    WRITE_SCR(pSmi, CMD_ADDR, address.value);			\
+	    do {							\
+		address.value = READ_SCR(pSmi, CMD_ADDR);		\
+		ErrorF("loop: %x\n", address.value);			\
+	    } while (!address.f.idle);					\
+	    WaitIdle();							\
+	    ErrorF(">>address = %d, finish = %d, index = %d\n",		\
+		   (address.f.address - pSmi->batch_offset) >> 3,	\
+		   pSmi->batch_finish, pSmi->batch_index);		\
+	}								\
+    } while (0)
+
+#endif
+
 /*
  *  512 kb reserved for usb buffers
  *
