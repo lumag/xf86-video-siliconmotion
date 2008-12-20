@@ -92,9 +92,19 @@ SMILynx_CrtcVideoInit_lcd(xf86CrtcPtr crtc)
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x44, fifo_readoffset & 0x000000FF);
     /* FIFO2 Read Offset */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4B, fifo_readoffset & 0x000000FF);
-    /* FIFO1/2 Read Offset overflow */
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C, (((fifo_readoffset & 0x00000300) >> 8) << 2) |
-		  (((fifo_readoffset & 0x00000300) >> 8) << 6));
+
+    if(pSmi->Chipset == SMI_LYNX3DM){
+	/* FIFO1/2 Read Offset overflow */
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C, (((fifo_readoffset & 0x00000300) >> 8) << 2) |
+		      (((fifo_readoffset & 0x00000300) >> 8) << 6));
+    }else{
+	/* FIFO1 Read Offset overflow */
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45,
+		      (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x45) & 0x3F) |
+		      ((fifo_readoffset & 0x00000300) >> 8) << 6);
+	/* FIFO2 Read Offset overflow */
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C, ((fifo_readoffset & 0x00000300) >> 8) << 6);
+    }
 
     /* FIFO Write Offset */
     fifo_writeoffset = crtc->mode.HDisplay * pSmi->Bpp >> 3;
@@ -194,8 +204,14 @@ SMILynx_CrtcAdjustFrame(xf86CrtcPtr crtc, int x, int y)
 			  ((Base & 0x0000FF00) >> 8));
 
 	    /* FIFO1/2 read start address overflow */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45,
-			  ((Base & 0x000F0000) >> 16) | (((Base & 0x000F0000) >> 16) << 4));
+	    if(pSmi->Chipset == SMI_LYNX3DM)
+		VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45,
+			      ((Base & 0x000F0000) >> 16) | (((Base & 0x000F0000) >> 16) << 4));
+	    else
+		VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45,
+			      (VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45) & 0xC0) |
+			      ((Base & 0x00070000) >> 16) | (((Base & 0x00070000) >> 16) << 3));
+
 	}else{
 	    /* CRT or single head */
 	    WRITE_VPR(pSmi, 0x0C, Base);
@@ -280,12 +296,14 @@ SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
 	vganew->CRTC[22] = VBlankEnd & 0xFF;
 
 	/* Write the overflow from several VGA registers */
-	CR30 = (VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30) & 0x30) |
-	    (HTotal & 0x100) >> 8 << 6 |
-	    (VTotal & 0x400) >> 10 << 3 |
+	CR30 = (VTotal & 0x400) >> 10 << 3 |
 	    (VDisplay & 0x400) >> 10 << 2 |
 	    (VBlankStart & 0x400) >> 10 << 1 |
 	    (VSyncStart & 0x400) >> 10 << 0;
+
+	if(pSmi->Chipset == SMI_LYNX3DM)
+	    CR30 |= (HTotal & 0x100) >> 8 << 6;
+
 	CR33 = (HBlankEnd & 0xC0) >> 6 << 5 | (VBlankEnd & 0x300) >> 8 << 3;
     }
 
@@ -309,7 +327,7 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
     int vgaIOBase  = hwp->IOBase;
     int	vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
     int	vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
-    CARD8 SR6C, SR6D;
+    CARD8 SR6C, SR6D, CR30, CR33;
 
     ENTER();
 
@@ -392,18 +410,21 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
 		      (VBlankStart & 0x200) >> 9 << 5 );
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4C, HDisplay & 0xFF );
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x4D, VDisplay & 0xFF );
-	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30,
-		      (VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E) & 0x30) |
-		      (HTotal & 0x100) >> 8 << 6 |
-		      (VTotal & 0x400) >> 10 << 3 |
-		      (VDisplay & 0x400) >> 10 << 2 |
-		      (VBlankStart & 0x400) >> 10 << 1 |
-		      (VSyncStart & 0x400) >> 10 << 0);
-	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33,
-		      (HBlankEnd & 0xC0) >> 6 << 5 |
-		      (VBlankEnd & 0x300) >> 8 << 3);
+
+	CR30 = (VTotal & 0x400) >> 10 << 3 |
+	    (VDisplay & 0x400) >> 10 << 2 |
+	    (VBlankStart & 0x400) >> 10 << 1 |
+	    (VSyncStart & 0x400) >> 10 << 0;
+
+	if(pSmi->Chipset == SMI_LYNX3DM)
+	    CR30 |= (HTotal & 0x100) >> 8 << 6;
+
+	CR33 = (HBlankEnd & 0xC0) >> 6 << 5 | (VBlankEnd & 0x300) >> 8 << 3;
 
     }
+
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30, CR30);
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, CR33);
 
     LEAVE();
 }
@@ -429,15 +450,15 @@ SMILynx_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     /* Program the PLL */
 
     /* calculate vclk2 */
-    if (SMI_LYNX_SERIES(pSmi->Chipset)) {
+    if (pSmi->Chipset == SMI_LYNX3DM) {
         SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
-			1, 1, 63, 0, 3,
+			1, 1, 63, 0, 1,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
                         &SR6E, &SR6F);
     } else {
         SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
-			1, 1, 63, 0, 1,
+			1, 1, 63, 0, 0,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
                         &SR6E, &SR6F);
