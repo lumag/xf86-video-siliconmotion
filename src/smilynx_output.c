@@ -119,6 +119,36 @@ SMILynx_OutputDPMS_lcd(xf86OutputPtr output, int mode)
 
 }
 
+static void
+SMILynx_OutputDPMS_bios(xf86OutputPtr output, int mode)
+{
+    ScrnInfoPtr pScrn = output->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER();
+
+    pSmi->pInt10->ax = 0x4F10;
+    switch (mode) {
+    case DPMSModeOn:
+	pSmi->pInt10->bx = 0x0001;
+	break;
+    case DPMSModeStandby:
+	pSmi->pInt10->bx = 0x0101;
+	break;
+    case DPMSModeSuspend:
+	pSmi->pInt10->bx = 0x0201;
+	break;
+    case DPMSModeOff:
+	pSmi->pInt10->bx = 0x0401;
+	break;
+    }
+    pSmi->pInt10->cx = 0x0000;
+    pSmi->pInt10->num = 0x10;
+    xf86ExecX86int10(pSmi->pInt10);
+
+    LEAVE();
+}
+
 
 static DisplayModePtr
 SMILynx_OutputGetModes_crt(xf86OutputPtr output)
@@ -147,13 +177,6 @@ SMILynx_OutputGetModes_crt(xf86OutputPtr output)
 	    }
 	}
 
-	/* Try DDC1 */
-	pMon=SMILynx_ddc1(pScrn);
-	if(pMon){
-	    xf86OutputSetEDID(output,pMon);
-	    LEAVE(xf86OutputGetEDIDModes(output));
-	}
-
 	/* Try DDC2 */
 	if(pSmi->I2C){
 	    pMon=xf86OutputGetEDID(output,pSmi->I2C);
@@ -161,6 +184,13 @@ SMILynx_OutputGetModes_crt(xf86OutputPtr output)
 		xf86OutputSetEDID(output,pMon);
 		LEAVE(xf86OutputGetEDIDModes(output));
 	    }
+	}
+
+	/* Try DDC1 */
+	pMon=SMILynx_ddc1(pScrn);
+	if(pMon){
+	    xf86OutputSetEDID(output,pMon);
+	    LEAVE(xf86OutputGetEDIDModes(output));
 	}
     }
 
@@ -255,7 +285,12 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 	}else{
 	    /* CRTC0 is LCD */
 	    SMI_OutputFuncsInit_base(&outputFuncs);
-	    outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+
+	    if(pSmi->useBIOS)
+		outputFuncs->dpms = SMILynx_OutputDPMS_bios;
+	    else
+		outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+
 	    outputFuncs->get_modes = SMI_OutputGetModes_native;
 	    outputFuncs->detect = SMI_OutputDetect_lcd;
 

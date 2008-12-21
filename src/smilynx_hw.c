@@ -54,63 +54,6 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
 	mode->SR17 &= ~0x20;
     }
 
-    /* Disable DAC and LCD framebuffer r/w operation */
-    mode->SR21 |= 0xB0;
-
-    /* Power down mode is standby mode, VCLK and MCLK divided by 4 in standby mode */
-    mode->SR20  = (mode->SR20 & ~0xB0) | 0x10;
-
-    /* Set DPMS state to Off */
-    mode->SR22 |= 0x30;
-
-    /* VESA compliance power down mode */
-    mode->SR24 &= ~0x01;
-
-    if (pSmi->Chipset != SMI_COUGAR3DR) {
-	/* Select no displays */
-	mode->SR31 &= ~0x07;
-
-	/* Enable virtual refresh */
-	if(pSmi->Dualhead){
-	    mode->SR31 |= 0x80;
-	}else{
-	    mode->SR31 &= ~0x80;
-	}
-
-        /* Disable expansion */
-	mode->SR32 &= ~0x03;
-	/* Enable autocentering */
-	if (SMI_LYNXM_SERIES(pSmi->Chipset))
-	    mode->SR32 |= 0x04;
-	else
-	    mode->SR32 &= ~0x04;
-
-	if (pSmi->lcd == 2) /* Panel is DSTN */
-	    mode->SR21 = 0x00;
-
-	/* Enable HW LCD power sequencing */
-	mode->SR34 |= 0x80;
-    }
-
-    /* Disable Vertical Expansion/Vertical Centering/Horizontal Centering */
-    mode->CR90[0xE] &= ~0x7;
-
-    /* Program MCLK */
-    if (pSmi->MCLK > 0)
-	SMI_CommonCalcClock(pScrn->scrnIndex, pSmi->MCLK,
-			    1, 1, 63, 0, 0,
-                            pSmi->clockRange.minClock,
-                            pSmi->clockRange.maxClock,
-                             &mode->SR6A, &mode->SR6B);
-
-    /* use vclk1 */
-    mode->SR68 = 0x54;
-
-    if(pSmi->Dualhead){
-	/* set LCD to vclk2 */
-	mode->SR69 = 0x04;
-    }
-
     /* Gamma correction */
     if (pSmi->Chipset == SMI_LYNX3DM || pSmi->Chipset == SMI_COUGAR3DR) {
 	if(pScrn->bitsPerPixel == 8)
@@ -119,11 +62,70 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
 	    mode->SR66 = (mode->SR66 & 0x33) | 0x04; /* Both RAMLUT on, Gamma correct ON */
     }
 
-    /* Disable panel video */
-    mode->SRA0 = 0;
+    /* Program MCLK */
+    if (pSmi->MCLK > 0)
+	SMI_CommonCalcClock(pScrn->scrnIndex, pSmi->MCLK,
+			    1, 1, 63, 0, 0,
+			    pSmi->clockRange.minClock,
+			    pSmi->clockRange.maxClock,
+			    &mode->SR6A, &mode->SR6B);
 
-    mode->CR33 = 0;
-    mode->CR3A = 0;
+    if(!pSmi->useBIOS) {
+	/* Disable DAC and LCD framebuffer r/w operation */
+	mode->SR21 |= 0xB0;
+
+	/* Power down mode is standby mode, VCLK and MCLK divided by 4 in standby mode */
+	mode->SR20  = (mode->SR20 & ~0xB0) | 0x10;
+
+	/* Set DPMS state to Off */
+	mode->SR22 |= 0x30;
+
+	/* VESA compliance power down mode */
+	mode->SR24 &= ~0x01;
+
+	if (pSmi->Chipset != SMI_COUGAR3DR) {
+	    /* Select no displays */
+	    mode->SR31 &= ~0x07;
+
+	    /* Enable virtual refresh */
+	    if(pSmi->Dualhead){
+		mode->SR31 |= 0x80;
+	    }else{
+		mode->SR31 &= ~0x80;
+	    }
+
+	    /* Disable expansion */
+	    mode->SR32 &= ~0x03;
+	    /* Enable autocentering */
+	    if (SMI_LYNXM_SERIES(pSmi->Chipset))
+		mode->SR32 |= 0x04;
+	    else
+		mode->SR32 &= ~0x04;
+
+	    if (pSmi->lcd == 2) /* Panel is DSTN */
+		mode->SR21 = 0x00;
+
+	    /* Enable HW LCD power sequencing */
+	    mode->SR34 |= 0x80;
+	}
+
+	/* Disable Vertical Expansion/Vertical Centering/Horizontal Centering */
+	mode->CR90[0xE] &= ~0x7;
+
+	/* use vclk1 */
+	mode->SR68 = 0x54;
+
+	if(pSmi->Dualhead){
+	    /* set LCD to vclk2 */
+	    mode->SR69 = 0x04;
+	}
+
+	/* Disable panel video */
+	mode->SRA0 = 0;
+
+	mode->CR33 = 0;
+	mode->CR3A = 0;
+    }
 
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17, mode->SR17);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20, mode->SR20);
@@ -340,7 +342,30 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 
     ENTER();
 
-    if (pSmi->useBIOS && pSmi->pInt10 != NULL && restore->mode != 0) {
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17, restore->SR17);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18, restore->SR18);
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20, restore->SR20);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, restore->SR21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, restore->SR22);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23, restore->SR23);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24, restore->SR24);
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, restore->SR31);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32, restore->SR32);
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, restore->SR66);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A, restore->SR6A);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B, restore->SR6B);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, restore->SR81);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0, restore->SRA0);
+
+    if (pSmi->useBIOS && restore->mode != 0){
 	pSmi->pInt10->num = 0x10;
 	pSmi->pInt10->ax = restore->mode | 0x80;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Setting mode 0x%02X\n",
@@ -356,29 +381,6 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, tmp & ~0x03);
     } else {
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17, restore->SR17);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18, restore->SR18);
-
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20, restore->SR20);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, restore->SR21);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, restore->SR22);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23, restore->SR23);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24, restore->SR24);
-
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, restore->SR31);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32, restore->SR32);
-
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, restore->SR66);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A, restore->SR6A);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B, restore->SR6B);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
-
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, restore->SR81);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0, restore->SRA0);
-
 	/* Restore the standard VGA registers */
 	vgaHWRestore(pScrn, vgaSavePtr, VGA_SR_ALL);
 	if (restore->smiDACMask) {

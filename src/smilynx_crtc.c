@@ -524,6 +524,90 @@ SMILynx_CrtcModeSet_lcd(xf86CrtcPtr crtc,
 }
 
 static void
+SMILynx_CrtcModeSet_bios(xf86CrtcPtr crtc,
+	    DisplayModePtr mode,
+	    DisplayModePtr adjusted_mode,
+	    int x, int y)
+{
+    ScrnInfoPtr pScrn=crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    SMIRegPtr reg = pSmi->mode;
+    int i;
+    CARD8 tmp;
+
+    ENTER();
+
+    /* Find the INT 10 mode number */
+    {
+	static struct {
+	    int x, y, bpp;
+	    CARD16 mode;
+	} modeTable[] =
+	    {
+		{  640,  480,  8, 0x50 },
+		{  640,  480, 16, 0x52 },
+		{  640,  480, 24, 0x53 },
+		{  640,  480, 32, 0x54 },
+		{  800,  480,  8, 0x4A },
+		{  800,  480, 16, 0x4C },
+		{  800,  480, 24, 0x4D },
+		{  800,  600,  8, 0x55 },
+		{  800,  600, 16, 0x57 },
+		{  800,  600, 24, 0x58 },
+		{  800,  600, 32, 0x59 },
+		{ 1024,  768,  8, 0x60 },
+		{ 1024,  768, 16, 0x62 },
+		{ 1024,  768, 24, 0x63 },
+		{ 1024,  768, 32, 0x64 },
+		{ 1280, 1024,  8, 0x65 },
+		{ 1280, 1024, 16, 0x67 },
+		{ 1280, 1024, 24, 0x68 },
+		{ 1280, 1024, 32, 0x69 },
+	    };
+
+	reg->mode = 0;
+	for (i = 0; i < sizeof(modeTable) / sizeof(modeTable[0]); i++) {
+	    if ((modeTable[i].x == mode->HDisplay) &&
+		(modeTable[i].y == mode->VDisplay) &&
+		(modeTable[i].bpp == pScrn->bitsPerPixel)) {
+		reg->mode = modeTable[i].mode;
+		break;
+	    }
+	}
+    }
+
+    if(!reg->mode){
+	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "SMILynx_CrtcModeSet_bios: Not a known BIOS mode: "
+		   "falling back to direct modesetting.\n");
+	SMILynx_CrtcModeSet_vga(crtc,mode,adjusted_mode,x,y);
+	LEAVE();
+    }
+
+    pSmi->pInt10->num = 0x10;
+    pSmi->pInt10->ax = reg->mode | 0x80;
+    xf86DrvMsg(pScrn->scrnIndex, X_INFO, "Setting mode 0x%02X\n",
+	       reg->mode);
+    xf86ExecX86int10(pSmi->pInt10);
+
+    /* Enable linear mode. */
+    outb(pSmi->PIOBase + VGA_SEQ_INDEX, 0x18);
+    tmp = inb(pSmi->PIOBase + VGA_SEQ_DATA);
+    outb(pSmi->PIOBase + VGA_SEQ_DATA, tmp | 0x01);
+
+    /* Enable DPR/VPR registers. */
+    tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, tmp & ~0x03);
+
+
+    /* Initialize Video Processor Registers */
+
+    SMICRTC(crtc)->video_init(crtc);
+    SMILynx_CrtcAdjustFrame(crtc, x,y);
+
+    LEAVE();
+}
+
+static void
 SMILynx_CrtcLoadLUT_crt(xf86CrtcPtr crtc)
 {
     ScrnInfoPtr pScrn = crtc->scrn;
@@ -755,7 +839,12 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	   functions. Has someone access to this hardware? */
 
 	SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
-	crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+
+	if(pSmi->useBIOS)
+	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_bios;
+	else
+	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+
 	crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	crtcPriv->video_init = SMI730_CrtcVideoInit;
 	crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
@@ -799,7 +888,12 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	    /* CRTC0 is LCD, but in standard refresh mode
 	       it is controlled through the primary VGA registers */
 	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
-	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+
+	    if(pSmi->useBIOS)
+		crtcFuncs->mode_set = SMILynx_CrtcModeSet_bios;
+	    else
+		crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
 	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
