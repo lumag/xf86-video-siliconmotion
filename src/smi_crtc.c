@@ -115,22 +115,16 @@ SMI_CrtcShadowAllocate (xf86CrtcPtr crtc, int width, int height)
     SMIPtr	 	 pSmi = SMIPTR(pScrn);
     SMICrtcPrivatePtr	 crtcPriv = SMICRTC(crtc);
     int			 offset, size;
-    unsigned char	*result = NULL;
 
     ENTER();
 
-    size = (pSmi->useEXA ? ((width * pSmi->Bpp + 15) & ~15) : width) * height;
+    size = ((width * pSmi->Bpp + 15) & ~15)  * height;
     offset = SMI_AllocateMemory(pScrn, &crtcPriv->shadowArea, size);
 
-    if (offset) {
-	result = pSmi->FBBase;
-	if (pSmi->useEXA)
-	    result += ((ExaOffscreenArea *)crtcPriv->shadowArea)->offset;
-	else
-	    result += offset * pSmi->Bpp;
-    }
+    if (!crtcPriv->shadowArea)
+	LEAVE(NULL);
 
-    LEAVE(result);
+    LEAVE(pSmi->FBBase + offset);
 }
 
 static PixmapPtr
