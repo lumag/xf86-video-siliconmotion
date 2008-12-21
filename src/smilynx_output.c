@@ -39,35 +39,31 @@ SMILynx_OutputDPMS_crt(xf86OutputPtr output, int mode)
 {
     ScrnInfoPtr pScrn = output->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
-    vgaHWPtr	hwp = VGAHWPTR(pScrn);
-    CARD8 SR21, SR22, SR31;
+    SMIRegPtr reg = pSmi->mode;
+    vgaHWPtr hwp = VGAHWPTR(pScrn);
 
     ENTER();
 
-    SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
-    SR22=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x22);
-    SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
-
     switch (mode) {
     case DPMSModeOn:
-	SR21 &= ~0x88; /* Enable DAC and color palette RAM */
-	SR31 |= 0x02; /* Enable CRT display*/
-	SR22 = (SR22 & ~0x30) | 0x00; /* Set DPMS state*/
+	reg->SR21 &= ~0x88; /* Enable DAC and color palette RAM */
+	reg->SR31 |= 0x02; /* Enable CRT display*/
+	reg->SR22 = (reg->SR22 & ~0x30) | 0x00; /* Set DPMS state*/
 	break;
     case DPMSModeStandby:
-	SR21 |= 0x88; /* Disable DAC and color palette RAM */
-	SR31 |= 0x02; /* Enable CRT display*/
-	SR22 = (SR22 & ~0x30) | 0x10; /* Set DPMS state*/
+	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
+	reg->SR31 |= 0x02; /* Enable CRT display*/
+	reg->SR22 = (reg->SR22 & ~0x30) | 0x10; /* Set DPMS state*/
 	break;
     case DPMSModeSuspend:
-	SR21 |= 0x88; /* Disable DAC and color palette RAM */
-	SR31 |= 0x02; /* Enable CRT display*/
-	SR22 = (SR22 & ~0x30) | 0x20; /* Set DPMS state*/
+	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
+	reg->SR31 |= 0x02; /* Enable CRT display*/
+	reg->SR22 = (reg->SR22 & ~0x30) | 0x20; /* Set DPMS state*/
 	break;
     case DPMSModeOff:
-	SR21 |= 0x88; /* Disable DAC and color palette RAM */
-	SR31 &= ~0x02; /* Disable CRT display*/
-	SR22 = (SR22 & ~0x30) | 0x30; /* Set DPMS state*/
+	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
+	reg->SR31 &= ~0x02; /* Disable CRT display*/
+	reg->SR22 = (reg->SR22 & ~0x30) | 0x30; /* Set DPMS state*/
 	break;
     }
 
@@ -77,9 +73,9 @@ SMILynx_OutputDPMS_crt(xf86OutputPtr output, int mode)
     while (!(hwp->readST01(hwp) & 0x8)) ;
 
     /* Write the registers */
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, SR22);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, SR31);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, reg->SR22);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, reg->SR31);
 
     LEAVE();
 
@@ -91,35 +87,32 @@ SMILynx_OutputDPMS_lcd(xf86OutputPtr output, int mode)
 {
     ScrnInfoPtr pScrn = output->scrn;
     SMIPtr pSmi = SMIPTR(pScrn);
-    CARD8 SR21, SR31;
+    SMIRegPtr reg = pSmi->mode;
 
     ENTER();
-
-    SR21=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
-    SR31=VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
 
     switch (mode) {
     case DPMSModeOn:
 	if(pSmi->lcd == 2 /* LCD is DSTN */
 	   || pSmi->Dualhead /* Virtual Refresh is enabled */)
-	    SR21 &= ~0x10; /* Enable LCD framebuffer read operation and DSTN dithering engine */
+	    reg->SR21 &= ~0x10; /* Enable LCD framebuffer read operation and DSTN dithering engine */
 	if(pSmi->lcd == 2 /* LCD is DSTN */
 	   && !pSmi->Dualhead /* Virtual Refresh is disabled */)
-	    SR21 &= ~0x20; /* Enable LCD framebuffer write operation */
+	    reg->SR21 &= ~0x20; /* Enable LCD framebuffer write operation */
 
-	SR31 |= 0x01; /* Enable LCD display*/
+	reg->SR31 |= 0x01; /* Enable LCD display*/
 	break;
     case DPMSModeStandby:
     case DPMSModeSuspend:
     case DPMSModeOff:
-	SR21 |= 0x30; /* Disable LCD framebuffer r/w operation */
-	SR31 &= ~0x01; /* Disable LCD display*/
+	reg->SR21 |= 0x30; /* Disable LCD framebuffer r/w operation */
+	reg->SR31 &= ~0x01; /* Disable LCD display*/
 	break;
     }
 
     /* Write the registers */
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, SR31);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, reg->SR31);
 
     LEAVE();
 
@@ -178,16 +171,16 @@ static xf86OutputStatus
 SMILynx_OutputDetect_crt(xf86OutputPtr output)
 {
     SMIPtr pSmi = SMIPTR(output->scrn);
-    vgaHWPtr	hwp = VGAHWPTR(output->scrn);
-    CARD8 SR21, SR7D;
+    SMIRegPtr mode = pSmi->mode;
+    vgaHWPtr hwp = VGAHWPTR(output->scrn);
+    CARD8 SR7D;
     Bool status;
 
     ENTER();
 
-    SR21 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
     SR7D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D);
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21 & ~0x80); /* Enable DAC */
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21 & ~0x80); /* Enable DAC */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7B, 0x40); /* "TV and RAMDAC Testing Power", Green component */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D, SR7D | 0x10); /* Enable monitor detect */
 
@@ -198,7 +191,7 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
     status = MMIO_IN8(pSmi->IOBase, 0x3C2) & 0x10;
 
     /* Restore previous state */
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, SR21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D, SR7D);
 
     if(status)

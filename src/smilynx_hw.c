@@ -40,77 +40,60 @@ Bool
 SMILynx_HWInit(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
+    SMIRegPtr mode = pSmi->mode;
     vgaHWPtr	hwp = VGAHWPTR(pScrn);
     int		vgaIOBase  = hwp->IOBase;
     int		vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
     int		vgaCRData  = vgaIOBase + VGA_CRTC_DATA_OFFSET;
-    CARD8 SR17, SR20, SR21, SR22, SR24, SR30, SR31, SR32, SR34,
-	SR66, SR68, SR69, SR6A, SR6B, CR9E;
 
     ENTER();
 
-    SR17 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x17);
-    SR20 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x20);
-    SR21 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21);
-    SR22 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x22);
-    SR24 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x24);
-    SR30 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x30);
-    SR31 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31);
-    SR32 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32);
-    SR34 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x34);
-    SR66 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x66);
-    SR68 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x68);
-    SR69 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x69);
-    SR6A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6A);
-    SR6B = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6B);
-    CR9E = VGAIN8_INDEX(pSmi, vgaCRIndex,vgaCRData,0x9E);
-
     if (pSmi->PCIBurst) {
-	SR17 |= 0x20;
+	mode->SR17 |= 0x20;
     } else {
-	SR17 &= ~0x20;
+	mode->SR17 &= ~0x20;
     }
 
     /* Disable DAC and LCD framebuffer r/w operation */
-    SR21 |= 0xB0;
+    mode->SR21 |= 0xB0;
 
     /* Power down mode is standby mode, VCLK and MCLK divided by 4 in standby mode */
-    SR20  = (SR20 & ~0xB0) | 0x10;
+    mode->SR20  = (mode->SR20 & ~0xB0) | 0x10;
 
     /* Set DPMS state to Off */
-    SR22 |= 0x30;
+    mode->SR22 |= 0x30;
 
     /* VESA compliance power down mode */
-    SR24 &= ~0x01;
+    mode->SR24 &= ~0x01;
 
     if (pSmi->Chipset != SMI_COUGAR3DR) {
 	/* Select no displays */
-	SR31 &= ~0x07;
+	mode->SR31 &= ~0x07;
 
 	/* Enable virtual refresh */
 	if(pSmi->Dualhead){
-	    SR31 |= 0x80;
+	    mode->SR31 |= 0x80;
 	}else{
-	    SR31 &= ~0x80;
+	    mode->SR31 &= ~0x80;
 	}
 
         /* Disable expansion */
-	SR32 &= ~0x03;
+	mode->SR32 &= ~0x03;
 	/* Enable autocentering */
 	if (SMI_LYNXM_SERIES(pSmi->Chipset))
-	    SR32 |= 0x04;
+	    mode->SR32 |= 0x04;
 	else
-	    SR32 &= ~0x04;
+	    mode->SR32 &= ~0x04;
 
 	if (pSmi->lcd == 2) /* Panel is DSTN */
-	    SR21 = 0x00;
+	    mode->SR21 = 0x00;
 
 	/* Enable HW LCD power sequencing */
-	SR34 |= 0x80;
+	mode->SR34 |= 0x80;
     }
 
     /* Disable Vertical Expansion/Vertical Centering/Horizontal Centering */
-    CR9E &= ~0x7;
+    mode->CR90[0xE] &= ~0x7;
 
     /* Program MCLK */
     if (pSmi->MCLK > 0)
@@ -118,43 +101,48 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
 			    1, 1, 63, 0, 0,
                             pSmi->clockRange.minClock,
                             pSmi->clockRange.maxClock,
-                             &SR6A, &SR6B);
+                             &mode->SR6A, &mode->SR6B);
 
     /* use vclk1 */
-    SR68 = 0x54;
+    mode->SR68 = 0x54;
 
     if(pSmi->Dualhead){
 	/* set LCD to vclk2 */
-	SR69 = 0x04;
+	mode->SR69 = 0x04;
     }
 
     /* Gamma correction */
     if (pSmi->Chipset == SMI_LYNX3DM || pSmi->Chipset == SMI_COUGAR3DR) {
 	if(pScrn->bitsPerPixel == 8)
-	    SR66 = (SR66 & 0x33) | 0x00; /* Both RAMLUT on, 6 bits-RAM */
+	    mode->SR66 = (mode->SR66 & 0x33) | 0x00; /* Both RAMLUT on, 6 bits-RAM */
 	else
-	    SR66 = (SR66 & 0x33) | 0x04; /* Both RAMLUT on, Gamma correct ON */
+	    mode->SR66 = (mode->SR66 & 0x33) | 0x04; /* Both RAMLUT on, Gamma correct ON */
     }
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x17,SR17);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x20,SR20);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x21,SR21);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x22,SR22);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x24,SR24);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x30,SR30);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x31,SR31);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x32,SR32);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x34,SR34);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x66,SR66);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x68,SR68);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x69,SR69);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6A,SR6A);
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0x6B,SR6B);
+    /* Disable panel video */
+    mode->SRA0 = 0;
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX,VGA_SEQ_DATA,0xA0, 0x00);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, 0x00);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, 0x00);
-    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData,0x9E, CR9E);
+    mode->CR33 = 0;
+    mode->CR3A = 0;
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17, mode->SR17);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20, mode->SR20);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, mode->SR22);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24, mode->SR24);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, mode->SR31);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32, mode->SR32);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x34, mode->SR34);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, mode->SR66);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, mode->SR68);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, mode->SR69);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A, mode->SR6A);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B, mode->SR6B);
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0, mode->SRA0);
+
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, mode->CR33);
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, mode->CR3A);
+    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, mode->CR90[0xE]);
 
     LEAVE(TRUE);
 }
@@ -195,23 +183,29 @@ SMILynx_Save(ScrnInfoPtr pScrn)
     /* Now we save all the extended registers we need. */
     save->SR17 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17);
     save->SR18 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18);
+
+    save->SR20 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20);
     save->SR21 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
+    save->SR22 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22);
+    save->SR23 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23);
+    save->SR24 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24);
+
     save->SR31 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31);
     save->SR32 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32);
+
+    save->SR66 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66);
+    save->SR68 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68);
+    save->SR69 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69);
     save->SR6A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A);
     save->SR6B = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B);
+    save->SR6C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C);
+    save->SR6D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D);
+
     save->SR81 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81);
     save->SRA0 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0);
 
-    /* vclk1 */
-    save->SR6C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C);
-    save->SR6D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D);
-    /* vclk1 control */
-    save->SR68 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68);
-
     if (pSmi->Dualhead) {
 	/* dualhead stuff */
-	save->SR22 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22);
 	save->SR40 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x40);
 	save->SR41 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x41);
 	save->SR42 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x42);
@@ -223,25 +217,41 @@ SMILynx_Save(ScrnInfoPtr pScrn)
 	save->SR4A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4A);
 	save->SR4B = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4B);
 	save->SR4C = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C);
+
+	save->SR50 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x50);
+	save->SR51 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x51);
+	save->SR52 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x52);
+	save->SR53 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x53);
+	save->SR54 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x54);
+	save->SR55 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x55);
+	save->SR56 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x56);
+	save->SR57 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x57);
+	save->SR5A = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x5A);
+
 	/* PLL2 stuff */
-	save->SR69 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69);
 	save->SR6E = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E);
 	save->SR6F = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F);
     }
 
     if (SMI_LYNXM_SERIES(pSmi->Chipset)) {
-	/* Save primary registers */
-	save->CR90[14] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E);
-	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, save->CR90[14] & ~0x20);
-
-	for (i = 0; i < 16; i++) {
+	/* Save common registers */
+	save->CR30 = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30);
+	save->CR3A = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A);
+	for (i = 0; i < 15; i++) {
 	    save->CR90[i] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x90 + i);
 	}
+	for (i = 0; i < 14; i++) {
+	    save->CRA0[i] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0xA0 + i);
+	}
+
+	/* Save primary registers */
+	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, save->CR90[14] & ~0x20);
+
 	save->CR33 = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33);
-	save->CR3A = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A);
 	for (i = 0; i < 14; i++) {
 	    save->CR40[i] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x40 + i);
 	}
+	save->CR9F = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9F);
 
 	/* Save secondary registers */
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, save->CR90[14] | 0x20);
@@ -251,27 +261,18 @@ SMILynx_Save(ScrnInfoPtr pScrn)
 	}
 	save->CR9F_2 = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9F);
 
-	/* Save common registers */
-	for (i = 0; i < 14; i++) {
-	    save->CRA0[i] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0xA0 + i);
-	}
-
 	/* PDR#1069 */
 	VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, save->CR90[14]);
+
     }
     else {
+	save->CR30 = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30);
 	save->CR33 = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33);
 	save->CR3A = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A);
 	for (i = 0; i < 14; i++) {
 	    save->CR40[i] = VGAIN8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x40 + i);
 	}
     }
-
-    /* CZ 2.11.2001: for gamma correction (TODO: other chipsets?) */
-    if ((pSmi->Chipset == SMI_LYNX3DM) || (pSmi->Chipset == SMI_COUGAR3DR)) {
-	save->CCR66 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66);
-    }
-    /* end CZ */
 
     save->DPR10 = READ_DPR(pSmi, 0x10);
     save->DPR1C = READ_DPR(pSmi, 0x1C);
@@ -297,7 +298,6 @@ SMILynx_Save(ScrnInfoPtr pScrn)
     save->CPR00 = READ_CPR(pSmi, 0x00);
 
     if (!pSmi->ModeStructInit) {
-	/* XXX Should check the return value of vgaHWCopyReg() */
 	vgaHWCopyReg(&hwp->ModeReg, vgaSavePtr);
 	memcpy(pSmi->mode, save, sizeof(SMIRegRec));
 	pSmi->ModeStructInit = TRUE;
@@ -331,8 +331,8 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 {
     SMIPtr	pSmi = SMIPTR(pScrn);
     int		i;
-    CARD8		tmp;
-    CARD32		offset;
+    CARD8	tmp;
+    CARD32	offset;
     vgaHWPtr	hwp = VGAHWPTR(pScrn);
     int		vgaIOBase  = hwp->IOBase;
     int		vgaCRIndex = vgaIOBase + VGA_CRTC_INDEX_OFFSET;
@@ -357,21 +357,25 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, tmp & ~0x03);
     } else {
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x17, restore->SR17);
-	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18) & ~0x1F;
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18, tmp |
-		      (restore->SR18 & 0x1F));
-	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, tmp & ~0x03);
-	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31) & ~0xC0;
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, tmp |
-		      (restore->SR31 & 0xC0));
-	tmp = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32) & ~0x07;
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32, tmp |
-		      (restore->SR32 & 0x07));
-	if (restore->SR6B != 0xFF) {
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A, restore->SR6A);
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B, restore->SR6B);
-	}
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x18, restore->SR18);
+
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x20, restore->SR20);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, restore->SR21);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, restore->SR22);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23, restore->SR23);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x24, restore->SR24);
+
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, restore->SR31);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x32, restore->SR32);
+
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, restore->SR66);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6A, restore->SR6A);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6B, restore->SR6B);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
+
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, restore->SR81);
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0xA0, restore->SRA0);
 
@@ -409,35 +413,26 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 			  restore->CR90[14] & ~0x20);
 
 	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, restore->CR33);
-	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, restore->CR3A);
 	    for (i = 0; i < 14; i++) {
 		VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x40 + i,
 			      restore->CR40[i]);
 	    }
-	    for (i = 0; i < 16; i++) {
-		if (i != 14) {
-		    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x90 + i,
-				  restore->CR90[i]);
-		}
-	    }
-	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9E, restore->CR90[14]);
+	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x9F, restore->CR9F);
 
 	    /* Restore common registers */
-	    for (i = 0; i < 14; i++) {
+	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30, restore->CR30);
+	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, restore->CR3A);
+
+	    for (i = 0; i < 15; i++)
+		VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x90 + i,
+			      restore->CR90[i]);
+
+	    for (i = 0; i < 14; i++)
 		VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0xA0 + i,
 			      restore->CRA0[i]);
-	    }
-	}
 
-	/* Restore the standard VGA registers */
-	if (xf86IsPrimaryPci(pSmi->PciInfo)) {
-	    vgaHWRestore(pScrn, vgaSavePtr, VGA_SR_CMAP | VGA_SR_FONTS);
-	}
-
-	if (restore->modeInit)
-	    vgaHWRestore(pScrn, vgaSavePtr, VGA_SR_ALL);
-
-	if (!SMI_LYNXM_SERIES(pSmi->Chipset)) {
+	}else{
+	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x30, restore->CR30);
 	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, restore->CR33);
 	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x3A, restore->CR3A);
 	    for (i = 0; i < 14; i++) {
@@ -446,63 +441,35 @@ SMILynx_WriteMode(ScrnInfoPtr pScrn, vgaRegPtr vgaSavePtr, SMIRegPtr restore)
 	    }
 	}
 
-	/* vclk1 */
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x68, restore->SR68);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6C, restore->SR6C);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6D, restore->SR6D);
-
 	if (pSmi->Dualhead) {
-
-	    /* TFT panel uses FIFO1, DSTN panel uses FIFO1 for upper panel and
-	     * FIFO2 for lower panel.  I don't have a DSTN panel, so it's untested.
-	     * -- AGD
-	     */
-
-	    /* PLL2 regs */
-
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x69, restore->SR69);
-
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E, restore->SR6E);
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F, restore->SR6F);
-
-	    /* setting SR21 bit 2 disables ZV circuitry,
-	     * if ZV is needed, SR21 = 0x20
-	     */
-	    /* enable DAC, PLL, etc. */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, restore->SR21);
-
-	    /* clear DPMS state */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, restore->SR22);
-
-	    /* enable virtual refresh and LCD and CRT outputs */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, restore->SR31);
-
-	    /* FIFO1 Read Offset */
+	    /* dualhead stuff */
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x40, restore->SR40);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x41, restore->SR41);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x42, restore->SR42);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x43, restore->SR43);
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x44, restore->SR44);
-	    /* FIFO2 Read Offset */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4B, restore->SR4B);
-	    /* FIFO1/2 Read Offset overflow */
-	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C, restore->SR4C);
-
-	    /* FIFO Write Offset */
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x45, restore->SR45);
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x48, restore->SR48);
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x49, restore->SR49);
-
-	    /* set FIFO levels */
 	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4A, restore->SR4A);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4B, restore->SR4B);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x4C, restore->SR4C);
 
-	    VGAOUT8_INDEX(pSmi, vgaCRIndex, vgaCRData, 0x33, restore->CR33);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x50, restore->SR50);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x51, restore->SR51);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x52, restore->SR52);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x53, restore->SR53);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x54, restore->SR54);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x55, restore->SR55);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x56, restore->SR56);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x57, restore->SR57);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x5A, restore->SR5A);
 
+	    /* PLL2 stuff */
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E, restore->SR6E);
+	    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F, restore->SR6F);
 	}
     }
-
-    /* CZ 2.11.2001: for gamma correction (TODO: other chipsets?) */
-    if ((pSmi->Chipset == SMI_LYNX3DM) || (pSmi->Chipset == SMI_COUGAR3DR)) {
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x66, restore->CCR66);
-    }
-    /* end CZ */
-
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x81, 0x00);
 
     /* Reset the graphics engine */
     WRITE_DPR(pSmi, 0x10, restore->DPR10);
@@ -550,6 +517,7 @@ SMILynx_DisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode,
 							  int flags)
 {
     SMIPtr	pSmi = SMIPTR(pScrn);
+    SMIRegPtr	mode = pSmi->mode;
     vgaHWPtr	hwp = VGAHWPTR(pScrn);
 
     ENTER();
@@ -558,21 +526,20 @@ SMILynx_DisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode,
     if (pSmi->CurrentDPMS != PowerManagementMode) {
 	/* Read the required SR registers for the DPMS handler */
 	CARD8 SR01 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x01);
-	CARD8 SR23 = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23);
 
 	switch (PowerManagementMode) {
 	    case DPMSModeOn:
 		SR01 &= ~0x20; /* Screen on */
-		SR23 &= ~0xC0; /* Disable chip activity detection */
+		mode->SR23 &= ~0xC0; /* Disable chip activity detection */
 		break;
 	    case DPMSModeStandby:
 	    case DPMSModeSuspend:
 	    case DPMSModeOff:
-		SR01 |= 0x20; /*Screen off*/
-		SR23  = (SR23 & ~0x07) | 0xD8; /*Enable chip activity detection
-						 Enable internal auto-standby mode
-					         Enable both IO Write and Host Memory write detect
-					         0 minutes timeout */
+		SR01 |= 0x20; /* Screen off */
+		mode->SR23 = (mode->SR23 & ~0x07) | 0xD8; /* Enable chip activity detection
+							     Enable internal auto-standby mode
+							     Enable both IO Write and Host Memory write detect
+							     0 minutes timeout */
 		break;
 	}
 
@@ -582,7 +549,7 @@ SMILynx_DisplayPowerManagementSet(ScrnInfoPtr pScrn, int PowerManagementMode,
 
 	/* Write the registers */
 	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x01, SR01);
-	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23, SR23);
+	VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x23, mode->SR23);
 
 	/* Set the DPMS mode to every output and CRTC */
 	xf86DPMSSet(pScrn, PowerManagementMode, flags);

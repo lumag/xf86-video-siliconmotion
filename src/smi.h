@@ -116,28 +116,29 @@ authorization from the XFree86 Project and Silicon Motion.
 /* Driver data structure; this should contain all needed info for a mode */
 typedef struct
 {
-    Bool    modeInit;
-    CARD16	mode;
-    CARD8	SR17, SR18, SR21, SR31, SR32, SR6A, SR6B, SR81, SRA0;
-    CARD8	CR33, CR33_2, CR3A;
-    CARD8	CR40[14], CR40_2[14];
-    CARD8	CR90[16], CR9F_2;
-    CARD8	CRA0[14];
+    CARD16 mode;
+
+    CARD8 SR17, SR18;
+    CARD8 SR20, SR21, SR22, SR23, SR24;
+    CARD8 SR30, SR31, SR32, SR34;
+    CARD8 SR40, SR41, SR42, SR43, SR44, SR45, SR48, SR49, SR4A, SR4B, SR4C;
+    CARD8 SR50, SR51, SR52, SR53, SR54, SR55, SR56, SR57, SR5A;
+    CARD8 SR66, SR68, SR69, SR6A, SR6B, SR6C, SR6D, SR6E, SR6F;
+    CARD8 SR81, SRA0;
+
+    CARD8 CR30, CR33, CR33_2, CR3A;
+    CARD8 CR40[14], CR40_2[14];
+    CARD8 CR90[15], CR9F, CR9F_2;
+    CARD8 CRA0[14];
+
     CARD8	smiDACMask, smiDacRegs[256][3];
-    /* CZ 2.11.2001: for gamma correction */
-    CARD8   CCR66;
-    /* end CZ */
     CARD8	smiFont[8192];
+
     CARD32	DPR10, DPR1C, DPR20, DPR24, DPR28, DPR2C, DPR30, DPR3C, DPR40,
 		DPR44;
     CARD32	VPR00, VPR0C, VPR10;
     CARD32	CPR00;
     CARD32	FPR00_, FPR0C_, FPR10_;
-    /* LCD FIFO regs, etc. - dualhead */
-    CARD8   SR22, SR40, SR41, SR42, SR43, SR44, SR45, SR48, SR49,
-	    SR4A, SR4B, SR4C;
-    /* PLL controls */
-    CARD8   SR68, SR69, SR6C, SR6D, SR6E, SR6F;
 } SMIRegRec, *SMIRegPtr;
 
 /* Global PDEV structure. */
