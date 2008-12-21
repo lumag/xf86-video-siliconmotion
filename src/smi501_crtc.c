@@ -619,63 +619,58 @@ SMI501_CrtcLoadCursorArgb(xf86CrtcPtr crtc, CARD32 *image)
  }
 #endif
 
-static xf86CrtcFuncsRec SMI501_Crtc0Funcs;
-static SMICrtcPrivateRec SMI501_Crtc0Priv;
-static xf86CrtcFuncsRec SMI501_Crtc1Funcs;
-static SMICrtcPrivateRec SMI501_Crtc1Priv;
-
 Bool
 SMI501_CrtcPreInit(ScrnInfoPtr pScrn)
 {
     SMIPtr	pSmi = SMIPTR(pScrn);
-    xf86CrtcPtr crtc0, crtc1;
+    xf86CrtcPtr crtc;
+    xf86CrtcFuncsPtr crtcFuncs;
+    SMICrtcPrivatePtr crtcPriv;
 
     ENTER();
 
     /* CRTC0 is LCD */
-    SMI_CrtcFuncsInit_base(&SMI501_Crtc0Funcs, &SMI501_Crtc0Priv);
-    SMI501_Crtc0Funcs.mode_set		= SMI501_CrtcModeSet_lcd;
-    SMI501_Crtc0Priv.adjust_frame	= SMI501_CrtcAdjustFrame;
-    SMI501_Crtc0Priv.video_init		= SMI501_CrtcVideoInit_lcd;
-    SMI501_Crtc0Priv.load_lut		= SMI501_CrtcLoadLUT;
+    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+    crtcFuncs->mode_set		= SMI501_CrtcModeSet_lcd;
+    crtcPriv->adjust_frame	= SMI501_CrtcAdjustFrame;
+    crtcPriv->video_init	= SMI501_CrtcVideoInit_lcd;
+    crtcPriv->load_lut		= SMI501_CrtcLoadLUT;
 
     if (pSmi->HwCursor) {
-	SMI501_Crtc0Funcs.set_cursor_colors = SMI501_CrtcSetCursorColors;
-	SMI501_Crtc0Funcs.set_cursor_position = SMI501_CrtcSetCursorPosition;
-	SMI501_Crtc0Funcs.show_cursor = SMI501_CrtcShowCursor;
-	SMI501_Crtc0Funcs.hide_cursor = SMI501_CrtcHideCursor;
-	SMI501_Crtc0Funcs.load_cursor_image = SMI501_CrtcLoadCursorImage;
+	crtcFuncs->set_cursor_colors = SMI501_CrtcSetCursorColors;
+	crtcFuncs->set_cursor_position = SMI501_CrtcSetCursorPosition;
+	crtcFuncs->show_cursor = SMI501_CrtcShowCursor;
+	crtcFuncs->hide_cursor = SMI501_CrtcHideCursor;
+	crtcFuncs->load_cursor_image = SMI501_CrtcLoadCursorImage;
 #if SMI_CURSOR_ALPHA_PLANE
 	if (!pSmi->Dualhead)
-	    SMI501_Crtc0Funcs.load_cursor_argb = SMI501_CrtcLoadCursorArgb;
+	    crtcFuncs->load_cursor_argb = SMI501_CrtcLoadCursorArgb;
 #endif
     }
 
-    crtc0 = xf86CrtcCreate(pScrn, &SMI501_Crtc0Funcs);
-    if (!crtc0)
+    if (! (crtc = xf86CrtcCreate(pScrn, crtcFuncs)))
 	LEAVE(FALSE);
-    crtc0->driver_private = &SMI501_Crtc0Priv;
+    crtc->driver_private = crtcPriv;
 
     /* CRTC1 is CRT */
     if (pSmi->Dualhead) {
-	SMI_CrtcFuncsInit_base(&SMI501_Crtc1Funcs, &SMI501_Crtc1Priv);
-	SMI501_Crtc1Funcs.mode_set	= SMI501_CrtcModeSet_crt;
-	SMI501_Crtc1Priv.adjust_frame	= SMI501_CrtcAdjustFrame;
-	SMI501_Crtc1Priv.video_init	= SMI501_CrtcVideoInit_crt;
-	SMI501_Crtc1Priv.load_lut	= SMI501_CrtcLoadLUT;
+	SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	crtcFuncs->mode_set	= SMI501_CrtcModeSet_crt;
+	crtcPriv->adjust_frame	= SMI501_CrtcAdjustFrame;
+	crtcPriv->video_init	= SMI501_CrtcVideoInit_crt;
+	crtcPriv->load_lut	= SMI501_CrtcLoadLUT;
 
 	if (pSmi->HwCursor) {
-	    SMI501_Crtc1Funcs.set_cursor_colors	= SMI501_CrtcSetCursorColors;
-	    SMI501_Crtc1Funcs.set_cursor_position = SMI501_CrtcSetCursorPosition;
-	    SMI501_Crtc1Funcs.show_cursor = SMI501_CrtcShowCursor;
-	    SMI501_Crtc1Funcs.hide_cursor = SMI501_CrtcHideCursor;
-	    SMI501_Crtc1Funcs.load_cursor_image = SMI501_CrtcLoadCursorImage;
+	    crtcFuncs->set_cursor_colors = SMI501_CrtcSetCursorColors;
+	    crtcFuncs->set_cursor_position = SMI501_CrtcSetCursorPosition;
+	    crtcFuncs->show_cursor = SMI501_CrtcShowCursor;
+	    crtcFuncs->hide_cursor = SMI501_CrtcHideCursor;
+	    crtcFuncs->load_cursor_image = SMI501_CrtcLoadCursorImage;
 	}
 
-	crtc1 = xf86CrtcCreate(pScrn, &SMI501_Crtc1Funcs);
-	if (!crtc1)
+	if (! (crtc = xf86CrtcCreate(pScrn, crtcFuncs)))
 	    LEAVE(FALSE);
-	crtc1->driver_private = &SMI501_Crtc1Priv;
+	crtc->driver_private = crtcPriv;
     }
 
     LEAVE(TRUE);

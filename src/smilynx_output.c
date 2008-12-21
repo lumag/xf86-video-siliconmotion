@@ -200,79 +200,72 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
 	LEAVE(XF86OutputStatusDisconnected);
 }
 
-static xf86OutputFuncsRec SMILynx_Output0Funcs;
-static xf86OutputFuncsRec SMILynx_Output1Funcs;
-
 Bool
 SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
-    xf86OutputPtr output0=NULL;
-    xf86OutputPtr output1=NULL;
+    xf86OutputPtr output;
+    xf86OutputFuncsPtr outputFuncs;
 
     ENTER();
 
     if(pSmi->Chipset == SMI_COUGAR3DR){
-	    /* CRTC0 is LCD */
-	    SMI_OutputFuncsInit_base(&SMILynx_Output0Funcs);
-	    SMILynx_Output0Funcs.dpms=SMILynx_OutputDPMS_lcd;
-	    SMILynx_Output0Funcs.get_modes=SMI_OutputGetModes_native;
-	    SMILynx_Output0Funcs.detect=SMI_OutputDetect_lcd;
+	/* CRTC0 is LCD */
+	SMI_OutputFuncsInit_base(&outputFuncs);
+	outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+	outputFuncs->get_modes = SMI_OutputGetModes_native;
+	outputFuncs->detect = SMI_OutputDetect_lcd;
 
-	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
-	    if(!output0)
-		LEAVE(FALSE);
+	if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
+	    LEAVE(FALSE);
 
-	    output0->possible_crtcs = 1 << 0;
-	    output0->possible_clones = 0;
-	    output0->interlaceAllowed = FALSE;
-	    output0->doubleScanAllowed = FALSE;
+	output->possible_crtcs = 1 << 0;
+	output->possible_clones = 0;
+	output->interlaceAllowed = FALSE;
+	output->doubleScanAllowed = FALSE;
     }else{
 	if(pSmi->Dualhead){
 	    /* CRTC0 is LCD*/
-	    SMI_OutputFuncsInit_base(&SMILynx_Output0Funcs);
-	    SMILynx_Output0Funcs.dpms=SMILynx_OutputDPMS_lcd;
-	    SMILynx_Output0Funcs.get_modes=SMI_OutputGetModes_native;
-	    SMILynx_Output0Funcs.detect=SMI_OutputDetect_lcd;
+	    SMI_OutputFuncsInit_base(&outputFuncs);
+	    outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+	    outputFuncs->get_modes = SMI_OutputGetModes_native;
+	    outputFuncs->detect = SMI_OutputDetect_lcd;
 
-	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
-	    if(!output0)
+	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
 		LEAVE(FALSE);
 
-	    output0->possible_crtcs = 1 << 0;
-	    output0->possible_clones = 0;
-	    output0->interlaceAllowed = FALSE;
-	    output0->doubleScanAllowed = FALSE;
+	    output->possible_crtcs = 1 << 0;
+	    output->possible_clones = 0;
+	    output->interlaceAllowed = FALSE;
+	    output->doubleScanAllowed = FALSE;
 
 	    /* CRTC1 is CRT*/
-	    SMI_OutputFuncsInit_base(&SMILynx_Output1Funcs);
-	    SMILynx_Output1Funcs.dpms=SMILynx_OutputDPMS_crt;
-	    SMILynx_Output1Funcs.get_modes=SMILynx_OutputGetModes_crt;
-	    SMILynx_Output1Funcs.detect=SMILynx_OutputDetect_crt;
+	    SMI_OutputFuncsInit_base(&outputFuncs);
+	    outputFuncs->dpms = SMILynx_OutputDPMS_crt;
+	    outputFuncs->get_modes = SMILynx_OutputGetModes_crt;
+	    outputFuncs->detect = SMILynx_OutputDetect_crt;
 
-	    output1=xf86OutputCreate(pScrn,&SMILynx_Output1Funcs,"VGA");
-	    if(!output1)
+	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"VGA")))
 		LEAVE(FALSE);
 
-	    output1->possible_crtcs = 1 << 1;
-	    output1->possible_clones = 0;
-	    output1->interlaceAllowed = FALSE;
-	    output1->doubleScanAllowed = FALSE;
+	    output->possible_crtcs = 1 << 1;
+	    output->possible_clones = 0;
+	    output->interlaceAllowed = FALSE;
+	    output->doubleScanAllowed = FALSE;
 	}else{
 	    /* CRTC0 is LCD */
-	    SMI_OutputFuncsInit_base(&SMILynx_Output0Funcs);
-	    SMILynx_Output0Funcs.dpms=SMILynx_OutputDPMS_lcd;
-	    SMILynx_Output0Funcs.get_modes=SMI_OutputGetModes_native;
-	    SMILynx_Output0Funcs.detect=SMI_OutputDetect_lcd;
+	    SMI_OutputFuncsInit_base(&outputFuncs);
+	    outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+	    outputFuncs->get_modes = SMI_OutputGetModes_native;
+	    outputFuncs->detect = SMI_OutputDetect_lcd;
 
-	    output0=xf86OutputCreate(pScrn,&SMILynx_Output0Funcs,"LVDS");
-	    if(!output0)
+	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
 		LEAVE(FALSE);
 
-	    output0->possible_crtcs = 1 << 0;
-	    output0->possible_clones = 0;
-	    output0->interlaceAllowed = FALSE;
-	    output0->doubleScanAllowed = FALSE;
+	    output->possible_crtcs = 1 << 0;
+	    output->possible_clones = 0;
+	    output->interlaceAllowed = FALSE;
+	    output->doubleScanAllowed = FALSE;
 	}
     }
 

@@ -151,30 +151,29 @@ SMI_OutputGetModes_native(xf86OutputPtr output)
 #endif
 }
 
-
-
 static void
 SMI_OutputDestroy(xf86OutputPtr output)
 {
     ENTER();
 
-    /* Nothing */
+    xfree(output->funcs);
 
     LEAVE();
 }
 
 void
-SMI_OutputFuncsInit_base(xf86OutputFuncsPtr outputFuncs)
+SMI_OutputFuncsInit_base(xf86OutputFuncsPtr* outputFuncs)
 {
-    memset(outputFuncs,0,sizeof(outputFuncs));
-    outputFuncs->create_resources = SMI_OutputCreateResources;
-    outputFuncs->mode_valid = SMI_OutputModeValid;
-    outputFuncs->mode_fixup = SMI_OutputModeFixup;
-    outputFuncs->prepare = SMI_OutputPrepare;
-    outputFuncs->commit = SMI_OutputCommit;
-    outputFuncs->mode_set = SMI_OutputModeSet;
-    outputFuncs->detect = SMI_OutputDetect;
-    outputFuncs->destroy = SMI_OutputDestroy;
+    *outputFuncs = xnfcalloc(sizeof(xf86OutputFuncsRec), 1);
+
+    (*outputFuncs)->create_resources = SMI_OutputCreateResources;
+    (*outputFuncs)->mode_valid = SMI_OutputModeValid;
+    (*outputFuncs)->mode_fixup = SMI_OutputModeFixup;
+    (*outputFuncs)->prepare = SMI_OutputPrepare;
+    (*outputFuncs)->commit = SMI_OutputCommit;
+    (*outputFuncs)->mode_set = SMI_OutputModeSet;
+    (*outputFuncs)->detect = SMI_OutputDetect;
+    (*outputFuncs)->destroy = SMI_OutputDestroy;
 }
 
 Bool

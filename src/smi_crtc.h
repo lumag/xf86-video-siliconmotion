@@ -47,13 +47,13 @@ typedef struct {
 
 /* smi_crtc.c */
 /* Initialize the xf86CrtcFuncsRec with functions common to all the hardware */
-void SMI_CrtcFuncsInit_base(xf86CrtcFuncsPtr crtcFuncs, SMICrtcPrivatePtr crtcPriv);
+void SMI_CrtcFuncsInit_base(xf86CrtcFuncsPtr* crtcFuncs, SMICrtcPrivatePtr* crtcPriv);
 /* Create and initialize the display controllers. */
 Bool SMI_CrtcPreInit(ScrnInfoPtr pScrn);
 
 /* smi_output.c */
 /* Initialize the xf86OutputFuncsRec with functions common to all the hardware */
-void SMI_OutputFuncsInit_base(xf86OutputFuncsPtr outputFuncs);
+void SMI_OutputFuncsInit_base(xf86OutputFuncsPtr* outputFuncs);
 /* Create and initialize the video outputs. */
 Bool SMI_OutputPreInit(ScrnInfoPtr pScrn);
 

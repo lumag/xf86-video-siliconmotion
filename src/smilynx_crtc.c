@@ -738,17 +738,13 @@ SMILynx_CrtcLoadCursorImage_crt (xf86CrtcPtr crtc, CARD8 *image)
     LEAVE();
 }
 
-static xf86CrtcFuncsRec SMILynx_Crtc0Funcs;
-static SMICrtcPrivateRec SMILynx_Crtc0Priv;
-static xf86CrtcFuncsRec SMILynx_Crtc1Funcs;
-static SMICrtcPrivateRec SMILynx_Crtc1Priv;
-
 Bool
 SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 {
     SMIPtr pSmi = SMIPTR(pScrn);
-    xf86CrtcPtr crtc0=NULL;
-    xf86CrtcPtr crtc1=NULL;
+    xf86CrtcPtr crtc;
+    xf86CrtcFuncsPtr crtcFuncs;
+    SMICrtcPrivatePtr crtcPriv;
 
     ENTER();
 
@@ -758,71 +754,67 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	   splitting the WRITE_FPR/WRITE_VPR calls in separate
 	   functions. Has someone access to this hardware? */
 
-	SMI_CrtcFuncsInit_base(&SMILynx_Crtc0Funcs, &SMILynx_Crtc0Priv);
-	SMILynx_Crtc0Funcs.mode_set = SMILynx_CrtcModeSet_vga;
-	SMILynx_Crtc0Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
-	SMILynx_Crtc0Priv.video_init = SMI730_CrtcVideoInit;
-	SMILynx_Crtc0Priv.load_lut = SMILynx_CrtcLoadLUT_crt;
+	SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+	crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
+	crtcPriv->video_init = SMI730_CrtcVideoInit;
+	crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
 
 	if(pSmi->HwCursor){
-	    SMILynx_Crtc0Funcs.set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
-	    SMILynx_Crtc0Funcs.set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
-	    SMILynx_Crtc0Funcs.show_cursor = SMILynx_CrtcShowCursor_crt;
-	    SMILynx_Crtc0Funcs.hide_cursor = SMILynx_CrtcHideCursor_crt;
-	    SMILynx_Crtc0Funcs.load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
+	    crtcFuncs->set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
+	    crtcFuncs->set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
+	    crtcFuncs->show_cursor = SMILynx_CrtcShowCursor_crt;
+	    crtcFuncs->hide_cursor = SMILynx_CrtcHideCursor_crt;
+	    crtcFuncs->load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
 	}
 
-	crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
-	if(!crtc0)
+	if(! (crtc = xf86CrtcCreate(pScrn,crtcFuncs)))
 	    LEAVE(FALSE);
-	crtc0->driver_private = &SMILynx_Crtc0Priv;
+	crtc->driver_private = crtcPriv;
     }else{
 	if(pSmi->Dualhead){
-	    /* CRTC0 is LCD*/
-	    SMI_CrtcFuncsInit_base(&SMILynx_Crtc0Funcs, &SMILynx_Crtc0Priv);
-	    SMILynx_Crtc0Funcs.mode_set = SMILynx_CrtcModeSet_lcd;
-	    SMILynx_Crtc0Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
-	    SMILynx_Crtc0Priv.video_init = SMILynx_CrtcVideoInit_lcd;
-	    SMILynx_Crtc0Priv.load_lut = SMILynx_CrtcLoadLUT_lcd;
+	    /* CRTC is LCD*/
+	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_lcd;
+	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
+	    crtcPriv->video_init = SMILynx_CrtcVideoInit_lcd;
+	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_lcd;
 
-	    crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
-	    if(!crtc0)
+	    if(! (crtc = xf86CrtcCreate(pScrn,crtcFuncs)))
 		LEAVE(FALSE);
-	    crtc0->driver_private = &SMILynx_Crtc0Priv;
+	    crtc->driver_private = crtcPriv;
 
 	    /* CRTC1 is CRT */
-	    SMI_CrtcFuncsInit_base(&SMILynx_Crtc1Funcs, &SMILynx_Crtc1Priv);
-	    SMILynx_Crtc1Funcs.mode_set = SMILynx_CrtcModeSet_crt;
-	    SMILynx_Crtc1Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
-	    SMILynx_Crtc1Priv.video_init = SMILynx_CrtcVideoInit_crt;
-	    SMILynx_Crtc1Priv.load_lut = SMILynx_CrtcLoadLUT_crt;
+	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_crt;
+	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
+	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
+	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
 
-	    crtc1=xf86CrtcCreate(pScrn,&SMILynx_Crtc1Funcs);
-	    if(!crtc1)
+	    if(! (crtc = xf86CrtcCreate(pScrn,crtcFuncs)))
 		LEAVE(FALSE);
-	    crtc1->driver_private = &SMILynx_Crtc1Priv;
+	    crtc->driver_private = crtcPriv;
 
 	}else{
 	    /* CRTC0 is LCD, but in standard refresh mode
 	       it is controlled through the primary VGA registers */
-	    SMI_CrtcFuncsInit_base(&SMILynx_Crtc0Funcs, &SMILynx_Crtc0Priv);
-	    SMILynx_Crtc0Funcs.mode_set = SMILynx_CrtcModeSet_vga;
-	    SMILynx_Crtc0Priv.adjust_frame = SMILynx_CrtcAdjustFrame;
-	    SMILynx_Crtc0Priv.video_init = SMILynx_CrtcVideoInit_crt;
-	    SMILynx_Crtc0Priv.load_lut = SMILynx_CrtcLoadLUT_crt;
+	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
+	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
+	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
 
 	    if(pSmi->HwCursor){
-		SMILynx_Crtc0Funcs.set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
-		SMILynx_Crtc0Funcs.set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
-		SMILynx_Crtc0Funcs.show_cursor = SMILynx_CrtcShowCursor_crt;
-		SMILynx_Crtc0Funcs.hide_cursor = SMILynx_CrtcHideCursor_crt;
-		SMILynx_Crtc0Funcs.load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
+		crtcFuncs->set_cursor_colors = SMILynx_CrtcSetCursorColors_crt;
+		crtcFuncs->set_cursor_position = SMILynx_CrtcSetCursorPosition_crt;
+		crtcFuncs->show_cursor = SMILynx_CrtcShowCursor_crt;
+		crtcFuncs->hide_cursor = SMILynx_CrtcHideCursor_crt;
+		crtcFuncs->load_cursor_image = SMILynx_CrtcLoadCursorImage_crt;
 	    }
 
-	    crtc0=xf86CrtcCreate(pScrn,&SMILynx_Crtc0Funcs);
-	    if(!crtc0)
+	    if(! (crtc = xf86CrtcCreate(pScrn,crtcFuncs)))
 		LEAVE(FALSE);
-	    crtc0->driver_private = &SMILynx_Crtc0Priv;
+	    crtc->driver_private = crtcPriv;
 	}
     }
 

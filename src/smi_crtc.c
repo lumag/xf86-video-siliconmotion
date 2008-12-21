@@ -173,7 +173,8 @@ SMI_CrtcDestroy (xf86CrtcPtr	crtc)
 {
     ENTER();
 
-    /* Nothing */
+    xfree(SMICRTC(crtc));
+    xfree(crtc->funcs);
 
     LEAVE();
 }
@@ -240,21 +241,21 @@ SMI_CrtcConfigResize(ScrnInfoPtr       pScrn,
 }
 
 void
-SMI_CrtcFuncsInit_base(xf86CrtcFuncsPtr crtcFuncs, SMICrtcPrivatePtr crtcPriv){
-    memset(crtcFuncs,0,sizeof(xf86CrtcFuncsRec));
-    memset(crtcPriv,0,sizeof(SMICrtcPrivatePtr));
+SMI_CrtcFuncsInit_base(xf86CrtcFuncsPtr* crtcFuncs, SMICrtcPrivatePtr* crtcPriv){
+    *crtcFuncs = xnfcalloc(sizeof(xf86CrtcFuncsRec), 1);
+    *crtcPriv = xnfcalloc(sizeof(SMICrtcPrivateRec), 1);
 
-    crtcFuncs->dpms = SMI_CrtcDPMS;
-    crtcFuncs->lock = SMI_CrtcLock;
-    crtcFuncs->unlock = SMI_CrtcUnlock;
-    crtcFuncs->mode_fixup = SMI_CrtcModeFixup;
-    crtcFuncs->prepare = SMI_CrtcPrepare;
-    crtcFuncs->commit = SMI_CrtcCommit;
-    crtcFuncs->gamma_set = SMI_CrtcGammaSet;
-    crtcFuncs->shadow_allocate = SMI_CrtcShadowAllocate;
-    crtcFuncs->shadow_create = SMI_CrtcShadowCreate;
-    crtcFuncs->shadow_destroy = SMI_CrtcShadowDestroy;
-    crtcFuncs->destroy = SMI_CrtcDestroy;
+    (*crtcFuncs)->dpms = SMI_CrtcDPMS;
+    (*crtcFuncs)->lock = SMI_CrtcLock;
+    (*crtcFuncs)->unlock = SMI_CrtcUnlock;
+    (*crtcFuncs)->mode_fixup = SMI_CrtcModeFixup;
+    (*crtcFuncs)->prepare = SMI_CrtcPrepare;
+    (*crtcFuncs)->commit = SMI_CrtcCommit;
+    (*crtcFuncs)->gamma_set = SMI_CrtcGammaSet;
+    (*crtcFuncs)->shadow_allocate = SMI_CrtcShadowAllocate;
+    (*crtcFuncs)->shadow_create = SMI_CrtcShadowCreate;
+    (*crtcFuncs)->shadow_destroy = SMI_CrtcShadowDestroy;
+    (*crtcFuncs)->destroy = SMI_CrtcDestroy;
 }
 
 static xf86CrtcConfigFuncsRec SMI_CrtcConfigFuncs = {
