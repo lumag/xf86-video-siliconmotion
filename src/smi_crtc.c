@@ -85,6 +85,9 @@ static void
 SMI_CrtcCommit(xf86CrtcPtr crtc)
 {
     ENTER();
+
+    crtc->funcs->dpms(crtc,DPMSModeOn);
+
     LEAVE();
 }
 

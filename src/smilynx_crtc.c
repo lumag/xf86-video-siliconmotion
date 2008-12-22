@@ -822,6 +822,25 @@ SMILynx_CrtcLoadCursorImage_crt (xf86CrtcPtr crtc, CARD8 *image)
     LEAVE();
 }
 
+static void
+SMILynx_CrtcDPMS_crt(xf86CrtcPtr crtc, int mode)
+{
+    ScrnInfoPtr pScrn = crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+    SMIRegPtr reg = pSmi->mode;
+
+    ENTER();
+
+    if(mode == DPMSModeOff)
+	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
+    else
+	reg->SR21 &= ~0x88; /* Enable DAC and color palette RAM */
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
+
+    LEAVE();
+}
+
 Bool
 SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 {
@@ -840,10 +859,12 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
 
-	if(pSmi->useBIOS)
+	if(pSmi->useBIOS){
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_bios;
-	else
+	}else{
+	    crtcFuncs->dpms = SMILynx_CrtcDPMS_crt;
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+	}
 
 	crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	crtcPriv->video_init = SMI730_CrtcVideoInit;
@@ -875,6 +896,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 
 	    /* CRTC1 is CRT */
 	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
+	    crtcFuncs->dpms = SMILynx_CrtcDPMS_crt;
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_crt;
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
@@ -889,10 +911,12 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	       it is controlled through the primary VGA registers */
 	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
 
-	    if(pSmi->useBIOS)
+	    if(pSmi->useBIOS){
 		crtcFuncs->mode_set = SMILynx_CrtcModeSet_bios;
-	    else
+	    }else{
+		crtcFuncs->dpms = SMILynx_CrtcDPMS_crt;
 		crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
+	    }
 
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;

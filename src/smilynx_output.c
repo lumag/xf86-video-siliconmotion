@@ -46,22 +46,18 @@ SMILynx_OutputDPMS_crt(xf86OutputPtr output, int mode)
 
     switch (mode) {
     case DPMSModeOn:
-	reg->SR21 &= ~0x88; /* Enable DAC and color palette RAM */
 	reg->SR31 |= 0x02; /* Enable CRT display*/
 	reg->SR22 = (reg->SR22 & ~0x30) | 0x00; /* Set DPMS state*/
 	break;
     case DPMSModeStandby:
-	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
 	reg->SR31 |= 0x02; /* Enable CRT display*/
 	reg->SR22 = (reg->SR22 & ~0x30) | 0x10; /* Set DPMS state*/
 	break;
     case DPMSModeSuspend:
-	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
 	reg->SR31 |= 0x02; /* Enable CRT display*/
 	reg->SR22 = (reg->SR22 & ~0x30) | 0x20; /* Set DPMS state*/
 	break;
     case DPMSModeOff:
-	reg->SR21 |= 0x88; /* Disable DAC and color palette RAM */
 	reg->SR31 &= ~0x02; /* Disable CRT display*/
 	reg->SR22 = (reg->SR22 & ~0x30) | 0x30; /* Set DPMS state*/
 	break;
@@ -73,14 +69,12 @@ SMILynx_OutputDPMS_crt(xf86OutputPtr output, int mode)
     while (!(hwp->readST01(hwp) & 0x8)) ;
 
     /* Write the registers */
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x22, reg->SR22);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, reg->SR31);
 
     LEAVE();
 
 }
-
 
 static void
 SMILynx_OutputDPMS_lcd(xf86OutputPtr output, int mode)
@@ -210,13 +204,13 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
 
     SR7D = VGAIN8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D);
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21 & ~0x80); /* Enable DAC */
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21 & ~0x88); /* Enable DAC and color palette RAM */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7B, 0x40); /* "TV and RAMDAC Testing Power", Green component */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x7D, SR7D | 0x10); /* Enable monitor detect */
 
     /* Wait for vertical retrace */
-    while (hwp->readST01(hwp) & 0x8) ;
     while (!(hwp->readST01(hwp) & 0x8)) ;
+    while (hwp->readST01(hwp) & 0x8) ;
 
     status = MMIO_IN8(pSmi->IOBase, 0x3C2) & 0x10;
 
@@ -240,9 +234,14 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
     ENTER();
 
     if(pSmi->Chipset == SMI_COUGAR3DR){
-	/* CRTC0 is LCD */
+	/* Output 0 is LCD */
 	SMI_OutputFuncsInit_base(&outputFuncs);
-	outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+
+	if(pSmi->useBIOS)
+	    outputFuncs->dpms = SMILynx_OutputDPMS_bios;
+	else
+	    outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
+
 	outputFuncs->get_modes = SMI_OutputGetModes_native;
 	outputFuncs->detect = SMI_OutputDetect_lcd;
 
@@ -254,22 +253,30 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 	output->interlaceAllowed = FALSE;
 	output->doubleScanAllowed = FALSE;
     }else{
-	if(pSmi->Dualhead){
-	    /* CRTC0 is LCD*/
-	    SMI_OutputFuncsInit_base(&outputFuncs);
+	/* Output 0 is LCD */
+	SMI_OutputFuncsInit_base(&outputFuncs);
+
+	if(pSmi->useBIOS)
+	    outputFuncs->dpms = SMILynx_OutputDPMS_bios;
+	else
 	    outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
-	    outputFuncs->get_modes = SMI_OutputGetModes_native;
-	    outputFuncs->detect = SMI_OutputDetect_lcd;
 
-	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
-		LEAVE(FALSE);
+	outputFuncs->get_modes = SMI_OutputGetModes_native;
+	outputFuncs->detect = SMI_OutputDetect_lcd;
 
-	    output->possible_crtcs = 1 << 0;
+	if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
+	    LEAVE(FALSE);
+
+	output->interlaceAllowed = FALSE;
+	output->doubleScanAllowed = FALSE;
+	output->possible_crtcs = 1 << 0;
+	if(pSmi->Dualhead)
 	    output->possible_clones = 0;
-	    output->interlaceAllowed = FALSE;
-	    output->doubleScanAllowed = FALSE;
+	else
+	    output->possible_clones = 1 << 1;
 
-	    /* CRTC1 is CRT*/
+	if(!pSmi->useBIOS){
+	    /* Output 1 is CRT */
 	    SMI_OutputFuncsInit_base(&outputFuncs);
 	    outputFuncs->dpms = SMILynx_OutputDPMS_crt;
 	    outputFuncs->get_modes = SMILynx_OutputGetModes_crt;
@@ -278,29 +285,16 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"VGA")))
 		LEAVE(FALSE);
 
-	    output->possible_crtcs = 1 << 1;
-	    output->possible_clones = 0;
 	    output->interlaceAllowed = FALSE;
 	    output->doubleScanAllowed = FALSE;
-	}else{
-	    /* CRTC0 is LCD */
-	    SMI_OutputFuncsInit_base(&outputFuncs);
 
-	    if(pSmi->useBIOS)
-		outputFuncs->dpms = SMILynx_OutputDPMS_bios;
-	    else
-		outputFuncs->dpms = SMILynx_OutputDPMS_lcd;
-
-	    outputFuncs->get_modes = SMI_OutputGetModes_native;
-	    outputFuncs->detect = SMI_OutputDetect_lcd;
-
-	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"LVDS")))
-		LEAVE(FALSE);
-
-	    output->possible_crtcs = 1 << 0;
-	    output->possible_clones = 0;
-	    output->interlaceAllowed = FALSE;
-	    output->doubleScanAllowed = FALSE;
+	    if(pSmi->Dualhead){
+		output->possible_crtcs = 1 << 1;
+		output->possible_clones = 0;
+	    }else{
+		output->possible_crtcs = 1 << 0;
+		output->possible_clones = 1 << 0;
+	    }
 	}
     }
 
