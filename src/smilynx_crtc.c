@@ -227,6 +227,34 @@ SMILynx_CrtcAdjustFrame(xf86CrtcPtr crtc, int x, int y)
     LEAVE();
 }
 
+static Bool
+SMILynx_CrtcModeFixup(xf86CrtcPtr crtc,
+		      DisplayModePtr mode,
+		      DisplayModePtr adjusted_mode)
+{
+    ScrnInfoPtr pScrn=crtc->scrn;
+    SMIPtr pSmi = SMIPTR(pScrn);
+
+    ENTER();
+
+    if (pSmi->Chipset == SMI_LYNXEMplus) {
+	/* Adjust the pixel clock in case it is near one of the known
+	   stable frequencies (KHz) */
+	int stable_clocks[] = {46534,};
+	int epsilon = 2000;
+	int i;
+
+	for (i=0; i < sizeof(stable_clocks)/sizeof(int); i++) {
+	    if ( abs(mode->Clock - stable_clocks[i]) < epsilon) {
+		adjusted_mode->Clock = stable_clocks[i];
+		break;
+	    }
+	}
+    }
+
+    LEAVE(TRUE);
+}
+
 static void
 SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
 	    DisplayModePtr mode,
@@ -254,13 +282,13 @@ SMILynx_CrtcModeSet_vga(xf86CrtcPtr crtc,
 
     /* calculate vclk1 */
     if (SMI_LYNX_SERIES(pSmi->Chipset)) {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
 			1, 1, 63, 0, 3,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
                         &reg->SR6C, &reg->SR6D);
     } else {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
 			1, 1, 63, 0, 1,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
@@ -348,13 +376,13 @@ SMILynx_CrtcModeSet_crt(xf86CrtcPtr crtc,
 
     /* calculate vclk1 */
     if (SMI_LYNX_SERIES(pSmi->Chipset)) {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
 			1, 1, 63, 0, 3,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
                         &reg->SR6C, &reg->SR6D);
     } else {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
 			1, 1, 63, 0, 1,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
@@ -456,19 +484,20 @@ SMILynx_CrtcModeSet_lcd(xf86CrtcPtr crtc,
     /* Program the PLL */
 
     /* calculate vclk2 */
-    if (pSmi->Chipset == SMI_LYNX3DM) {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
-			1, 1, 63, 0, 1,
-                        pSmi->clockRange.minClock,
-                        pSmi->clockRange.maxClock,
-                        &reg->SR6E, &reg->SR6F);
-    } else {
-        SMI_CommonCalcClock(pScrn->scrnIndex, mode->Clock,
+    if (SMI_LYNX_SERIES(pSmi->Chipset)) {
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
 			1, 1, 63, 0, 0,
                         pSmi->clockRange.minClock,
                         pSmi->clockRange.maxClock,
                         &reg->SR6E, &reg->SR6F);
+    } else {
+        SMI_CommonCalcClock(pScrn->scrnIndex, adjusted_mode->Clock,
+			1, 1, 63, 0, 1,
+                        pSmi->clockRange.minClock,
+                        pSmi->clockRange.maxClock,
+                        &reg->SR6E, &reg->SR6F);
     }
+
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6E, reg->SR6E);
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x6F, reg->SR6F);
 
@@ -866,6 +895,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
 	}
 
+	crtcFuncs->mode_fixup = SMILynx_CrtcModeFixup;
 	crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	crtcPriv->video_init = SMI730_CrtcVideoInit;
 	crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
@@ -886,6 +916,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	    /* CRTC is LCD*/
 	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_lcd;
+	    crtcFuncs->mode_fixup = SMILynx_CrtcModeFixup;
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_lcd;
 	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_lcd;
@@ -898,6 +929,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 	    SMI_CrtcFuncsInit_base(&crtcFuncs, &crtcPriv);
 	    crtcFuncs->dpms = SMILynx_CrtcDPMS_crt;
 	    crtcFuncs->mode_set = SMILynx_CrtcModeSet_crt;
+	    crtcFuncs->mode_fixup = SMILynx_CrtcModeFixup;
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
 	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;
@@ -918,6 +950,7 @@ SMILynx_CrtcPreInit(ScrnInfoPtr pScrn)
 		crtcFuncs->mode_set = SMILynx_CrtcModeSet_vga;
 	    }
 
+	    crtcFuncs->mode_fixup = SMILynx_CrtcModeFixup;
 	    crtcPriv->adjust_frame = SMILynx_CrtcAdjustFrame;
 	    crtcPriv->video_init = SMILynx_CrtcVideoInit_crt;
 	    crtcPriv->load_lut = SMILynx_CrtcLoadLUT_crt;

@@ -1222,14 +1222,24 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
     int			mclk, mxclk;
     SMIPtr		pSmi = SMIPTR(pScrn);
 
-    pSmi->MCLK = pSmi->MXCLK = 0;
+    /* MCLK defaults */
+    if (pSmi->Chipset == SMI_LYNXEMplus){
+	/* The SM712 can be safely clocked up to 157MHz, according to
+	   Silicon Motion engineers. */
+	pSmi->MCLK = 157000;
+    }else
+	pSmi->MCLK = 0;
+
+    pSmi->MXCLK = 0;
+
+    /* MCLK from user settings */
     if (xf86GetOptValFreq(pSmi->Options, OPTION_MCLK, OPTUNITS_MHZ, &real)) {
-	pSmi->MCLK = (int)(real * 1000.0);
-	if (!IS_MSOC(pSmi) && pSmi->MCLK > 120000) {
+	if (IS_MSOC(pSmi) || (int)real <= 120) {
+	    pSmi->MCLK = (int)(real * 1000.0);
+	} else {
 	    xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 		       "Memory Clock %1.3f MHz larger than limit of 120 MHz\n",
 		       real);
-	    pSmi->MCLK = 0;
 	}
     }
     mclk = pSmi->MCLK;
@@ -1243,6 +1253,7 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
 	}
     }
 
+    /* Already programmed MCLK */
     if (pSmi->MCLK == 0) {
 	if (IS_MSOC(pSmi))
 	    mclk = ((clock.f.m_select ? 336 : 288) /
