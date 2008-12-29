@@ -1247,10 +1247,8 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
     if (IS_MSOC(pSmi)) {
 	clock.value = READ_SCR(pSmi, CURRENT_CLOCK);
 	if (xf86GetOptValFreq(pSmi->Options, OPTION_MXCLK,
-			      OPTUNITS_MHZ, &real)) {
+			      OPTUNITS_MHZ, &real))
 	    pSmi->MXCLK = (int)(real * 1000.0);
-	    mxclk = pSmi->MXCLK;
-	}
     }
 
     /* Already programmed MCLK */
@@ -1282,10 +1280,13 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
 
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MCLK = %1.3f\n", mclk / 1000.0);
     if (IS_MSOC(pSmi)) {
-	if (pSmi->MXCLK == 0)
+	if (pSmi->MXCLK == 0) {
 	    mxclk = ((clock.f.m1_select ? 336 : 288) /
 		     ((clock.f.m1_divider ? 3 : 1) <<
 		      (unsigned)clock.f.m1_shift)) * 1000;
+	}
+	else
+	    mxclk = pSmi->MXCLK;
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO, "MXCLK = %1.3f\n", mxclk / 1000.0);
     }
 }

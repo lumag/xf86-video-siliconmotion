@@ -26,6 +26,11 @@ AC_INIT([xf86-video-siliconmotion],
         [https://bugs.freedesktop.org/enter_bug.cgi?product=xorg],
         xf86-video-siliconmotion)
 
+# Require xorg-macros version 1.2 or newer for XORG_CWARNFLAGS and
+# XORG_CHANGELOG macros
+m4_ifndef([XORG_MACROS_VERSION], [AC_FATAL([must install xorg-macros 1.2.1 or later before running autoconf/autogen])])
+XORG_MACROS_VERSION(1.2.1)
+
 AC_CONFIG_SRCDIR([Makefile.am])
 AM_CONFIG_HEADER([config.h])
 AC_CONFIG_AUX_DIR(.)
@@ -81,6 +86,8 @@ if test "x$XMODES" = xyes; then
     AC_DEFINE(HAVE_XMODES, 1, [X server has new mode code])
 fi
 
+XORG_CWARNFLAGS
+XORG_CFLAGS="$CWARNFLAGS $XORG_CFLAGS"
 AC_SUBST([XORG_CFLAGS])
 AC_SUBST([moduledir])
 
@@ -89,6 +96,7 @@ AC_SUBST([DRIVER_NAME])
 
 XORG_MANPAGE_SECTIONS
 XORG_RELEASE_VERSION
+XORG_CHANGELOG
 
 AC_OUTPUT([
 	Makefile
