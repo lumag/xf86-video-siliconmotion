@@ -1530,20 +1530,11 @@ SMI_PutImage(
 
     switch (id) {
     case FOURCC_YV12:
+    case FOURCC_I420:
 	srcPitch  = (width + 3) & ~3;
 	offset2   = srcPitch * height;
 	srcPitch2 = ((width >> 1) + 3) & ~3;
 	offset3   = offset2 + (srcPitch2 * (height >> 1));
-	if (pSmi->CSCVideo)
-	    dstPitch  = (((width >> 1) + 15) & ~15) << 1;
-	else
-	    dstPitch  = ((width << 1) + 15) & ~15;
-	break;
-    case FOURCC_I420:
-	srcPitch  = (width + 3) & ~3;
-	offset3   = srcPitch * height;
-	srcPitch2 = ((width >> 1) + 3) & ~3;
-	offset2   = offset3 + (srcPitch2 * (height >> 1));
 	if (pSmi->CSCVideo)
 	    dstPitch  = (((width >> 1) + 15) & ~15) << 1;
 	else
@@ -1589,19 +1580,17 @@ SMI_PutImage(
 	tmp = ((top >> 1) * srcPitch2) + (left >> 2);
 	offset2 += tmp;
 	offset3 += tmp;
-
-	if (id == FOURCC_I420) {
-	    tmp = offset2;
-	    offset2 = offset3;
-	    offset3 = tmp;
-	}
-
 	if (pSmi->CSCVideo)
 	    CopyYV12ToVideoMem(buf,
 			       buf + offset2, buf + offset3,
 			       dstStart, srcPitch, srcPitch2, dstPitch,
 			       height, width);
 	else {
+	    if (id == FOURCC_I420) {
+		tmp = offset2;
+		offset2 = offset3;
+		offset3 = tmp;
+	    }
 	    nLines = ((((y2 + 0xffff) >> 16) + 1) & ~1) - top;
 	    xf86XVCopyYUV12ToPacked(buf + (top * srcPitch) + (left >> 1), 
 				    buf + offset2, buf + offset3, dstStart,
@@ -1849,38 +1838,45 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
     csc = (1 << 31) | (1 << 25);
     if (pSmi->Bpp > 2)
 	csc |= 1 << 26;
-    if (id == FOURCC_YV12 || id == FOURCC_I420)
-	csc |= 2 << 28;
+
+    switch (id) {
+	case FOURCC_YV12:
+	    SrcUVPitch = SrcYPitch / 2;
+	    SrcVBase = SrcYBase + SrcYPitch * height;
+	    SrcUBase = SrcVBase + SrcUVPitch * height / 2;
+	    csc |= 2 << 28;
+	    break;
+
+	case FOURCC_I420:
+	    SrcUVPitch = SrcYPitch / 2;
+	    SrcUBase = SrcYBase + SrcYPitch * height;
+	    SrcVBase = SrcUBase + SrcUVPitch * height / 2;
+	    csc |= 2 << 28;
+	    break;
+
+	case FOURCC_YUY2:
+	case FOURCC_RV16:
+	case FOURCC_RV32:
+	    SrcUBase = SrcVBase = SrcYBase;
+	    SrcUVPitch = SrcYPitch;
+	    break;
+
+	default:
+	    LEAVE();
+    }
+
+    WRITE_DPR(pSmi, 0xE4, ((SrcYPitch >> 4) << 16) | (SrcUVPitch >> 4));
+    WRITE_DPR(pSmi, 0xC8, SrcYBase);
+    WRITE_DPR(pSmi, 0xD8, SrcUBase);
+    WRITE_DPR(pSmi, 0xDC, SrcVBase);
+    WRITE_DPR(pSmi, 0xF4, (((ScaleXn << 13) | ScaleXd) << 16) |
+	      (ScaleYn << 13 | ScaleYd));
 
     for (i = 0; i < nbox; i++, pbox++) {
 	rect_x = pbox->x1;
 	rect_y = pbox->y1;
 	rect_w = pbox->x2 - pbox->x1;
 	rect_h = pbox->y2 - pbox->y1;
-
-	switch (id) {
-	    case FOURCC_YV12:
-		SrcUVPitch = SrcYPitch / 2;
-		SrcVBase = SrcYBase + SrcYPitch * height;
-		SrcUBase = SrcVBase + SrcUVPitch * height / 2;
-		break;
-
-	    case FOURCC_I420:
-		SrcUVPitch = SrcYPitch / 2;
-		SrcUBase = SrcYBase + SrcYPitch * height;
-		SrcVBase = SrcUBase + SrcUVPitch * height / 2;
-		break;
-
-	    case FOURCC_YUY2:
-	    case FOURCC_RV16:
-	    case FOURCC_RV32:
-		SrcUBase = SrcVBase = SrcYBase;
-		SrcUVPitch = SrcYPitch;
-		break;
-
-	    default:
-		return;
-	}
 
 	SrcLn = (rect_x - dstBox->x1) * Hscale;
 	SrcLd = ((rect_x - dstBox->x1) << 13) * Hscale - (SrcLn << 13);
@@ -1896,15 +1892,9 @@ SMI_DisplayVideo0501_CSC(ScrnInfoPtr pScrn, int id, int offset,
 	WRITE_DPR(pSmi, 0xD0, (SrcLn << 16) | SrcLd);
 	WRITE_DPR(pSmi, 0xD4, (SrcTn << 16) | SrcTd);
 	WRITE_DPR(pSmi, 0xE0, (SrcDimX << 16) | SrcDimY);
-	WRITE_DPR(pSmi, 0xE4, ((SrcYPitch >> 4) << 16) | (SrcUVPitch >> 4));
 	WRITE_DPR(pSmi, 0xE8, (rect_x << 16) | rect_y);
 	WRITE_DPR(pSmi, 0xEC, (rect_w << 16) | rect_h);
 	WRITE_DPR(pSmi, 0xF0, ((DestPitch >> 4) << 16) | rect_h);
-	WRITE_DPR(pSmi, 0xF4, (((ScaleXn << 13) | ScaleXd) << 16) |
-		  (ScaleYn << 13 | ScaleYd));
-	WRITE_DPR(pSmi, 0xC8, SrcYBase);
-	WRITE_DPR(pSmi, 0xD8, SrcUBase);
-	WRITE_DPR(pSmi, 0xDC, SrcVBase);
 
 	while (READ_DPR(pSmi, 0xfc) & (1 << 31))
 	    ;
