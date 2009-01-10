@@ -191,7 +191,7 @@ recent PCI chipsets.  Default: value of
 option.
 
 .SH SEE ALSO
-__xservername__(1), __xconfigfile__(__filemansuffix__), xorgconfig(1), Xserver(1), X(__miscmansuffix__)
+__xservername__(1), __xconfigfile__(__filemansuffix__), Xserver(1), X(__miscmansuffix__)
 
 .SH SUPPORT
 For assistance with this driver, or __xservername__ in general, check the web
