@@ -792,9 +792,13 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		   	  pSmi->PciInfo->func);
 #endif
 
-    pSmi->Dualhead = FALSE;
-
     from = X_DEFAULT;
+    if(pSmi->Chipset == SMI_LYNX3DM &&
+       pScrn->bitsPerPixel == 16)
+	pSmi->Dualhead = TRUE;
+    else
+	pSmi->Dualhead = FALSE;
+
     if (xf86GetOptValBool(pSmi->Options, OPTION_DUALHEAD, &pSmi->Dualhead))
 	from = X_CONFIG;
 
