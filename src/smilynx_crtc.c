@@ -866,11 +866,11 @@ SMILynx_CrtcDPMS_crt(xf86CrtcPtr crtc, int mode)
     else
 	reg->SR21 &= ~0x88; /* Enable DAC and color palette RAM */
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
-
     /* Wait for vertical retrace */
     while (hwp->readST01(hwp) & 0x8) ;
     while (!(hwp->readST01(hwp) & 0x8)) ;
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, reg->SR21);
 
     if(mode == DPMSModeOn){
 	/* Reload the LUT */
@@ -895,11 +895,11 @@ SMILynx_CrtcDPMS_lcd(xf86CrtcPtr crtc, int mode)
     else
 	reg->SR31 |= 0x80; /* Enable Virtual Refresh */
 
-    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, reg->SR31);
-
     /* Wait for vertical retrace */
     while (hwp->readST01(hwp) & 0x8) ;
     while (!(hwp->readST01(hwp) & 0x8)) ;
+
+    VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x31, reg->SR31);
 
     LEAVE();
 }
