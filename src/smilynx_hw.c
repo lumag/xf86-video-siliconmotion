@@ -87,12 +87,8 @@ SMILynx_HWInit(ScrnInfoPtr pScrn)
 	    /* Select no displays */
 	    mode->SR31 &= ~0x07;
 
-	    /* Enable virtual refresh */
-	    if(pSmi->Dualhead){
-		mode->SR31 |= 0x80;
-	    }else{
-		mode->SR31 &= ~0x80;
-	    }
+	    /* Disable virtual refresh */
+	    mode->SR31 &= ~0x80;
 
 	    /* Disable expansion */
 	    mode->SR32 &= ~0x03;
