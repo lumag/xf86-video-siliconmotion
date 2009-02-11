@@ -1539,7 +1539,7 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	pSmi->FBReserved = pSmi->FBCursorOffset = pSmi->videoRAMBytes -
 	    (pSmi->Dualhead ? SMI501_CURSOR_SIZE << 1 : SMI501_CURSOR_SIZE);
 
-# ifdef SMI501_CLI_DEBUG
+# if SMI501_CLI_DEBUG
 	if (pSmi->useEXA) {
 	    pSmi->batch_active = FALSE;
 	    pSmi->batch_length = 4096;
