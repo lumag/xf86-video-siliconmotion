@@ -220,7 +220,7 @@ SMILynx_OutputDetect_crt(xf86OutputPtr output)
     while (!(hwp->readST01(hwp) & 0x8)) ;
     while (hwp->readST01(hwp) & 0x8) ;
 
-    status = MMIO_IN8(pSmi->IOBase, 0x3C2) & 0x10;
+    status = VGAIN8(pSmi, 0x3C2) & 0x10;
 
     /* Restore previous state */
     VGAOUT8_INDEX(pSmi, VGA_SEQ_INDEX, VGA_SEQ_DATA, 0x21, mode->SR21);
