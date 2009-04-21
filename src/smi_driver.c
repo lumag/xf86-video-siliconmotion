@@ -918,8 +918,7 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     pSmi->clockRange.next = NULL;
     pSmi->clockRange.minClock = 20000;
 
-    if (pSmi->Chipset == SMI_LYNX3DM ||
-	pSmi->Chipset == SMI_COUGAR3DR ||
+    if (SMI_LYNXM_SERIES(pSmi->Chipset) ||
 	IS_MSOC(pSmi))
 	pSmi->clockRange.maxClock = 200000;
     else
