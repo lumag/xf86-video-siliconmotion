@@ -285,7 +285,9 @@ SMILynx_OutputPreInit(ScrnInfoPtr pScrn)
 	    SMI_OutputFuncsInit_base(&outputFuncs);
 	    outputFuncs->dpms = SMILynx_OutputDPMS_crt;
 	    outputFuncs->get_modes = SMILynx_OutputGetModes_crt;
-	    outputFuncs->detect = SMILynx_OutputDetect_crt;
+
+	    if(pSmi->Chipset == SMI_LYNX3DM)
+		outputFuncs->detect = SMILynx_OutputDetect_crt;
 
 	    if(! (output = xf86OutputCreate(pScrn,outputFuncs,"VGA")))
 		LEAVE(FALSE);
