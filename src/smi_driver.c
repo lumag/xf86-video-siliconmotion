@@ -578,6 +578,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     xf86PrintDepthBpp(pScrn);
 
+    pSmi->Bpp = pScrn->bitsPerPixel >> 3;
+
     /*
      * This must happen after pScrn->display has been set because
      * xf86SetWeight references it.
@@ -937,7 +939,25 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     /* Only allow growing the screen dimensions if EXA is being used */
     if (!xf86InitialConfiguration (pScrn, !pSmi->NoAccel && pSmi->useEXA)){
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "No valid modes found\n");
+
+	SMI_EnableVideo(pScrn);
+	SMI_UnmapMem(pScrn);
 	LEAVE(FALSE);
+    }
+
+    /* Ensure that the framebuffer size just set fits in video memory. */
+    {
+	int aligned_pitch = (pScrn->virtualX*pSmi->Bpp + 15) & ~15;
+
+	if(aligned_pitch * pScrn->virtualY > pSmi->FBReserved){
+	    xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Not enough video memory "
+		       "for the configured screen size (%dx%d) and color depth.\n",
+                       pScrn->virtualX, pScrn->virtualY);
+
+	    SMI_EnableVideo(pScrn);
+	    SMI_UnmapMem(pScrn);
+	    LEAVE(FALSE);
+	}
     }
 
 
@@ -1724,7 +1744,6 @@ SMI_ScreenInit(int scrnIndex, ScreenPtr pScreen, int argc, char **argv)
     pScrn->vtSema = TRUE;
     pScrn->pScreen = pScreen;
 
-    pSmi->Bpp = pScrn->bitsPerPixel >> 3;
     pScrn->displayWidth = ((pScrn->virtualX * pSmi->Bpp + 15) & ~15) / pSmi->Bpp;
 
     pSmi->fbArea = NULL;
