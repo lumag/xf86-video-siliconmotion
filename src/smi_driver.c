@@ -1423,6 +1423,55 @@ SMI_MapMmio(ScrnInfoPtr pScrn)
     return (TRUE);
 }
 
+/* HACK - In some cases the BIOS hasn't filled in the "scratchpad
+   registers" (SR71) with the right amount of memory installed (e.g. MIPS
+   platform). Probe it manually. */
+static unsigned long
+SMI_ProbeMem(ScrnInfoPtr pScrn, unsigned long mem_skip, unsigned long mem_max)
+{
+    SMIPtr pSmi = SMIPTR(pScrn);
+    unsigned long mem_probe = 1024*1024;
+    unsigned long aperture_base;
+    void* mem;
+
+    ENTER();
+
+    aperture_base = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + mem_skip;
+    mem_max = min(mem_max , PCI_REGION_SIZE(pSmi->PciInfo, 0) - mem_skip);
+
+#ifndef XSERVER_LIBPCIACCESS
+    mem = xf86MapPciMem(pScrn->scrnIndex, VIDMEM_MMIO, pSmi->PciTag,
+			aperture_base, mem_max);
+
+    if(!mem)
+	LEAVE(0);
+#else
+    if(pci_device_map_range(pSmi->PciInfo, aperture_base, mem_max,
+			    PCI_DEV_MAP_FLAG_WRITABLE, &mem))
+	LEAVE(0);
+#endif
+
+    while(mem_probe <= mem_max){
+	MMIO_OUT32(mem, mem_probe-4, 0x55555555);
+	if(MMIO_IN32(mem, mem_probe-4) != 0x55555555)
+	    break;
+
+	MMIO_OUT32(mem, mem_probe-4, 0xAAAAAAAA);
+	if(MMIO_IN32(mem, mem_probe-4) != 0xAAAAAAAA)
+	    break;
+
+	mem_probe <<= 1;
+    }
+
+#ifndef XSERVER_LIBPCIACCESS
+    xf86UnMapVidMem(pScrn->scrnIndex, mem, mem_max);
+#else
+    pci_device_unmap_range(pSmi->PciInfo, mem, mem_max);
+#endif
+
+    LEAVE(mem_probe >> 1);
+}
+
 static Bool
 SMI_DetectMem(ScrnInfoPtr pScrn)
 {
@@ -1451,6 +1500,9 @@ SMI_DetectMem(ScrnInfoPtr pScrn)
 		case SMI_LYNX3D:
 		    pSmi->videoRAMKBytes = lynx3d_table[config >> 6] * 1024 +
 			512;
+		    break;
+		case SMI_LYNXEMplus:
+		    pSmi->videoRAMKBytes = SMI_ProbeMem(pScrn, 0, 0x400000) / 1024;
 		    break;
 		case SMI_LYNX3DM:
 		    pSmi->videoRAMKBytes = lynx3dm_table[config >> 6] * 1024;
