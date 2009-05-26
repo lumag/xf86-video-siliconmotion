@@ -1250,10 +1250,21 @@ SMI_DetectMCLK(ScrnInfoPtr pScrn)
 	/* The SM712 can be safely clocked up to 157MHz, according to
 	   Silicon Motion engineers. */
 	pSmi->MCLK = 157000;
-    }else
-	pSmi->MCLK = 0;
 
-    pSmi->MXCLK = 0;
+    } else if (IS_MSOC(pSmi)) {
+       /* Set some sane defaults for the clock settings if we are on a
+          SM502 and it's likely to be uninitialized. */
+
+       if (!xf86IsPrimaryPci(pSmi->PciInfo) &&
+           (READ_SCR(pSmi, DEVICE_ID) & 0xFF) >= 0xC0) {
+          pSmi->MCLK = 112000;
+          pSmi->MXCLK = 144000;
+       }
+
+    } else {
+        pSmi->MCLK = 0;
+        pSmi->MXCLK = 0;
+    }
 
     /* MCLK from user settings */
     if (xf86GetOptValFreq(pSmi->Options, OPTION_MCLK, OPTUNITS_MHZ, &real)) {
