@@ -190,104 +190,6 @@ static const OptionInfoRec SMIOptions[] =
     { -1,		     NULL,		  OPTV_NONE,	{0}, FALSE }
 };
 
-/*
- * Lists of symbols that may/may not be required by this driver.
- * This allows the loader to know which ones to issue warnings for.
- *
- * Note that vgahwSymbols and xaaSymbols are referenced outside the
- * XFree86LOADER define in later code, so are defined outside of that
- * define here also.
- */
-
-static const char *vgahwSymbols[] =
-{
-    "vgaHWCopyReg",
-    "vgaHWGetHWRec",
-    "vgaHWGetIOBase",
-    "vgaHWGetIndex",
-    "vgaHWInit",
-    "vgaHWLock",
-    "vgaHWMapMem",
-    "vgaHWProtect",
-    "vgaHWRestore",
-    "vgaHWSave",
-    "vgaHWSaveScreen",
-    "vgaHWSetMmioFuncs",
-    "vgaHWSetStdFuncs",
-    "vgaHWUnmapMem",
-    "vgaHWddc1SetSpeedWeak",
-    NULL
-};
-
-static const char *xaaSymbols[] =
-{
-    "XAAGetCopyROP",
-    "XAACreateInfoRec",
-    "XAADestroyInfoRec",
-    "XAAGetFallbackOps",
-    "XAAInit",
-    "XAAGetPatternROP",
-    NULL
-};
-
-static const char *exaSymbols[] =
-{
-    "exaDriverAlloc",
-    "exaDriverInit",
-    "exaDriverFini",
-    "exaOffscreenAlloc",
-    "exaOffscreenFree",
-    "exaGetPixmapPitch",
-    "exaGetPixmapOffset",
-    "exaGetPixmapSize",
-    NULL
-};
-
-static const char *ddcSymbols[] =
-{
-    "xf86PrintEDID",
-    "xf86DoEDID_DDC1",
-    "xf86DoEDID_DDC2",
-    "xf86SetDDCproperties",
-    NULL
-};
-
-static const char *i2cSymbols[] =
-{
-    "xf86CreateI2CBusRec",
-    "xf86CreateI2CDevRec",
-    "xf86DestroyI2CBusRec",
-    "xf86DestroyI2CDevRec",
-    "xf86I2CBusInit",
-    "xf86I2CDevInit",
-    "xf86I2CReadBytes",
-    "xf86I2CWriteByte",
-    NULL
-};
-
-static const char *int10Symbols[] =
-{
-    "xf86ExecX86int10",
-    "xf86FreeInt10",
-    "xf86InitInt10",
-    NULL
-};
-
-static const char *vbeSymbols[] =
-{
-    "VBEInit",
-    "vbeDoEDID",
-    "vbeFree",
-    NULL
-};
-
-static const char *fbSymbols[] =
-{
-    "fbPictureInit",
-    "fbScreenInit",
-    NULL
-};
-
 #ifdef XFree86LOADER
 
 static MODULESETUPPROTO(siliconmotionSetup);
@@ -328,19 +230,6 @@ siliconmotionSetup(pointer module, pointer opts, int *errmaj, int *errmin)
     if (!setupDone) {
 	setupDone = TRUE;
 	xf86AddDriver(&SILICONMOTION, module, 0);
-
-	/*
-	 * Modules that this driver always requires can be loaded here
-	 * by calling LoadSubModule().
-	 */
-
-	/*
-	 * Tell the loader about symbols from other modules that this module
-	 * might refer to.
-	 */
-	LoaderRefSymLists(vgahwSymbols, fbSymbols, xaaSymbols, exaSymbols,
-					  ddcSymbols, i2cSymbols, int10Symbols, vbeSymbols,
-					  NULL);
 
 	/*
 	 * The return value must be non-NULL on success even though there
@@ -537,8 +426,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	if (!xf86LoadSubModule(pScrn, "vgahw"))
 	    LEAVE(FALSE);
 
-	xf86LoaderReqSymLists(vgahwSymbols, NULL);
-
 	/*
 	 * Allocate a vgaHWRec
 	 */
@@ -721,12 +608,10 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     if (pSmi->useBIOS) {
 	if (xf86LoadSubModule(pScrn,"int10")) {
-	    xf86LoaderReqSymLists(int10Symbols,NULL);
 	    pSmi->pInt10 = xf86InitInt10(pEnt->index);
 	}
 
 	if (pSmi->pInt10 && xf86LoadSubModule(pScrn, "vbe")) {
-	    xf86LoaderReqSymLists(vbeSymbols, NULL);
 	    pSmi->pVbe = VBEInit(pSmi->pInt10, pEnt->index);
 	}
 
@@ -890,12 +775,9 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 
     if(!IS_MSOC(pSmi)){
 	if (xf86LoadSubModule(pScrn, "i2c")) {
-	    xf86LoaderReqSymLists(i2cSymbols, NULL);
 	    SMI_I2CInit(pScrn);
 	}
-	if (xf86LoadSubModule(pScrn, "ddc")) {
-	    xf86LoaderReqSymLists(ddcSymbols, NULL);
-	}
+	xf86LoadSubModule(pScrn, "ddc");
     }
 
     /*
@@ -981,8 +863,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	LEAVE(FALSE);
     }
 
-    xf86LoaderReqSymLists(fbSymbols, NULL);
-
     /* Load XAA or EXA if needed */
     if (!pSmi->NoAccel) {
 	if (!pSmi->useEXA) {
@@ -990,7 +870,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		SMI_FreeRec(pScrn);
 		LEAVE(FALSE);
 	    }
-	    xf86LoaderReqSymLists(xaaSymbols, NULL);
 	} else {
 	    XF86ModReqInfo req;
 	    int errmaj, errmin;
@@ -1005,7 +884,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 		SMI_FreeRec(pScrn);
 		LEAVE(FALSE);
 	    }
-	    xf86LoaderReqSymLists(exaSymbols, NULL);
 	}
     }
 
