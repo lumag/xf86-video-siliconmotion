@@ -36,7 +36,7 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "xf86int10.h"
 #include "vbe.h"
 
-#ifndef XSERVER_LIBPCIACCESS
+#if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
 #include "xf86Resources.h"
 #include "xf86RAC.h"
 #endif
