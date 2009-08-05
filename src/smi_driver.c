@@ -31,7 +31,7 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "config.h"
 #endif
 
-
+#include "xf86.h"
 #include "xf86DDC.h"
 #include "xf86int10.h"
 #include "vbe.h"
