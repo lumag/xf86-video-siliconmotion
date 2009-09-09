@@ -153,6 +153,12 @@ static PciChipsets SMIPciChipsets[] =
     { -1,		-1,			RES_UNDEFINED  }
 };
 
+static IsaChipsets SMIVirtChipsets[] =
+{
+    { PCI_CHIP_SMI501,	RES_UNDEFINED  },
+    { -1,		RES_UNDEFINED  }
+};
+
 typedef enum
 {
     OPTION_PCI_BURST,
@@ -310,6 +316,7 @@ SMI_Identify(int flags)
     LEAVE();
 }
 
+
 static Bool
 SMI_Probe(DriverPtr drv, int flags)
 {
@@ -329,8 +336,7 @@ SMI_Probe(DriverPtr drv, int flags)
 	LEAVE(FALSE);
 
 #ifndef XSERVER_LIBPCIACCESS
-    if (xf86GetPciVideoInfo() == NULL)
-	LEAVE(FALSE);
+    if (xf86GetPciVideoInfo()) {
 #endif
 
     numUsed = xf86MatchPciInstances(SILICONMOTION_NAME, PCI_SMI_VENDOR_ID,
@@ -338,40 +344,78 @@ SMI_Probe(DriverPtr drv, int flags)
 				    numDevSections, drv, &usedChips);
 
     /* Free it since we don't need that list after this */
-    xfree(devSections);
-    if (numUsed <= 0)
-	LEAVE(FALSE);
+    if (numUsed > 0)
+    {
+	if (flags & PROBE_DETECT)
+	    foundScreen = TRUE;
+	else {
+	    ScrnInfoPtr	pScrn;
+	    EntityInfoPtr	pEnt;
 
-    if (flags & PROBE_DETECT)
-	foundScreen = TRUE;
-    else {
-	ScrnInfoPtr	pScrn;
-	EntityInfoPtr	pEnt;
+	    for (i = 0; i < numUsed; i++) {
+		if ((pScrn = xf86ConfigPciEntity(NULL, 0, usedChips[i],
+						 SMIPciChipsets, NULL,
+						 NULL, NULL, NULL, NULL))) {
+		    pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
+		    pScrn->driverName    = SILICONMOTION_DRIVER_NAME;
+		    pScrn->name	     = SILICONMOTION_NAME;
+		    pScrn->Probe	     = SMI_Probe;
+		    pScrn->PreInit	     = SMI_PreInit;
+		    pScrn->ScreenInit    = SMI_ScreenInit;
+		    pScrn->SwitchMode    = SMI_SwitchMode;
+		    pScrn->AdjustFrame   = SMI_AdjustFrame;
 
-	for (i = 0; i < numUsed; i++) {
-	    if ((pScrn = xf86ConfigPciEntity(NULL, 0, usedChips[i],
-					     SMIPciChipsets, NULL,
-					     NULL, NULL, NULL, NULL))) {
-		pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
-		pScrn->driverName    = SILICONMOTION_DRIVER_NAME;
-		pScrn->name	     = SILICONMOTION_NAME;
-		pScrn->Probe	     = SMI_Probe;
-		pScrn->PreInit	     = SMI_PreInit;
-		pScrn->ScreenInit    = SMI_ScreenInit;
-		pScrn->SwitchMode    = SMI_SwitchMode;
-		pScrn->AdjustFrame   = SMI_AdjustFrame;
-
-		if ((pEnt = xf86GetEntityInfo(usedChips[i]))) {
-			pScrn->EnterVT   = SMI_EnterVT;
-			pScrn->LeaveVT   = SMI_LeaveVT;
-		    xfree(pEnt);
+		    if ((pEnt = xf86GetEntityInfo(usedChips[i]))) {
+			    pScrn->EnterVT   = SMI_EnterVT;
+			    pScrn->LeaveVT   = SMI_LeaveVT;
+			xfree(pEnt);
+		    }
+		    pScrn->FreeScreen    = SMI_FreeScreen;
+		    foundScreen	     = TRUE;
 		}
-		pScrn->FreeScreen    = SMI_FreeScreen;
-		foundScreen	     = TRUE;
 	    }
 	}
+	xfree(usedChips);
     }
-    xfree(usedChips);
+#ifndef XSERVER_LIBPCIACCESS
+    }
+#endif
+
+    numUsed = xf86MatchVirtualInstances(SILICONMOTION_NAME,
+				    SMIChipsets, SMIVirtChipsets, drv, NULL,
+				    devSections, numDevSections, &usedChips);
+    if (numUsed > 0)
+    {
+	if (flags & PROBE_DETECT)
+	    foundScreen = TRUE;
+	else {
+	    ScrnInfoPtr	pScrn;
+	    EntityInfoPtr	pEnt;
+
+	    for (i = 0; i < numUsed; i++) {
+		if ((pScrn = xf86AllocateScreen(drv, 0))) {
+		    xf86AddEntityToScreen(pScrn, usedChips[i]);
+		    pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
+		    pScrn->driverName    = SILICONMOTION_DRIVER_NAME;
+		    pScrn->name	     = SILICONMOTION_NAME;
+		    pScrn->Probe	     = SMI_Probe;
+		    pScrn->PreInit	     = SMI_PreInit;
+		    pScrn->ScreenInit    = SMI_ScreenInit;
+		    pScrn->SwitchMode    = SMI_SwitchMode;
+		    pScrn->AdjustFrame   = SMI_AdjustFrame;
+
+		    if ((pEnt = xf86GetEntityInfo(usedChips[i]))) {
+			    pScrn->EnterVT   = SMI_EnterVT;
+			    pScrn->LeaveVT   = SMI_LeaveVT;
+			xfree(pEnt);
+		    }
+		    pScrn->FreeScreen    = SMI_FreeScreen;
+		    foundScreen	     = TRUE;
+		}
+	    }
+	}
+	xfree(usedChips);
+    }
 
     LEAVE(foundScreen);
 }
@@ -400,9 +444,17 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     /* Find the PCI slot for this screen */
     pEnt = xf86GetEntityInfo(pScrn->entityList[0]);
 
-    pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
-    pSmi->Chipset = PCI_DEV_DEVICE_ID(pSmi->PciInfo);
-
+    if (pEnt->location.type == BUS_PCI) {
+	pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
+	pSmi->Chipset = PCI_DEV_DEVICE_ID(pSmi->PciInfo);
+    } else {
+	pSmi->Chipset = SMIVirtChipsets[pEnt->chipset].numChipset;
+	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+		   "non-PCI devices aren't yet supported (%04x)\n", pSmi->Chipset);
+	xfree(pEnt);
+	SMI_FreeRec(pScrn);
+	LEAVE(FALSE);
+    }
     if (IS_MSOC(pSmi)) {
 	pSmi->Save = SMI501_Save;
 	pSmi->save = xnfcalloc(sizeof(MSOCRegRec), 1);
@@ -419,13 +471,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	    SMI_ProbeDDC(pScrn, xf86GetEntityInfo(pScrn->entityList[0])->index);
 	LEAVE(TRUE);
     }
-
-    if (pEnt->location.type != BUS_PCI) {
-	xfree(pEnt);
-	SMI_FreeRec(pScrn);
-	LEAVE(FALSE);
-    }
-    pSmi->PciInfo = xf86GetPciInfoForEntity(pEnt->index);
 
     /* Set pScrn->monitor */
     pScrn->monitor = pScrn->confScreen->monitor;

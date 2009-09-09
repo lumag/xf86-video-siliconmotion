@@ -29,6 +29,7 @@ siliconmotion_drv_la_LDFLAGS = -module -avoid-version
 siliconmotion_drv_ladir = @moduledir@/drivers
 
 siliconmotion_drv_la_SOURCES = \
+         xf86virt.c \
          regsmi.h \
          smi_501.c \
          smi_501.h \
