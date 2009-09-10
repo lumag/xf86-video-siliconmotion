@@ -391,10 +391,12 @@ SMI_Probe(DriverPtr drv, int flags)
 	else {
 	    ScrnInfoPtr	pScrn;
 	    EntityInfoPtr	pEnt;
+	    resList		list = NULL; // FIXME
 
 	    for (i = 0; i < numUsed; i++) {
 		if ((pScrn = xf86AllocateScreen(drv, 0))) {
 		    xf86AddEntityToScreen(pScrn, usedChips[i]);
+		    xf86ClaimFixedResources(list, usedChips[i]);
 		    pScrn->driverVersion = SILICONMOTION_DRIVER_VERSION;
 		    pScrn->driverName    = SILICONMOTION_DRIVER_NAME;
 		    pScrn->name	     = SILICONMOTION_NAME;
@@ -449,11 +451,6 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	pSmi->Chipset = PCI_DEV_DEVICE_ID(pSmi->PciInfo);
     } else {
 	pSmi->Chipset = SMIVirtChipsets[pEnt->chipset].numChipset;
-	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
-		   "non-PCI devices aren't yet supported (%04x)\n", pSmi->Chipset);
-	xfree(pEnt);
-	SMI_FreeRec(pScrn);
-	LEAVE(FALSE);
     }
     if (IS_MSOC(pSmi)) {
 	pSmi->Save = SMI501_Save;
@@ -705,10 +702,9 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
 	xf86DrvMsg(pScrn->scrnIndex, X_CONFIG, "ChipRev override: %d\n",
 		   pSmi->ChipRev);
     }
-    else
+    else if (pEnt->location.type == BUS_PCI)
         pSmi->ChipRev = PCI_DEV_REVISION(pSmi->PciInfo);
     xfree(pEnt);
-
     /*
      * This shouldn't happen because such problems should be caught in
      * SMI_Probe(), but check it just in case.
@@ -728,7 +724,8 @@ SMI_PreInit(ScrnInfoPtr pScrn, int flags)
     xf86DrvMsg(pScrn->scrnIndex, from, "Chipset: \"%s\"\n", pScrn->chipset);
 
 #ifndef XSERVER_LIBPCIACCESS
-    pSmi->PciTag = pciTag(pSmi->PciInfo->bus, pSmi->PciInfo->device,
+    if (pEnt->location.type == BUS_PCI)
+	pSmi->PciTag = pciTag(pSmi->PciInfo->bus, pSmi->PciInfo->device,
 		   	  pSmi->PciInfo->func);
 #endif
 
@@ -1266,29 +1263,37 @@ SMI_MapMmio(ScrnInfoPtr pScrn)
 
     switch (pSmi->Chipset) {
 	case SMI_COUGAR3DR:
-	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
+	case SMI_LYNX3DM:
+	case SMI_MSOC:
 	    pSmi->MapSize = 0x200000;
 	    break;
 	case SMI_LYNX3D:
-	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x680000;
 	    pSmi->MapSize = 0x180000;
 	    break;
 	case SMI_LYNXEM:
 	case SMI_LYNXEMplus:
-	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
 	    pSmi->MapSize = 0x400000;
+	    break;
+	default:
+	    pSmi->MapSize = 0x10000;
+	    break;
+    }
+    if (pSmi->PciInfo) {
+    switch (pSmi->Chipset) {
+	case SMI_COUGAR3DR:
+	case SMI_MSOC:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
+	    break;
+	case SMI_LYNX3D:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x680000;
+	    break;
+	case SMI_LYNXEM:
+	case SMI_LYNXEMplus:
+	default:
+	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
 	    break;
 	case SMI_LYNX3DM:
 	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
-	    pSmi->MapSize = 0x200000;
-	    break;
-	case SMI_MSOC:
-	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 1, REGION_MEM);
-	    pSmi->MapSize = 0x200000;
-	    break;
-	default:
-	    memBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM) + 0x400000;
-	    pSmi->MapSize = 0x10000;
 	    break;
     }
 
@@ -1308,6 +1313,11 @@ SMI_MapMmio(ScrnInfoPtr pScrn)
 	    return (FALSE);
     }
 #endif
+    } else {
+	memBase = 0xa0000000; // FIXME: this is for my PC :)))
+	pSmi->MapBase = xf86MapVidMem(pScrn->scrnIndex, VIDMEM_MMIO,
+				  memBase, pSmi->MapSize);
+    }
 
     if (pSmi->MapBase == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "Internal error: could not map "
@@ -1501,12 +1511,13 @@ SMI_MapMem(ScrnInfoPtr pScrn)
     if (pSmi->MapBase == NULL && SMI_MapMmio(pScrn) == FALSE)
 	LEAVE(FALSE);
 
-    pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
-
     if (pSmi->Chipset == SMI_LYNX3DM)
 	pSmi->fbMapOffset = 0x200000;
     else
 	pSmi->fbMapOffset = 0x0;
+
+    if (pSmi->PciInfo) {
+    pScrn->memPhysBase = PCI_REGION_BASE(pSmi->PciInfo, 0, REGION_MEM);
 
 #ifndef XSERVER_LIBPCIACCESS
     pSmi->FBBase = xf86MapPciMem(pScrn->scrnIndex,
@@ -1529,6 +1540,13 @@ SMI_MapMem(ScrnInfoPtr pScrn)
 	    LEAVE(FALSE);
     }
 #endif
+    } else {
+	pScrn->memPhysBase = 0xa1000000; // FIXME:: this is for my PC :)))
+	pSmi->FBBase = xf86MapVidMem(pScrn->scrnIndex,
+				 VIDMEM_FRAMEBUFFER,
+				 pScrn->memPhysBase + pSmi->fbMapOffset,
+				 pSmi->videoRAMBytes);
+    }
 
     if (pSmi->FBBase == NULL) {
 	xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
