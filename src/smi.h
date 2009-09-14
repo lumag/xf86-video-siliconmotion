@@ -155,9 +155,11 @@ typedef struct
     xf86Int10InfoPtr	pInt10;		/* Pointer to INT10 module */
     vbeInfoPtr          pVbe;           /* Pointer to VBE module */
 
-    pciVideoPtr		PciInfo;	/* PCI info vars */
 #ifndef XSERVER_LIBPCIACCESS
+    pciVideoPtr		PciInfo;	/* PCI info vars */
     PCITAG		PciTag;
+#else
+    struct pci_device	*PciInfo;
 #endif
     int			Chipset;	/* Chip info, set using PCI
 					   above */
