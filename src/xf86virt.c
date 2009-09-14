@@ -27,18 +27,18 @@
  */
 
 #include "xf86.h"
-/* FIXME: this should go away */
-#include "smi.h"
+#include "xorg-server.h"
+#include "xf86virt.h"
 
 /* FIXME: This should go tinto xf86Helper.c */
 
 int xf86MatchVirtualInstances(const char *driverName, SymTabPtr chipsets,
-		      IsaChipsets *ISAchipsets, DriverPtr drvp,
-		      FindIsaDevProc FindDevice, GDevPtr *devList,
+		      VirtChipsets *VIRTchipsets, DriverPtr drvp,
+		      GDevPtr *devList,
 		      int numDevs, int **foundEntities)
 {
     SymTabRec *c;
-    IsaChipsets *Chips;
+    VirtChipsets *Chips;
     int i;
     int numFound = 0;
     int foundChip = -1;
@@ -70,17 +70,13 @@ int xf86MatchVirtualInstances(const char *driverName, SymTabPtr chipsets,
 				dev->identifier);
 		} else
 		    foundChip = c->token;
-	    } else {
-		if (FindDevice) foundChip = (*FindDevice)(dev);
-                                                        /* Probe it */
-		from = X_PROBED;
 	    }
 	}
 
 	/* Check if the chip type is listed in the chipset table - for sanity*/
 
 	if (foundChip >= 0){
-	    for (Chips = ISAchipsets; Chips->numChipset >= 0; Chips++) {
+	    for (Chips = VIRTchipsets; Chips->numChipset >= 0; Chips++) {
 		if (Chips->numChipset == foundChip)
 		    break;
 	    }

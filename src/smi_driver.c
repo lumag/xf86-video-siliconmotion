@@ -35,6 +35,7 @@ authorization from The XFree86 Project or Silicon Motion.
 #include "xf86DDC.h"
 #include "xf86int10.h"
 #include "vbe.h"
+#include "xf86virt.h"
 
 #if GET_ABI_MAJOR(ABI_VIDEODRV_VERSION) < 6
 #include "xf86Resources.h"
@@ -153,10 +154,10 @@ static PciChipsets SMIPciChipsets[] =
     { -1,		-1,			RES_UNDEFINED  }
 };
 
-static IsaChipsets SMIVirtChipsets[] =
+static VirtChipsets SMIVirtChipsets[] =
 {
-    { PCI_CHIP_SMI501,	RES_UNDEFINED  },
-    { -1,		RES_UNDEFINED  }
+    { PCI_CHIP_SMI501,	},
+    { -1,		}
 };
 
 typedef enum
@@ -382,7 +383,7 @@ SMI_Probe(DriverPtr drv, int flags)
 #endif
 
     numUsed = xf86MatchVirtualInstances(SILICONMOTION_NAME,
-				    SMIChipsets, SMIVirtChipsets, drv, NULL,
+				    SMIChipsets, SMIVirtChipsets, drv,
 				    devSections, numDevSections, &usedChips);
     if (numUsed > 0)
     {

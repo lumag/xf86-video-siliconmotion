@@ -389,9 +389,4 @@ void SMI_InitVideo(ScreenPtr pScreen);
 CARD32 SMI_AllocateMemory(ScrnInfoPtr pScrn, void **mem_struct, int size);
 void SMI_FreeMemory(ScrnInfoPtr pScrn, void *mem_struct);
 
-int xf86MatchVirtualInstances(const char *driverName, SymTabPtr chipsets,
-		      IsaChipsets *ISAchipsets, DriverPtr drvp,
-		      FindIsaDevProc FindDevice, GDevPtr *devList,
-		      int numDevs, int **foundEntities);
-
 #endif  /*_SMI_H*/
